@@ -21,7 +21,7 @@ CALLER_SCOPE_SALT = b"cli-proxy-api:caller-scope:v1\0"
 
 
 HOST_SHELL = r"""<!doctype html>
-<html lang="zh-CN" data-host="__HOST_MODE__">
+<html lang="en" data-host="__HOST_MODE__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -150,6 +150,7 @@ html[data-host=cpamp] #plugin-frame{background:var(--bg-primary)}
 <header class="navbar">
   <div class="navbar-left"><button class="mobile-menu" title="菜单">☰</button><span>API Key 计费</span></div>
   <div class="theme-controls" aria-label="预览主题">
+    <select id="host-language" aria-label="Language"><option value="en">English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="ru">Русский</option></select>
     <button type="button" data-action="refresh" title="刷新">↻</button>
     <button type="button" data-theme-choice="light" title="浅色主题">◐</button>
     <button type="button" class="theme-white" data-theme-choice="white" title="白色主题">○</button>
@@ -163,6 +164,9 @@ const HOST_MODE="__HOST_MODE__";
 const INITIAL_THEME="__INITIAL_THEME__";
 const root=document.documentElement;
 const frame=document.getElementById("plugin-frame");
+const language=document.getElementById("host-language");
+language.value=root.lang;
+language.onchange=()=>{root.lang=language.value;};
 const systemDark=()=>!!matchMedia("(prefers-color-scheme:dark)").matches;
 let selectedTheme=INITIAL_THEME;
 
@@ -521,11 +525,21 @@ def auth_file_quota(query):
     if quota is None:
         return None
     auth_file = next(item for item in AUTH_FILES if item["auth_index"] == auth_index)
-    return {
+    result = {
         "auth_revision": auth_file["cache_revision"],
         "fetched_at": iso(NOW),
         **quota,
     }
+    english = json.loads((UI_PATH.parent / "locales/en.json").read_text())
+    chinese = json.loads((UI_PATH.parent / "locales/zh-CN.json").read_text())
+    labels = {value: key for key, value in chinese.items() if key.startswith("backend.") and "{" not in value}
+    result["quota"] = [dict(row) for row in result["quota"]]
+    for row in result["quota"]:
+        key = labels.get(row.get("label", ""))
+        if key:
+            row["label"] = english[key]
+            row["label_message"] = {"message_key": key}
+    return result
 
 
 KEY_PROFILES = [
@@ -1372,6 +1386,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path in ("/", "/ui"):
             body = UI_PATH.read_text()
+            catalogs = {language: json.loads((UI_PATH.parent / "locales" / f"{language}.json").read_text())
+                        for language in ("en", "zh-CN")}
+            script = "const BILLING_MESSAGES = " + json.dumps(catalogs).replace("<", "\\u003c") + ";\n"
+            script += (UI_PATH.parent / "i18n.js").read_text()
+            body = body.replace("// BILLING_I18N", script)
             if self.host_mode != "standalone":
                 body = body.replace(
                     "</head>",

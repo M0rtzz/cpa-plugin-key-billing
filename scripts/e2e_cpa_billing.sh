@@ -662,7 +662,7 @@ assert_route_blacklist_policy() {
     -H "Content-Type: application/json" \
     --data "$(jq -nc --arg id "$route" '{id:$id,rule:{denied_credential_providers:[{source:"ai-providers",provider:"openai-compatible-route-allowed-e2e"},{source:"ai-providers",provider:"openai-compatible-route-denied-e2e"}]}}')" >/dev/null
   http_status="$(curl -sS --max-time 30 -H "Content-Type: application/json" -H "Authorization: Bearer e2e-downstream-key" --data "$body" --output "$response_file" --write-out '%{http_code}' "http://127.0.0.1:$port/v1/chat/completions")"
-  if [[ "$http_status" != "503" ]] || ! jq -e '(.error.message | contains("当前没有符合路由规则且可用的上游凭证"))' "$response_file" >/dev/null; then
+  if [[ "$http_status" != "503" ]] || ! jq -e '(.error.message | contains("No available upstream credentials match the routing rules"))' "$response_file" >/dev/null; then
     echo "全部候选被黑名单排除后未返回 503。" >&2
     return 1
   fi
@@ -776,7 +776,7 @@ assert_route_credential_policy() {
     "http://127.0.0.1:$port/v1/chat/completions")"
   if [[ "$http_status" != "503" ]] || ! jq -e '
       .error.type == "server_error" and .error.code == "internal_server_error" and
-      (.error.message | contains("当前没有符合路由规则且可用的上游凭证"))
+      (.error.message | contains("No available upstream credentials match the routing rules"))
     ' "$response_file" >/dev/null; then
     echo "没有合格凭证时未按预期返回 503：HTTP $http_status $(jq -c '.' "$response_file")" >&2
     return 1
@@ -1043,9 +1043,9 @@ assert_quota_exhausted() {
     return 1
   fi
   management_call GET "$port" "/v0/management/plugins/cpa-key-billing/plugin-logs" >"$plugin_logs_file"
-  if ! jq -e --arg plan "$plan_name" '[.entries[] | select(.level == "info" and (.message | startswith("额度拦截：")) and (.message | contains($plan)))] | length == 1' \
+  if ! jq -e --arg plan "$plan_name" '[.entries[] | select(.level == "info" and (.message | startswith("Quota blocked: ")) and (.message | contains($plan)))] | length == 1' \
     "$plugin_logs_file" >/dev/null; then
-    echo "插件日志的额度拦截记录数量不正确：$(jq -c '[.entries[] | select(.message | startswith("额度拦截："))]' "$plugin_logs_file")" >&2
+    echo "插件日志的额度拦截记录数量不正确：$(jq -c '[.entries[] | select(.message | startswith("Quota blocked: "))]' "$plugin_logs_file")" >&2
     return 1
   fi
 
@@ -1095,7 +1095,7 @@ assert_headless_price_admission() {
       "http://127.0.0.1:$port$endpoint")"
     if [[ "$http_status" != "503" ]] || ! jq -e '
       .error.type == "cpa_key_billing_error" and .error.code == "model_price_error" and
-      .error.message == "模型 e2e-chat-to-chat-nonstream 尚未定价"
+      .error.message == "Model e2e-chat-to-chat-nonstream has no configured price"
     ' "$runtime_dir/unpriced-$client.json" >/dev/null; then
       echo "未访问前端时的 ${client} 定价拦截失败，HTTP ${http_status}。" >&2
       return 1
@@ -1494,7 +1494,7 @@ run_target() {
   done
 
   management_call GET "$port" "/v0/management/plugins/cpa-key-billing/plugin-logs" >"$runtime_dir/plugin-logs.json"
-  if ! jq -e '[.entries[] | select(.level == "info" and (.message | contains("已加载计费数据库")))] | length == 1' \
+  if ! jq -e '[.entries[] | select(.level == "info" and (.message | contains("Loaded billing database")))] | length == 1' \
     "$runtime_dir/plugin-logs.json" >/dev/null; then
     echo "插件日志缺少启动记录：$(jq -c '.entries' "$runtime_dir/plugin-logs.json")" >&2
     return 1

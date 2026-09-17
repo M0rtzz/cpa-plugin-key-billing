@@ -8,16 +8,18 @@ import (
 	"strings"
 
 	"cpa-key-billing/internal/billing"
+	"cpa-key-billing/internal/messages"
 )
 
 type credentialView struct {
-	Ref         string `json:"ref"`
-	Source      string `json:"source"`
-	Provider    string `json:"provider"`
-	DisplayName string `json:"display_name"`
-	Status      string `json:"status,omitempty"`
-	Disabled    bool   `json:"disabled"`
-	Unavailable bool   `json:"unavailable"`
+	Ref            string           `json:"ref"`
+	Source         string           `json:"source"`
+	Provider       string           `json:"provider"`
+	DisplayName    string           `json:"display_name"`
+	DisplayMessage messages.Message `json:"display_name_message,omitzero"`
+	Status         string           `json:"status,omitempty"`
+	Disabled       bool             `json:"disabled"`
+	Unavailable    bool             `json:"unavailable"`
 }
 
 var secretLikeToken = regexp.MustCompile(`(?i)(?:(?:sk|key|token)-[a-z0-9_\-]{4,}|[a-z0-9_\-]{24,})`)
@@ -45,7 +47,7 @@ func safeCredentialName(raw, account, provider, ref string) string {
 		if len(short) > 8 {
 			short = short[:8]
 		}
-		name = strings.TrimSpace(provider) + " 上游凭证 " + short
+		name = strings.TrimSpace(provider) + " upstream credential " + short
 	}
 	if len([]byte(name)) > 160 {
 		name = string([]byte(name)[:160])
@@ -58,7 +60,7 @@ func credentialDisplayName(file hostAuthFile, source, provider, ref string) stri
 		// Authentication-file identity comes only from CPA's explicit email.
 		email := cleanText(file.Email)
 		if email == "" {
-			return "未提供邮箱"
+			return "No email provided"
 		}
 		return email
 	}
@@ -140,6 +142,11 @@ func (a *App) refreshCredentialInventory() error {
 		next[ref] = credentialView{Ref: ref, Source: source, Provider: provider,
 			DisplayName: credentialDisplayName(file, source, provider, ref), Status: file.Status,
 			Disabled: file.Disabled, Unavailable: file.Unavailable}
+		if source == billing.CredentialSourceAuthFiles && cleanText(file.Email) == "" {
+			item := next[ref]
+			item.DisplayMessage = messages.New("No email provided")
+			next[ref] = item
+		}
 		raw[id] = ref
 	}
 	a.routingMu.Lock()
@@ -175,14 +182,17 @@ func (a *App) observeCandidates(candidates []SchedulerAuthCandidate) {
 			continue
 		}
 		provider := strings.ToLower(strings.TrimSpace(candidate.Provider))
-		name := "配置凭证 " + shortCredentialRef(ref)
+		name := "Configured credential " + shortCredentialRef(ref)
+		detail := messages.New("Configured credential %s", shortCredentialRef(ref))
 		if source == billing.CredentialSourceAuthFiles {
-			name = "未提供邮箱"
+			name = "No email provided"
+			detail = messages.New("No email provided")
 		}
 		if existing, ok := a.credentials[ref]; ok && existing.DisplayName != "" {
 			name = existing.DisplayName
+			detail = existing.DisplayMessage
 		}
-		a.credentials[ref] = credentialView{Ref: ref, Source: source, Provider: provider, DisplayName: name, Status: candidate.Status}
+		a.credentials[ref] = credentialView{Ref: ref, Source: source, Provider: provider, DisplayName: name, DisplayMessage: detail, Status: candidate.Status}
 		a.credentialsByRawID[id] = ref
 	}
 }
@@ -206,6 +216,7 @@ func (a *App) observeCredentialUsage(authIndex, authType, source, scope string) 
 		return
 	}
 	credential.DisplayName = name
+	credential.DisplayMessage = messages.Message{}
 	a.credentials[ref] = credential
 }
 
@@ -222,7 +233,7 @@ func (a *App) syncConfiguredCredentials(req ManagementRequest) ManagementRespons
 		return errorResponse(errDecode)
 	}
 	if len(body.Credentials) > 4096 {
-		return JSONError(http.StatusBadRequest, "invalid", "配置凭证数量超限")
+		return JSONError(http.StatusBadRequest, "invalid", "Too many configured credentials")
 	}
 
 	next := make(map[string]billing.ConfigCredential, len(body.Credentials))
@@ -230,10 +241,11 @@ func (a *App) syncConfiguredCredentials(req ManagementRequest) ManagementRespons
 		ref := strings.ToLower(strings.TrimSpace(item.Ref))
 		provider := strings.ToLower(strings.TrimSpace(item.Provider))
 		if !billing.ValidCredentialFingerprint(ref) || provider == "" || len(provider) > 160 || cleanText(provider) != provider {
-			return JSONError(http.StatusBadRequest, "invalid", "配置凭证标识无效")
+			return JSONError(http.StatusBadRequest, "invalid", "Invalid configured credential identifier")
 		}
 		preview := cleanText(item.DisplayName)
-		if preview == "未配置 API Key" {
+		// Accept the old UI sentinel during upgrades; new clients send an empty value.
+		if preview == "No API key configured" || preview == "未配置 API Key" {
 			preview = ""
 		}
 		next[ref] = billing.ConfigCredential{
@@ -268,8 +280,10 @@ func (a *App) replaceSyncedCredentials(previous, next map[string]billing.ConfigC
 	}
 	for ref, item := range next {
 		name := item.KeyPreview
+		var detail messages.Message
 		if name == "" {
-			name = "未配置 API Key"
+			name = "No API key configured"
+			detail = messages.New("No API key configured")
 		}
 		status := "active"
 		if item.Disabled {
@@ -277,7 +291,7 @@ func (a *App) replaceSyncedCredentials(previous, next map[string]billing.ConfigC
 		}
 		a.credentials[ref] = credentialView{
 			Ref: ref, Source: billing.CredentialSourceAIProviders, Provider: item.Provider,
-			DisplayName: name, Status: status, Disabled: item.Disabled,
+			DisplayName: name, DisplayMessage: detail, Status: status, Disabled: item.Disabled,
 		}
 	}
 }
@@ -324,7 +338,7 @@ func (a *App) credentialLabels(refs []string) map[string]string {
 
 func (a *App) listCredentials(_ ManagementRequest) ManagementResponse {
 	if err := a.refreshCredentialInventory(); err != nil {
-		return JSONError(http.StatusBadGateway, "host_unavailable", err.Error())
+		return jsonMessageError(http.StatusBadGateway, "host_unavailable", messages.FromError(err))
 	}
 	return JSONResponse(http.StatusOK, map[string]any{"credentials": a.credentialInventory()})
 }

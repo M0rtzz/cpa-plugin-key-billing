@@ -7,6 +7,7 @@
     <img src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platforms: Windows, macOS, and Linux">
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
   </p>
+  <p><a href="./README.en.md">English</a> · <strong>简体中文</strong></p>
 </div>
 <img src="images/example.png" alt="cpa-plugin-key-billing example" width="100%" />
 
@@ -43,8 +44,6 @@ flowchart TB
     D --> F["usage.handle<br/>记录请求事件与用量"]
     F --> G["归一化 Token 并计费<br/>更新周期消费额"]
 ```
-
-性能方面，插件以同步 RPC 方法接入 CLIProxyAPI 的请求链路。请求准入与凭证调度仅执行本地状态查询和规则计算，不进行网络 I/O，也不复制或解析上游响应；用量记录与计费则在上游调用结束后通过 `usage.handle` 完成。插件不创建后台协程、定时器或异步刷新任务，整体资源占用较少；请求链路上的额外开销仅来自轻量的本地判断，对请求延迟几乎没有影响。
 
 ## 环境要求
 
@@ -99,11 +98,11 @@ plugins:
 > - v1.0.0 至最新版本的数据库文件支持自动迁移。
 > - v0.8.4 及更早版本的 JSON 或 SQLite 数据文件不支持迁移，请将 `state_file` 指向新文件。
 
-重启 CLIProxyAPI 后，在管理中心打开「API Key 计费」。确认模型定价后，创建订阅计划并绑定需要限制的 API Key。
+重启 CLIProxyAPI 后，在管理中心打开「API Key Billing」。确认模型定价后，创建订阅计划并绑定需要限制的 API Key。
 
 ## 页面访问
 
-管理员可以从 CLIProxyAPI 管理中心的「API Key 计费」菜单进入，也可以直接打开：
+管理员可以从 CLIProxyAPI 管理中心的「API Key Billing」菜单进入，也可以直接打开：
 
 ```text
 http(s)://<CLIProxyAPI 地址>/v0/resource/plugins/cpa-key-billing/ui
