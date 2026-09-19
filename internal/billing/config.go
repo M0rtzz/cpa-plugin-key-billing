@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"net/netip"
 	"net/url"
 	"strconv"
@@ -15,17 +16,20 @@ import (
 const DefaultStateFile = "plugins/cpa-key-billing-state-v1.db"
 
 type Config struct {
-	Enabled              bool   `yaml:"enabled"`
-	Debug                bool   `yaml:"debug"`
-	StateFile            string `yaml:"state_file"`
-	CodexFastModeBilling bool   `yaml:"codex_fast_mode_billing"`
-	AccountAPIBaseURL    string `yaml:"account_api_base_url"`
+	Enabled              bool    `yaml:"enabled"`
+	Debug                bool    `yaml:"debug"`
+	StateFile            string  `yaml:"state_file"`
+	CodexFastModeBilling bool    `yaml:"codex_fast_mode_billing"`
+	BillingMultiplier    float64 `yaml:"billing_multiplier"`
+	AccountAPIBaseURL    string  `yaml:"account_api_base_url"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Enabled:   false,
-		StateFile: DefaultStateFile,
+		Enabled:              false,
+		StateFile:            DefaultStateFile,
+		BillingMultiplier:    1,
+		CodexFastModeBilling: true,
 	}
 }
 
@@ -49,12 +53,22 @@ func DecodeConfig(raw []byte) (Config, error) {
 		cfg = document.Config
 	}
 	cfg = cfg.normalized()
+	if err := cfg.validateBillingMultiplier(); err != nil {
+		return Config{}, err
+	}
 	origin, err := ValidateAccountAPIBaseURL(cfg.AccountAPIBaseURL)
 	if err != nil {
 		return Config{}, err
 	}
 	cfg.AccountAPIBaseURL = origin
 	return cfg, nil
+}
+
+func (c Config) validateBillingMultiplier() error {
+	if c.BillingMultiplier <= 0 || math.IsNaN(c.BillingMultiplier) || math.IsInf(c.BillingMultiplier, 0) {
+		return fmt.Errorf("billing_multiplier must be a finite number greater than zero")
+	}
+	return nil
 }
 
 // Config returns a snapshot without holding the store lock during HTTP calls.

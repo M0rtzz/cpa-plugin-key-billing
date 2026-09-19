@@ -86,12 +86,17 @@ plugins:
     cpa-key-billing:
       enabled: true
       debug: false # 是否记录 debug 日志，例如路由日志、匹配参考价日志
-      codex_fast_mode_billing: false # 开启后，Codex 的 priority 请求按 2.5 倍计费
+      billing_multiplier: 1 # 全局计费倍率，默认 1；例如 0.2 表示按基础费用的 20% 计费
+      codex_fast_mode_billing: true # 默认开启，符合条件的 Codex OAuth priority 请求再乘 2.5
       state_file: "plugins/cpa-key-billing-state-v1.db"
       account_api_base_url: "http://127.0.0.1:18316" # 普通用户鉴权地址，端口改为当前 CPA 监听端口
 ```
 
-`codex_fast_mode_billing` 开启后，请求 Codex 上游时在请求中指定 `service_tier=priority`，按普通费用的 **2.5 倍**结算。
+管理员可在管理中心「插件管理 → CPA Key Billing → 配置」修改倍率。`billing_multiplier` 必须是有限正数，默认 `1`。`codex_fast_mode_billing` 默认开启；符合条件的 Codex OAuth `service_tier=priority` 请求额外乘以 **2.5**，显式设为 `false` 可关闭。
+
+例如全局倍率为 `0.2` 时，普通请求按 **0.2 倍**、Fast 请求按 **0.5 倍**计费。费用统计和金额配额扣除使用同一金额，Token 与请求次数配额保持原值。每条账单保存当时的倍率；后续修改配置只影响新入账请求。用户页面和 CSV 展示已计费金额，不会再次乘倍率。
+
+历史金额换算必须显式运行离线维护工具。数据库结构升级不会自动重算旧账单；操作步骤、事务与重复执行保护见 [倍率与历史账单换算](docs/billing-multiplier.md)。
 
 > [!WARNING]
 > 升级前请备份数据文件。

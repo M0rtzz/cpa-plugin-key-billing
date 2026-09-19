@@ -88,12 +88,17 @@ plugins:
     cpa-key-billing:
       enabled: true
       debug: false # Include routing and reference-price matching in debug logs
-      codex_fast_mode_billing: false # Charge 2.5× for Codex priority requests
+      billing_multiplier: 1 # Global factor; 0.2 bills 20% of the base cost
+      codex_fast_mode_billing: true # Enabled by default; qualifying Codex OAuth priority usage adds 2.5×
       state_file: "plugins/cpa-key-billing-state-v1.db"
       account_api_base_url: "http://127.0.0.1:18316" # Use this CPA instance's actual loopback port
 ```
 
-When `codex_fast_mode_billing` is enabled, requests to the Codex upstream with `service_tier=priority` are billed at **2.5 times** the standard cost.
+Administrators can edit the global factor in the management center under **Plugins → CPA Key Billing → Configuration**. `billing_multiplier` must be finite and positive and defaults to `1`. `codex_fast_mode_billing` defaults to `true`; qualifying Codex OAuth requests with `service_tier=priority` add a **2.5×** factor. Set it explicitly to `false` to disable the surcharge.
+
+With a global factor of `0.2`, ordinary requests use **0.2×**, and qualifying Fast requests use **0.5×**. Stored costs and monetary quota consumption use the same adjusted amounts; token and request quotas are unchanged. Each event retains its applied factors. Configuration changes affect only newly recorded usage, and pages and CSV do not multiply stored costs again.
+
+Historical rebilling requires an explicit offline maintenance operation. Schema upgrades preserve existing monetary values. See the [multiplier and historical rebilling guide](docs/billing-multiplier.md) for backups, transactional migration, and replay protection.
 
 > [!WARNING]
 > Back up your data file before upgrading.

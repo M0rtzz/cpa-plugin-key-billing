@@ -11,6 +11,22 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
+// Version 15 records the billing factors explicitly. Existing monetary values
+// remain immutable here; historical rebilling is a separate offline operation.
+func migrateToV15(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+		ALTER TABLE request_events ADD COLUMN billing_multiplier REAL NOT NULL DEFAULT 1;
+		ALTER TABLE request_events ADD COLUMN service_tier_multiplier REAL NOT NULL DEFAULT 1;
+		UPDATE request_events SET service_tier_multiplier = 2.5,
+			price_source = substr(price_source, 1, length(price_source) - 5)
+		WHERE price_source IN ('custom:x2.5', 'builtin:x2.5', 'reference:x2.5');
+	` + billingAdjustmentSchema)
+	if err != nil {
+		return fmt.Errorf("Migrate billing multiplier metadata: %w", err)
+	}
+	return nil
+}
+
 func migrateToV14(tx *sql.Tx, version int) error {
 	var steps []func(*sql.Tx) error
 	switch version {

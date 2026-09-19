@@ -232,6 +232,7 @@
 <div class="intro"><div><div class="eyebrow">Capacity & availability</div><h1>额度总览</h1><p class="muted">查看自己的订阅，以及可用上游账户的共享额度快照。</p></div><span id="identity" class="badge"></span></div>
 <section id="auth" class="panel auth"><h2>查看当前额度</h2><p class="muted">输入服务管理员提供的 API Key，查看当前可见的额度信息。</p><form id="login"><label for="key">API Key</label><div class="auth-row"><input id="key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="8192"><button class="primary" type="submit">查看额度</button></div><small>Key 仅保存在当前页面内存中，不写入浏览器存储。</small></form></section>
 <div id="dashboard" hidden>
+<section id="billing-policy" class="panel" data-private aria-label="计费倍率"></section>
 <div class="notice">此页只读，展示服务器已有的额度快照。数据不会自动更新，账户额度由管理员维护。</div>
 <div id="stats" class="grid stats" data-private></div>
 <section class="panel"><div class="section-head"><h2>我的订阅与并发</h2><span id="subscription-status" class="badge" data-private></span></div><div id="subscription" data-private></div></section>
@@ -251,6 +252,16 @@
     const percent = (value) => (Number.isFinite(Number(value)) && value != null ? Number(value).toFixed(1) + "%" : "未提供");
     const when = (value) =>
       value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "尚无记录";
+    const factor = (value, fallback = 1) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback);
+    const factorText = (value) => factor(value).toLocaleString("zh-CN", { maximumSignificantDigits: 12 }) + "×";
+    function billingPolicy(value) {
+      const parent = clear("billing-policy");
+      parent.append(
+        node("strong", "当前全局计费倍率 " + factorText(value.billing_multiplier)),
+        node("p", "Codex priority 快速模式：" + (value.codex_fast_mode_billing === true ? "已启用 2.5×" : "未启用 2.5×"), "muted"),
+        node("small", "费用已包含账单记录的倍率。设置变更适用于新请求，历史账单保留记录倍率；金额额度按同一费用扣减。")
+      );
+    }
     function node(tag, text, cls) {
       const value = document.createElement(tag);
       if (text != null) value.textContent = String(text);
@@ -393,6 +404,7 @@
       parent.append(row);
     }
     function renderQuota(value) {
+      billingPolicy(value);
       const counts = value.counts || {}, stats = clear("stats");
       card(stats, "可见账户", integer(counts.total), "当前 API Key 可见的上游账户");
       card(stats, "已缓存", integer(counts.ready), "已过期 " + integer(counts.stale));

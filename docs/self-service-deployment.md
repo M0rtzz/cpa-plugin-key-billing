@@ -35,6 +35,8 @@ plugins:
       enabled: true
       state_file: "plugins/cpa-key-billing-state-v1.db"
       account_api_base_url: "http://127.0.0.1:18316"
+      billing_multiplier: 1
+      codex_fast_mode_billing: true
 ```
 
 `account_api_base_url` 必须是 CPA 自身的数字回环地址，只填写 origin，不添加 `/v1`。端口要与 CPA 实际监听端口一致；CPA 必须监听该回环地址。HTTPS 地址需要系统信任的证书，不跳过证书校验。不支持主机名、认证信息、查询参数或非回环地址。
@@ -103,4 +105,6 @@ http://222.20.99.38:18316/v0/resource/plugins/cpa-key-billing/quota.html
 
 验收时使用两个测试 Key，确认各自只能看到自己的账单和允许的匿名账号；通过管理员刷新，确认两个角色看到一致的 Plus/Pro 20x 类型及额度。检查无缓存、过期和禁用状态，并撤销一个 Key 验证下一次请求返回 `401`。测试不需要真实模型生成。
 
-回滚时停止 CPA，恢复备份的插件和 `config.yaml`，再按原命令启动。旧插件不认识新增配置项，因此应同时恢复配置。数据库没有结构变化，正常回滚继续使用现有数据库以保留上线后账单；不要用旧数据库备份覆盖新增记录。
+当前版本将数据库结构从 v14 升级到 v15，以保存每笔账单的全局及 Fast 倍率。结构升级保留费用金额；历史金额换算是独立的离线操作，见 [倍率与历史账单换算](billing-multiplier.md)。
+
+旧插件无法打开 v15 数据库。上线前应在隔离副本上完成迁移与验收；尚未接收新请求时，可停服后恢复完整的插件、配置和数据库备份。已经产生新账单后，保留当前数据库修复，不能直接替换旧插件，也不能用旧数据库备份覆盖新增记录。不要手动修改 `PRAGMA user_version` 伪装数据库版本。

@@ -2435,6 +2435,7 @@
           </div>
           <div id="account-shared-time-backdrop" class="time-range-backdrop hidden"></div>
           <section id="account-tab-subscription">
+            <div id="account-billing-policy"></div>
             <div class="stats account-subscription-stats">
               <div class="card account-plan">
                 <div class="row spread">
@@ -2785,6 +2786,8 @@
           "reasoning_tokens",
           "cache_read_tokens",
           "cache_write_tokens",
+          "billing_multiplier",
+          "service_tier_multiplier",
           "multiplier",
           "total_usd"
         ],
@@ -4505,6 +4508,7 @@
         const data = resources.account.subscription;
         const subscription = data.value?.subscription || {};
         const concurrency = data.value?.concurrency || {};
+        $("account-billing-policy").replaceChildren(...(data.value ? [billingPolicy(data.value)] : []));
         setText(
           $("account-concurrency"),
           !data.value ? "—" : int(concurrency.current) + " / " + (Number(concurrency.limit || 0) > 0 ? int(concurrency.limit) : "∞")
@@ -5188,6 +5192,7 @@
           content = el(
             "div",
             { class: "analysis-content" },
+            el("div", { class: "analysis-billing-policy" }),
             el("div", { class: "analysis-summary-grid" }),
             el(
               "section",
@@ -5233,6 +5238,7 @@
         const points = trends.total_tokens;
         const daily = points.length > 1 && new Date(points[1].time) - new Date(points[0].time) > 12 * 3600000;
         const colors = analysisColors();
+        content.querySelector(".analysis-billing-policy").replaceChildren(billingPolicy(analysis, !account));
         content.querySelector(".analysis-summary-grid").replaceWith(renderAnalysisSummary(summary, trends, daily));
         for (const canvas of target.querySelectorAll("[data-analysis-trend]")) {
           drawAnalysisTrend(canvas, trends[canvas.dataset.analysisTrend]);
@@ -7003,6 +7009,34 @@
         renderCollection($("prices-body"), rows, { headers, render: renderRow });
       }
 
+      function multiplierNumber(value, fallback = 1) {
+        return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+      }
+
+      function multiplierText(value) { return multiplierNumber(value).toLocaleString(locale(), { maximumSignificantDigits: 12 }) + "×"; }
+
+      function costMultipliers(cost) {
+        const billing = multiplierNumber(cost.billing_multiplier);
+        const serviceTier = multiplierNumber(cost.service_tier_multiplier);
+        return { billing, serviceTier, total: multiplierNumber(cost.multiplier, billing * serviceTier) };
+      }
+
+      function billingPolicy(value, administrator = false) {
+        const fast = value.codex_fast_mode_billing === true;
+        return el(
+          "div",
+          { class: "card billing-policy" },
+          el(
+            "div",
+            { class: "row spread" },
+            el("strong", {}, m("ui.current_global_billing_multiplier"), ": ", multiplierText(value.billing_multiplier)),
+            el("span", { class: "tag plain" }, m(fast ? "ui.codex_fast_billing_enabled" : "ui.codex_fast_billing_disabled"))
+          ),
+          el("p", { class: "muted small" }, m("ui.billing_policy_history_note")),
+          administrator ? el("p", { class: "muted small" }, m("ui.billing_multiplier_settings_location")) : null
+        );
+      }
+
       function costTierText(cost) {
         const threshold = tokenThreshold(cost.threshold_input_tokens);
         return cost.long_context ? m("ui.long_context_value", { v0: threshold }) : m("ui.standard_context_value", { v0: threshold });
@@ -7021,17 +7055,29 @@
           ...(cost.tiered
             ? [el("div", { class: "cost-tooltip-summary" }, el("span", {}, m("ui.tier")), el("b", {}, costTierText(cost)))]
             : []),
-          ...(cost.multiplier === 2.5
+          ...(typeof cost.billing_multiplier === "number"
             ? [
                 el(
                   "div",
                   { class: "cost-tooltip-summary" },
-                  el("span", {}, m("ui.billing_multiplier")),
-                  el("b", {}, "2.5×" + DISPLAY_SEPARATOR, m("ui.codex_fast_mode"))
+                  el("span", {}, m("ui.global_billing_multiplier")),
+                  el("b", {}, multiplierText(costMultipliers(cost).billing))
                 ),
-                el("div", { class: "cost-tooltip-summary" }, m("ui.the_prices_and_amounts_below_include_the_multiplier"))
+                el(
+                  "div",
+                  { class: "cost-tooltip-summary" },
+                  el("span", {}, m("ui.service_tier_multiplier")),
+                  el("b", {}, multiplierText(costMultipliers(cost).serviceTier))
+                )
               ]
             : []),
+          el(
+            "div",
+            { class: "cost-tooltip-summary" },
+            el("span", {}, m("ui.effective_billing_multiplier")),
+            el("b", {}, multiplierText(costMultipliers(cost).total))
+          ),
+          el("div", { class: "cost-tooltip-summary" }, m("ui.the_prices_and_amounts_below_include_the_multiplier")),
           el(
             "div",
             { class: "cost-tooltip-grid" },
@@ -7694,7 +7740,10 @@
               ? {
                   ...entry,
                   ...entry.cost,
-                  multiplier: entry.cost.multiplier || 1,
+                  billing_multiplier: typeof entry.cost.billing_multiplier === "number" ? costMultipliers(entry.cost).billing : null,
+                  service_tier_multiplier:
+                    typeof entry.cost.service_tier_multiplier === "number" ? costMultipliers(entry.cost).serviceTier : null,
+                  multiplier: costMultipliers(entry.cost).total,
                   input_tokens: requestInputTokens(entry.cost),
                   output_tps: outputTPS(entry.cost, entry.latency_ms, measured)
                 }
@@ -7767,7 +7816,7 @@
           const cost = entry.cost;
           const costNote = [
             cost.tiered ? (cost.long_context ? m("ui.long_context") : m("ui.standard")) : "",
-            cost.multiplier === 2.5 ? "x2.5" : ""
+            multiplierText(costMultipliers(cost).total)
           ]
             .filter(Boolean)
             .join(DISPLAY_SEPARATOR);

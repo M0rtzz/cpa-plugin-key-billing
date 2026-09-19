@@ -657,5 +657,13 @@
   "ui.tokens": "Token",
   "quota.amount_limit": "金额限额（USD）",
   "quota.token_limit": "Token 限额",
-  "quota.request_limit": "请求限额（次）"
+  "quota.request_limit": "请求限额（次）",
+  "ui.current_global_billing_multiplier": "当前全局计费倍率",
+  "ui.global_billing_multiplier": "全局计费倍率",
+  "ui.service_tier_multiplier": "Codex 快速模式倍率",
+  "ui.effective_billing_multiplier": "最终计费倍率",
+  "ui.codex_fast_billing_enabled": "Codex priority：已启用 2.5×",
+  "ui.codex_fast_billing_disabled": "Codex priority：未启用 2.5×",
+  "ui.billing_policy_history_note": "费用已包含账单记录的倍率。设置变更适用于新请求，历史账单保留记录倍率；金额额度按同一费用扣减。",
+  "ui.billing_multiplier_settings_location": "管理员可在「插件管理 → CPA Key Billing → 配置」中修改 billing_multiplier。"
 }

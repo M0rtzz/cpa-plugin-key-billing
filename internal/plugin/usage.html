@@ -232,6 +232,7 @@
 <div class="intro"><div><div class="eyebrow">Your usage, at a glance</div><h1>我的用量</h1><p class="muted">查看当前 API Key 的请求、Token、费用与错误记录。</p></div><span id="identity" class="badge"></span></div>
 <section id="auth" class="panel auth"><h2>查看自己的用量</h2><p class="muted">输入服务管理员提供的 API Key，查看对应的使用记录。</p><form id="login"><label for="key">API Key</label><div class="auth-row"><input id="key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="8192"><button class="primary" type="submit">查看用量</button></div><small>Key 仅用于当前页面请求，不写入浏览器存储。关闭页面或退出后需要重新输入。</small></form></section>
 <div id="dashboard" hidden>
+<section id="billing-policy" class="panel" data-private aria-label="计费倍率"></section>
 <section class="panel"><form id="filter" class="filters"><label for="from">开始日期<input id="from" type="date" required></label><label for="to">结束日期<input id="to" type="date" required></label><button class="primary" type="submit">查询</button><small>按本地时区统计，结束日期包含当天。</small></form></section>
 <div id="stats" class="grid stats" data-private></div>
 <div class="grid two"><section class="panel"><div class="section-head"><h2>用量趋势</h2><select id="trend-metric" aria-label="趋势指标"><option value="requests">请求数</option><option value="total_tokens">Token 数</option><option value="total_cost">费用（USD）</option></select></div><div id="trend" data-private></div></section><section class="panel"><div class="section-head"><h2>模型分布</h2><span class="muted">按 Token 占比</span></div><div id="models" data-private></div></section></div>
@@ -250,6 +251,16 @@
     const percent = (value) => (Number.isFinite(Number(value)) && value != null ? Number(value).toFixed(1) + "%" : "未提供");
     const when = (value) =>
       value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "尚无记录";
+    const factor = (value, fallback = 1) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback);
+    const factorText = (value) => factor(value).toLocaleString("zh-CN", { maximumSignificantDigits: 12 }) + "×";
+    function billingPolicy(value) {
+      const parent = clear("billing-policy");
+      parent.append(
+        node("strong", "当前全局计费倍率 " + factorText(value.billing_multiplier)),
+        node("p", "Codex priority 快速模式：" + (value.codex_fast_mode_billing === true ? "已启用 2.5×" : "未启用 2.5×"), "muted"),
+        node("small", "费用已包含账单记录的倍率。设置变更适用于新请求，历史账单保留记录倍率；金额额度按同一费用扣减。")
+      );
+    }
     function node(tag, text, cls) {
       const value = document.createElement(tag);
       if (text != null) value.textContent = String(text);
@@ -375,6 +386,7 @@
       }).toString();
     }
     function renderAnalysis(value) {
+      billingPolicy(value);
       analysis = value;
       const summary = value.summary || {}, stats = clear("stats");
       card(stats, "请求总数", integer(summary.requests), "成功 " + integer(summary.succeeded) + " · 失败 " + integer(summary.failed));
@@ -384,7 +396,7 @@
         integer(summary.total_tokens),
         "输入 " + integer(summary.input_tokens) + " · 输出 " + integer(summary.output_tokens)
       );
-      card(stats, "累计费用 · USD", money(summary.cost?.total_usd), "采用实际计费记录");
+      card(stats, "累计费用 · USD", money(summary.cost?.total_usd), "已按每条账单倍率计费");
       card(stats, "请求成功率", percent(summary.success_rate), "缓存命中率 " + percent(summary.cache_rate));
       renderTrend();
       const models = clear("models"), values = value.usage_distribution?.models || [];
@@ -455,7 +467,9 @@
       if (!entries.length) empty(parent, tab === "errors" ? "所选范围内暂无错误记录" : "所选范围内暂无请求记录");
       else {
         const table = node("table"), head = node("thead"), row = node("tr");
-        for (const label of tab === "errors" ? ["时间", "模型", "HTTP 状态", "错误类型", "错误说明"] : ["时间", "模型", "状态", "Token", "费用（USD）", "耗时"])
+        for (const label of tab === "errors"
+          ? ["时间", "模型", "HTTP 状态", "错误类型", "错误说明"]
+          : ["时间", "模型", "状态", "Token", "费用（USD）", "计费倍率", "耗时"])
           row.append(node("th", label));
         head.append(row);
         table.append(head);
@@ -482,6 +496,10 @@
                   entry.failed ? "失败" : "成功",
                   integer(tokens),
                   money(cost.total_usd),
+                  typeof cost.billing_multiplier === "number"
+                    ? "全局 " + factorText(cost.billing_multiplier) + " · 快速 " + factorText(cost.service_tier_multiplier) + " = " +
+                      factorText(factor(cost.multiplier, factor(cost.billing_multiplier) * factor(cost.service_tier_multiplier)))
+                    : "最终 " + factorText(cost.multiplier),
                   entry.latency_ms == null ? "—" : integer(entry.latency_ms) + " ms"
                 ];
           values.forEach((text, index) => tr.append(node("td", text, tab === "errors" && index === 4 ? "message" : "")));

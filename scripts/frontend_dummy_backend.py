@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 UI_PATH = ROOT / "internal" / "plugin" / "ui.html"
 API_BASE = "/v0/management/plugins/cpa-key-billing"
 RESOURCE_BASE = "/v0/resource/plugins/cpa-key-billing"
+BILLING_POLICY = {"billing_multiplier": 0.2, "codex_fast_mode_billing": True}
 NOW = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
 CALLER_SCOPE_SALT = b"cli-proxy-api:caller-scope:v1\0"
 
@@ -666,7 +667,8 @@ PRICES = [
     },
 ]
 
-def make_cost(uncached, cache_read, cache_write, output, rates, tiered=False, long_context=False, multiplier=1):
+def make_cost(uncached, cache_read, cache_write, output, rates, tiered=False, long_context=False, service_tier_multiplier=1, billing_multiplier=0.2):
+    multiplier = billing_multiplier * service_tier_multiplier
     input_price, read_price, write_price, output_price = (rate * multiplier for rate in rates)
     parts = {
         "uncached_input_usd": uncached * input_price / 1_000_000,
@@ -676,6 +678,8 @@ def make_cost(uncached, cache_read, cache_write, output, rates, tiered=False, lo
     }
     return {
         **parts,
+        "billing_multiplier": billing_multiplier,
+        "service_tier_multiplier": service_tier_multiplier,
         "multiplier": multiplier,
         "total_usd": sum(parts.values()),
         "uncached_input_tokens": uncached,
@@ -710,6 +714,7 @@ def event_sample(
     long_context=False,
     failed=False,
     multiplier=1,
+    billing_multiplier=0.2,
 ):
     uncached, cache_read, cache_write, output = tokens
     if failed:
@@ -737,6 +742,7 @@ def event_sample(
             model.startswith("gpt-5."),
             long_context,
             multiplier if not failed else 1,
+            billing_multiplier,
         ),
         "reasoning_tokens": 0 if failed else reasoning_tokens,
     }
@@ -747,11 +753,11 @@ def event_sample(
 SUCCESS_EVENT_SAMPLES = [
     event_sample(0, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "high", "priority", 11513, 8209, 266, (712, 91648, 4096, 425), (4, 0.4, 5, 20), multiplier=2.5),
     event_sample(5, "codex · dev-team@example.com", "codex", "gpt-5.6-luna", "CodexWebsocketsExecutor", "low", "auto", 2516, 1431, 10, (1030, 49920, 0, 75), (0.2, 0.02, 0.25, 1.2)),
-    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "medium", "auto", 2417, 1103, 0, (1194, 95616, 0, 73), (5, 0.5, 5, 30)),
-    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "high", "auto", 5306, 2121, 21, (798, 169984, 0, 201), (4, 0.4, 5, 20)),
+    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "medium", "auto", 2417, 1103, 0, (1194, 95616, 0, 73), (5, 0.5, 5, 30), billing_multiplier=1),
+    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "high", "priority", 5306, 2121, 21, (798, 169984, 0, 201), (4, 0.4, 5, 20), billing_multiplier=1, multiplier=2.5),
     event_sample(2, "claude · platform@example.com", "claude", "deepseek-v4-pro", "ClaudeExecutor", "high", "auto", 10061, 637, 0, (38049, 0, 0, 474), (0.435, 0.003625, 0.435, 0.87), billing_model="claude/deepseek-v4-pro"),
     event_sample(7, "codex · sk-proxy…7f3a", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "high", "auto", 7288, 4130, 188, (8502, 45440, 0, 309), (5, 0.5, 5, 30)),
-    event_sample(6, "codex · dev-team@example.com", "codex", "gpt-5.6-terra", "CodexWebsocketsExecutor", "medium", "auto", 10120, 3379, 81, (1300, 69376, 0, 477), (2, 0.2, 2.5, 12)),
+    event_sample(6, "codex · dev-team@example.com", "codex", "gpt-5.6-terra", "CodexWebsocketsExecutor", "medium", "auto", 10120, 3379, 81, (1300, 69376, 0, 477), (2, 0.2, 2.5, 12), billing_multiplier=2.5),
     event_sample(4, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "high", "auto", 2609, 1881, 6, (1368, 237824, 0, 46), (4, 0.4, 5, 20)),
     event_sample(5, "codex · dev-team@example.com", "codex", "gpt-5.6-luna", "CodexWebsocketsExecutor", "low", "auto", 5002, 2464, 61, (1261, 149248, 0, 147), (0.2, 0.02, 0.25, 1.2)),
     event_sample(7, "codex · sk-proxy…7f3a", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "high", "auto", 7634, 4412, 94, (24196, 19840, 0, 275), (5, 0.5, 5, 30)),
@@ -925,7 +931,7 @@ def quota_summary(index, scenario=""):
                 group["absolute_sample_count"] += 1
     for group in grouped.values():
         if group["sample_count"]: group["remaining_percent"] /= group["sample_count"]
-    return dict(subscription={"name": key["plan_name"], "unlimited": key["unlimited"], "blocked": key["blocked"], "windows": key["windows"], "retry_at": key.get("retry_at")},
+    return dict(**BILLING_POLICY, subscription={"name": key["plan_name"], "unlimited": key["unlimited"], "blocked": key["blocked"], "windows": key["windows"], "retry_at": key.get("retry_at")},
                 concurrency={"limit": key["concurrency_limit"], "current": key["current_concurrency"]}, accounts=accounts,
                 groups=list(grouped.values()), counts=counts,
                 model_scope={"restricted": scenario == "model-restricted", "complete": scenario != "model-restricted"})
@@ -1217,6 +1223,7 @@ def analysis_view(query, scope=""):
     }
 
     return {
+        **BILLING_POLICY,
         "summary": {
             "requests": requests,
             "succeeded": requests - failed,
@@ -1478,11 +1485,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, quota_summary(index, scenario))
             elif parsed.path.endswith("/profile"):
                 key = LIVE_KEYS[index]
-                self.send_json(200, {"tracked": True, "identity": {"preview": key["preview"], "label": key["label"]}})
+                self.send_json(200, {**BILLING_POLICY, "tracked": True, "identity": {"preview": key["preview"], "label": key["label"]}})
             elif parsed.path.endswith("/subscription"):
                 key = LIVE_KEYS[index]
                 refresh_key_quota(key)
-                self.send_json(200, {"subscription": {"name": key["plan_name"], "unlimited": key["unlimited"], "blocked": key["blocked"], "windows": key["windows"], "retry_at": key.get("retry_at")}, "concurrency": {"limit": key["concurrency_limit"], "current": key["current_concurrency"]}})
+                self.send_json(200, {**BILLING_POLICY, "subscription": {"name": key["plan_name"], "unlimited": key["unlimited"], "blocked": key["blocked"], "windows": key["windows"], "retry_at": key.get("retry_at")}, "concurrency": {"limit": key["concurrency_limit"], "current": key["current_concurrency"]}})
             elif parsed.path.endswith("/routing"):
                 self.send_json(200, account_routing_view(index))
             elif parsed.path.endswith("/prices"):

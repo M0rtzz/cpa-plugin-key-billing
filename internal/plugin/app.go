@@ -139,6 +139,10 @@ func registration() Registration {
 			GitHubRepository: GitHubRepository,
 			ConfigFields: []ConfigField{
 				{
+					Name: "billing_multiplier", Type: "number",
+					Description: "Global billing multiplier for new usage (default 1; must be positive). Composes with Codex fast billing; historical costs remain recorded values.",
+				},
+				{
 					Name: "account_api_base_url", Type: "string",
 					Description: "Local CPA origin used to validate self-service API keys, e.g. http://127.0.0.1:18316",
 				},
@@ -150,7 +154,7 @@ func registration() Registration {
 				{
 					Name:        "codex_fast_mode_billing",
 					Type:        "boolean",
-					Description: "Bill Codex priority requests at 2.5 times the standard cost",
+					Description: "Bill Codex OAuth priority requests at 2.5 times the global-adjusted cost (default true)",
 				},
 				{
 					Name:        "state_file",

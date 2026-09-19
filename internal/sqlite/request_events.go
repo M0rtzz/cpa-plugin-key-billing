@@ -11,29 +11,32 @@ import (
 )
 
 func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
-	// Only persistence encodes the multiplier into the price source.
-	priceSource := string(entry.PriceSource)
-	switch entry.PriceSource {
-	case billing.PriceSourceCustom, billing.PriceSourceBuiltin, billing.PriceSourceReference:
-		if entry.Cost.Multiplier == billing.CodexFastModeMultiplier {
-			priceSource += ":x2.5"
+	global, service := entry.Cost.BillingMultiplier, entry.Cost.ServiceTierMultiplier
+	if global == 0 {
+		global = 1
+	}
+	if service == 0 {
+		service = 1
+		// Older in-memory callers supplied only the combined fast-mode factor.
+		if entry.Cost.BillingMultiplier == 0 && entry.Cost.Multiplier == billing.CodexFastModeMultiplier {
+			service = billing.CodexFastModeMultiplier
 		}
 	}
 	result, errInsert := tx.Exec(`
 		INSERT INTO request_events (
 			at, scope, auth_index, provider, account, executor_type, reasoning_effort, service_tier,
 			upstream_model, billing_model, failed, latency_ms, ttft_ms,
-			accounting_quality, price_source, reasoning_tokens,
+			accounting_quality, price_source, reasoning_tokens, billing_multiplier, service_tier_multiplier,
 			total_usd, uncached_input_usd, cache_read_usd, cache_write_usd, output_usd,
 			uncached_input_tokens, cache_read_tokens, cache_write_tokens, billed_output_tokens,
 			tiered, long_context, threshold_input_tokens,
 			applied_input_per_1m, applied_output_per_1m,
 			applied_cache_read_per_1m, applied_cache_write_per_1m
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		nanos(entry.At), entry.Scope, entry.AuthIndex, entry.Provider, entry.Account, entry.ExecutorType, entry.ReasoningEffort, entry.ServiceTier,
 		entry.UpstreamModel, entry.BillingModel, entry.Failed,
 		entry.LatencyMS, entry.TTFTMS,
-		string(entry.AccountingQuality), priceSource, entry.ReasoningTokens,
+		string(entry.AccountingQuality), string(entry.PriceSource), entry.ReasoningTokens, global, service,
 		entry.Cost.TotalUSD, entry.Cost.UncachedInputUSD, entry.Cost.CacheReadUSD,
 		entry.Cost.CacheWriteUSD, entry.Cost.OutputUSD,
 		entry.Cost.UncachedInputTokens, entry.Cost.CacheReadTokens,
@@ -133,7 +136,7 @@ func (d *DB) RequestEvents(query billing.RequestEventQuery, since time.Time) (bi
 		SELECT r.id, r.at, r.scope, r.auth_index, r.provider, r.account,
 			r.executor_type, r.reasoning_effort, r.service_tier,
 			r.upstream_model, r.billing_model, r.failed, r.latency_ms, r.ttft_ms,
-			r.accounting_quality, r.price_source, r.reasoning_tokens,
+			r.accounting_quality, r.price_source, r.reasoning_tokens, r.billing_multiplier, r.service_tier_multiplier,
 			r.total_usd, r.uncached_input_usd, r.cache_read_usd, r.cache_write_usd, r.output_usd,
 			r.uncached_input_tokens, r.cache_read_tokens, r.cache_write_tokens, r.billed_output_tokens,
 			r.tiered, r.long_context, r.threshold_input_tokens,
@@ -249,7 +252,7 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 		&row.ExecutorType, &row.ReasoningEffort, &row.ServiceTier,
 		&row.UpstreamModel, &row.BillingModel, &failed,
 		&row.LatencyMS, &row.TTFTMS,
-		&quality, &priceSource, &row.ReasoningTokens,
+		&quality, &priceSource, &row.ReasoningTokens, &row.Cost.BillingMultiplier, &row.Cost.ServiceTierMultiplier,
 		&row.Cost.TotalUSD, &row.Cost.UncachedInputUSD, &row.Cost.CacheReadUSD,
 		&row.Cost.CacheWriteUSD, &row.Cost.OutputUSD,
 		&row.Cost.UncachedInputTokens, &row.Cost.CacheReadTokens,
@@ -263,11 +266,7 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 	row.At = timeAt(at)
 	row.Failed = failed != 0
 	row.AccountingQuality = billing.TokenAccountingQuality(quality)
-	switch priceSource {
-	case "custom:x2.5", "builtin:x2.5", "reference:x2.5":
-		priceSource = strings.TrimSuffix(priceSource, ":x2.5")
-		row.Cost.Multiplier = billing.CodexFastModeMultiplier
-	}
+	row.Cost.Multiplier = row.Cost.BillingMultiplier * row.Cost.ServiceTierMultiplier
 	row.PriceSource = billing.PriceSource(priceSource)
 	return row, nil
 }

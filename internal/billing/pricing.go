@@ -131,9 +131,12 @@ func (r PriceRates) resolve(source PriceSource) Price {
 const CodexFastModeMultiplier = 2.5
 
 type Cost struct {
-	// Multiplier is the applied billing multiplier. Zero/omitted means 1x.
-	// Applied rates and amounts already include it; token counts do not.
-	Multiplier float64 `json:"multiplier,omitempty"`
+	// Multiplier is the product of BillingMultiplier and ServiceTierMultiplier.
+	// Applied rates and amounts already include it; token counts do not. Legacy
+	// records with omitted component fields are normalized when loaded.
+	Multiplier            float64 `json:"multiplier,omitempty"`
+	BillingMultiplier     float64 `json:"billing_multiplier"`
+	ServiceTierMultiplier float64 `json:"service_tier_multiplier"`
 
 	TotalUSD         float64 `json:"total_usd"`
 	UncachedInputUSD float64 `json:"uncached_input_usd"`
@@ -178,6 +181,9 @@ func ComputeCost(price Price, breakdown TokenBreakdown) Cost {
 		}
 	}
 	cost := Cost{
+		Multiplier:             1,
+		BillingMultiplier:      1,
+		ServiceTierMultiplier:  1,
 		UncachedInputUSD:       perMillion(breakdown.Input.UncachedTokens, inputPrice),
 		CacheReadUSD:           perMillion(breakdown.Input.CacheReadTokens, cacheReadPrice),
 		CacheWriteUSD:          perMillion(breakdown.Input.CacheWriteTokens, cacheWritePrice),
@@ -196,6 +202,24 @@ func ComputeCost(price Price, breakdown TokenBreakdown) Cost {
 	}
 	cost.TotalUSD = cost.UncachedInputUSD + cost.CacheReadUSD + cost.CacheWriteUSD + cost.OutputUSD
 	return cost
+}
+
+// applyMultipliers captures this event's billing policy at ingestion. ComputeCost
+// returns base prices; neither read paths nor future configuration changes may
+// apply the multiplier again to these persisted amounts.
+func (c *Cost) applyMultipliers(billingMultiplier, serviceTierMultiplier float64) {
+	c.BillingMultiplier = billingMultiplier
+	c.ServiceTierMultiplier = serviceTierMultiplier
+	c.Multiplier = billingMultiplier * serviceTierMultiplier
+	c.UncachedInputUSD *= c.Multiplier
+	c.CacheReadUSD *= c.Multiplier
+	c.CacheWriteUSD *= c.Multiplier
+	c.OutputUSD *= c.Multiplier
+	c.TotalUSD = c.UncachedInputUSD + c.CacheReadUSD + c.CacheWriteUSD + c.OutputUSD
+	c.AppliedInputPer1M *= c.Multiplier
+	c.AppliedOutputPer1M *= c.Multiplier
+	c.AppliedCacheReadPer1M *= c.Multiplier
+	c.AppliedCacheWritePer1M *= c.Multiplier
 }
 
 func perMillion(tokens int64, pricePer1M float64) float64 {

@@ -158,11 +158,18 @@ func (a *App) listRequestErrors(req ManagementRequest, access viewAccess) Manage
 	return viewJSON(access, http.StatusOK, view)
 }
 
+type analysisResponse struct {
+	billing.AnalysisView
+	billingSettingsResponse
+}
+
 func (a *App) analysis(req ManagementRequest, access viewAccess) ManagementResponse {
 	if access.APIKey && !access.Tracked {
-		return viewJSON(access, http.StatusOK, billing.AnalysisView{
-			UsageDistribution: billing.UsageDistribution{
+		return viewJSON(access, http.StatusOK, analysisResponse{
+			billingSettingsResponse: a.billingSettings(),
+			AnalysisView: billing.AnalysisView{UsageDistribution: billing.UsageDistribution{
 				APIKeys: []billing.AnalysisComposition{}, Models: []billing.AnalysisComposition{}, Sources: []billing.AnalysisComposition{},
+			},
 			},
 		})
 	}
@@ -195,7 +202,7 @@ func (a *App) analysis(req ManagementRequest, access viewAccess) ManagementRespo
 	if access.APIKey {
 		view.UsageDistribution.Sources = []billing.AnalysisComposition{}
 	}
-	return viewJSON(access, http.StatusOK, view)
+	return viewJSON(access, http.StatusOK, analysisResponse{AnalysisView: view, billingSettingsResponse: a.billingSettings()})
 }
 
 func requestPageParams(values url.Values, offset, limit *int, from, to *time.Time, snapshot **int64) error {

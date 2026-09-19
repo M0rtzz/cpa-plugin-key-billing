@@ -657,5 +657,13 @@
   "ui.tokens": "Tokens",
   "quota.amount_limit": "Spending limit (USD)",
   "quota.token_limit": "Token limit",
-  "quota.request_limit": "Request limit"
+  "quota.request_limit": "Request limit",
+  "ui.current_global_billing_multiplier": "Current global billing multiplier",
+  "ui.global_billing_multiplier": "Global billing multiplier",
+  "ui.service_tier_multiplier": "Codex fast mode multiplier",
+  "ui.effective_billing_multiplier": "Effective billing multiplier",
+  "ui.codex_fast_billing_enabled": "Codex priority: 2.5× enabled",
+  "ui.codex_fast_billing_disabled": "Codex priority: 2.5× disabled",
+  "ui.billing_policy_history_note": "Amounts already include the recorded multipliers. Setting changes apply to new requests; historical bills keep their recorded rates. Monetary quotas use the same billed amounts.",
+  "ui.billing_multiplier_settings_location": "Administrators can change billing_multiplier in Plugin management → CPA Key Billing → Configuration."
 }

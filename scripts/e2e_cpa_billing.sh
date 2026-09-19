@@ -1150,6 +1150,51 @@ assert_reference_price_billing() {
   log_step "参考价已验证：普通模型及带前缀、思考后缀的模型，流式和非流式均按参考价记账"
 }
 
+assert_global_billing_multiplier() {
+  local port="$1" runtime_dir="$2" count factor attempt body
+  local before="$runtime_dir/multiplier-before.json" events="$runtime_dir/multiplier-events.json"
+  management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=1000" >"$before"
+  count="$(jq -er '.total' "$before")"
+  management_call PUT "$port" "/v0/management/plugins/cpa-key-billing/prices" \
+    -H 'Content-Type: application/json' \
+    --data '{"model_id":"gpt-4o","input_per_1m":1,"output_per_1m":3,"cache_read_per_1m":0.1,"cache_write_per_1m":2}' >/dev/null
+  for factor in 0.2 0.3; do
+    management_call PATCH "$port" "/v0/management/plugins/cpa-key-billing/config" \
+      -H 'Content-Type: application/json' --data "{\"billing_multiplier\":$factor}" >/dev/null
+    # Host config writes complete before the asynchronous plugin reconfigure.
+    for attempt in {1..100}; do
+      management_call GET "$port" "/v0/management/plugins/cpa-key-billing/analysis" >"$runtime_dir/multiplier-analysis.json"
+      if jq -e --argjson factor "$factor" '.billing_multiplier == $factor and .codex_fast_mode_billing == true' \
+        "$runtime_dir/multiplier-analysis.json" >/dev/null; then
+        break
+      fi
+      sleep 0.1
+    done
+    jq -e --argjson factor "$factor" '.billing_multiplier == $factor and .codex_fast_mode_billing == true' \
+      "$runtime_dir/multiplier-analysis.json" >/dev/null
+    body="$(request_body chat gpt-4o false 'Reply with exactly OK.')"
+    api_call "$port" "全局倍率 $factor" /v1/chat/completions "$body" chat "$runtime_dir/responses/multiplier-$factor.json"
+    count=$((count + 1))
+    wait_for_event_count "$port" "$count" "$events"
+    jq -e --argjson factor "$factor" '
+      .entries[0].cost |
+      .billing_multiplier == $factor and .service_tier_multiplier == 1 and .multiplier == $factor and
+      .uncached_input_tokens == 80 and .cache_read_tokens == 32 and .cache_write_tokens == 16 and .billed_output_tokens == 8 and
+      ((.total_usd - (139.2 / 1000000 * $factor)) | fabs) < 0.000000000001
+    ' "$events" >/dev/null
+    account_call "$port" /v0/resource/plugins/cpa-key-billing/analysis >"$runtime_dir/multiplier-user-analysis.json"
+    jq -e --argjson factor "$factor" '.billing_multiplier == $factor' "$runtime_dir/multiplier-user-analysis.json" >/dev/null
+  done
+  management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=1000" >"$events"
+  jq -e --slurpfile old "$before" '
+    ($old[0].entries | map(.id | tonumber) | max) as $max |
+    [.entries[] | select((.id | tonumber) <= $max)] == $old[0].entries and
+    .entries[1].cost.billing_multiplier == 0.2 and
+    ((.entries[1].cost.total_usd - 0.00002784) | fabs) < 0.000000000001
+  ' "$events" >/dev/null
+  log_step "全局倍率已验证：0.2→0.3 热更新，用户元数据与费用一致，旧账单不变"
+}
+
 run_target() {
   local target="$1"
   local index="$2"
@@ -1528,11 +1573,12 @@ run_target() {
   fi
   log_step "插件启动事件已验证"
   assert_reference_price_billing "$port" "$runtime_dir"
+  assert_global_billing_multiplier "$port" "$runtime_dir"
 
   kill "$active_pid" >/dev/null 2>&1 || true
   wait "$active_pid" >/dev/null 2>&1 || true
   active_pid=""
-  log_ok "${host_label}：51 个上游请求（含 4 个参考价请求），1 次并发拦截，6 次模型拦截，4 次凭证路由，2 次凭证拦截，12 次额度拦截"
+  log_ok "${host_label}：53 个上游请求（含 4 个参考价及 2 个倍率请求），1 次并发拦截，6 次模型拦截，4 次凭证路由，2 次凭证拦截，12 次额度拦截"
 }
 
 log_stage "启动 dummy provider"

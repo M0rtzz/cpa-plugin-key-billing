@@ -1,6 +1,7 @@
 package billing
 
 import (
+	"math"
 	"strings"
 	"testing"
 )
@@ -10,12 +11,41 @@ func TestDecodeConfigDefaults(t *testing.T) {
 	if errDecode != nil {
 		t.Fatalf("DecodeConfig: %v", errDecode)
 	}
-	if !cfg.Enabled || cfg.Debug || cfg.CodexFastModeBilling || cfg.StateFile != DefaultStateFile {
+	if !cfg.Enabled || cfg.Debug || !cfg.CodexFastModeBilling || cfg.BillingMultiplier != 1 || cfg.StateFile != DefaultStateFile {
 		t.Fatalf("config = %+v", cfg)
 	}
 	cfg, errDecode = DecodeConfig([]byte("enabled: true\ndebug: true\ncodex_fast_mode_billing: true\n"))
 	if errDecode != nil || !cfg.Debug || !cfg.CodexFastModeBilling {
 		t.Fatalf("config = %+v, error = %v", cfg, errDecode)
+	}
+}
+
+func TestDecodeConfigBillingMultiplierAndFastOptOut(t *testing.T) {
+	cfg, err := DecodeConfig([]byte("billing_multiplier: 0.2\ncodex_fast_mode_billing: false\n"))
+	if err != nil || cfg.BillingMultiplier != 0.2 || cfg.CodexFastModeBilling {
+		t.Fatalf("config = %+v, error = %v", cfg, err)
+	}
+	for _, raw := range []string{"0", "-0.2", ".nan", ".inf", "-.inf", "not-a-number"} {
+		t.Run(raw, func(t *testing.T) {
+			if _, err := DecodeConfig([]byte("billing_multiplier: " + raw + "\n")); err == nil {
+				t.Fatal("accepted invalid billing multiplier")
+			}
+		})
+	}
+}
+
+func TestConfigureRejectsInvalidMultiplierBeforeChangingStore(t *testing.T) {
+	store, _ := newStoreWithRepository(t)
+	previous := store.Config()
+	for _, multiplier := range []float64{0, -0.2, math.NaN(), math.Inf(1), math.Inf(-1)} {
+		cfg := previous
+		cfg.BillingMultiplier = multiplier
+		if err := store.Configure(cfg); err == nil {
+			t.Fatalf("accepted invalid billing multiplier %v", multiplier)
+		}
+		if got := store.Config(); got != previous {
+			t.Fatalf("invalid configuration changed live store: %+v", got)
+		}
 	}
 }
 

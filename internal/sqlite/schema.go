@@ -113,6 +113,8 @@ CREATE TABLE request_events (
 	ttft_ms                     INTEGER NOT NULL DEFAULT 0,
 	accounting_quality          TEXT    NOT NULL DEFAULT '',
 	price_source                TEXT    NOT NULL DEFAULT '',
+	billing_multiplier          REAL    NOT NULL DEFAULT 1,
+	service_tier_multiplier     REAL    NOT NULL DEFAULT 1,
 	reasoning_tokens            INTEGER NOT NULL DEFAULT 0,
 	total_usd                   REAL    NOT NULL DEFAULT 0,
 	uncached_input_usd          REAL    NOT NULL DEFAULT 0,
@@ -145,5 +147,15 @@ CREATE TABLE plugin_logs (
 	at      INTEGER NOT NULL,
 	level   TEXT    NOT NULL DEFAULT '',
 	message TEXT    NOT NULL DEFAULT ''
+);
+
+` + billingAdjustmentSchema
+
+const billingAdjustmentSchema = `
+CREATE TABLE billing_adjustments (
+	operation_id           TEXT PRIMARY KEY,
+	multiplier             REAL NOT NULL,
+	completed_at           INTEGER NOT NULL,
+	result_json            TEXT NOT NULL
 );
 `

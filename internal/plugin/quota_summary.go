@@ -247,6 +247,7 @@ type accountQuotaGroup struct {
 }
 
 type accountQuotaSummaryResponse struct {
+	billingSettingsResponse
 	Subscription accountSubscription    `json:"subscription"`
 	Concurrency  accountConcurrency     `json:"concurrency"`
 	Accounts     []accountQuotaAccount  `json:"accounts"`
@@ -262,9 +263,10 @@ func (a *App) accountQuotaSummary(_ ManagementRequest, access viewAccess) Manage
 	}
 	decision := a.store.ResolveRouting(access.Scope, "", "")
 	out := accountQuotaSummaryResponse{
-		Subscription: accountSubscription{Name: access.Key.PlanName, QuotaView: access.Key.QuotaView},
-		Concurrency:  accountConcurrency{Limit: access.Key.ConcurrencyLimit, Current: access.Key.CurrentConcurrency},
-		Accounts:     []accountQuotaAccount{}, Groups: []accountQuotaGroup{},
+		billingSettingsResponse: a.billingSettings(),
+		Subscription:            accountSubscription{Name: access.Key.PlanName, QuotaView: access.Key.QuotaView},
+		Concurrency:             accountConcurrency{Limit: access.Key.ConcurrencyLimit, Current: access.Key.CurrentConcurrency},
+		Accounts:                []accountQuotaAccount{}, Groups: []accountQuotaGroup{},
 		ModelScope: accountQuotaModelScope{Restricted: decision.RestrictsModels(), Complete: true},
 	}
 	if decision.ConfigurationError != "" {

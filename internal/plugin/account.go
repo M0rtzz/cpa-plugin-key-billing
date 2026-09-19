@@ -24,12 +24,25 @@ type accountConcurrency struct {
 	Current int `json:"current"`
 }
 
+// These describe the current configuration, not the factors of older events.
+type billingSettingsResponse struct {
+	BillingMultiplier    float64 `json:"billing_multiplier"`
+	CodexFastModeBilling bool    `json:"codex_fast_mode_billing"`
+}
+
+func (a *App) billingSettings() billingSettingsResponse {
+	cfg := a.store.Config()
+	return billingSettingsResponse{BillingMultiplier: cfg.BillingMultiplier, CodexFastModeBilling: cfg.CodexFastModeBilling}
+}
+
 type accountProfileResponse struct {
+	billingSettingsResponse
 	Tracked  bool            `json:"tracked"`
 	Identity accountIdentity `json:"identity"`
 }
 
 type accountSubscriptionResponse struct {
+	billingSettingsResponse
 	Subscription accountSubscription `json:"subscription"`
 	Concurrency  accountConcurrency  `json:"concurrency"`
 }
@@ -55,7 +68,7 @@ type accountRouteCredential struct {
 }
 
 func (a *App) accountProfile(access viewAccess) ManagementResponse {
-	response := accountProfileResponse{Tracked: access.Tracked}
+	response := accountProfileResponse{billingSettingsResponse: a.billingSettings(), Tracked: access.Tracked}
 	if access.Tracked {
 		response.Identity = accountIdentity{Preview: access.Key.Preview, Label: access.Key.Label}
 	}
@@ -65,8 +78,9 @@ func (a *App) accountProfile(access viewAccess) ManagementResponse {
 func (a *App) accountSubscription(access viewAccess) ManagementResponse {
 	view := access.Key
 	return apiKeyJSON(http.StatusOK, accountSubscriptionResponse{
-		Subscription: accountSubscription{Name: view.PlanName, QuotaView: view.QuotaView},
-		Concurrency:  accountConcurrency{Limit: view.ConcurrencyLimit, Current: view.CurrentConcurrency},
+		billingSettingsResponse: a.billingSettings(),
+		Subscription:            accountSubscription{Name: view.PlanName, QuotaView: view.QuotaView},
+		Concurrency:             accountConcurrency{Limit: view.ConcurrencyLimit, Current: view.CurrentConcurrency},
 	})
 }
 
