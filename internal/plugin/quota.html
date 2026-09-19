@@ -236,8 +236,7 @@
 <div class="notice">此页只读，展示服务器已有的额度快照。数据不会自动更新，账户额度由管理员维护。</div>
 <div id="stats" class="grid stats" data-private></div>
 <section class="panel"><div class="section-head"><h2>我的订阅与并发</h2><span id="subscription-status" class="badge" data-private></span></div><div id="subscription" data-private></div></section>
-<section class="panel"><div class="section-head"><h2>共享额度概览</h2><span class="muted">按提供商、套餐和额度窗口分组</span></div><p id="scope" class="scope-note" data-private></p><div id="groups" class="grid account-grid" data-private></div><p class="scope-note">百分比为组内已缓存快照的平均值，不等于可用请求数；不同套餐与额度窗口不相加。历史快照会标记为过期，不能视为实时可用额度；停用或不可用账户不计入汇总。</p></section>
-<section class="panel"><div class="section-head"><h2>匿名账户明细</h2><span class="muted">不展示邮箱和认证文件名</span></div><div id="accounts" class="grid account-grid" data-private></div></section>
+<section class="panel"><div class="section-head"><h2>号池明细</h2></div><div id="accounts" class="grid account-grid" data-private></div></section>
 </div>
 
 <footer class="footer">CPA Key Billing · 账户自助查询 · 页面关闭后清除 Key</footer>
@@ -458,29 +457,6 @@
         sub.append(item);
       }
       if (subscription.retry_at) sub.append(node("p", "预计恢复 " + when(subscription.retry_at), "scope-note"));
-      const scope = value.model_scope || {};
-      $("scope").textContent = scope.restricted ? "当前 API Key 存在模型限制；无法确认适用范围的上游额度不予展示。" : "展示当前 API Key 可见的上游账户快照。";
-      if (scope.complete === false) $("scope").textContent += " 当前快照无法完整表达模型可用范围。";
-      const groups = clear("groups");
-      for (const group of value.groups || []) {
-        const item = node("article", null, "card");
-        item.append(
-          node("h3", [group.provider, planName(group.plan)].filter(Boolean).join(" · ")),
-          node("p", [group.group, group.window].filter(Boolean).join(" · ") || "额度窗口", "muted"),
-          node("div", "剩余 " + percent(group.remaining_percent), "value")
-        );
-        bar(item, group.remaining_percent, "组内平均剩余比例");
-        item.append(node("small", "百分比样本 " + integer(group.sample_count)));
-        if (group.stale) item.append(node("div", "包含历史快照", "badge warn"));
-        if (group.next_reset_at) item.append(node("p", "下次重置 " + when(group.next_reset_at), "timestamp"));
-        if (group.remaining != null)
-          item.append(
-            node("p", "绝对剩余额度 " + Number(group.remaining).toLocaleString("zh-CN") + (group.unit ? " " + group.unit : ""), "account-meta")
-          );
-        if (group.absolute_sample_count) item.append(node("small", "绝对值样本 " + integer(group.absolute_sample_count)));
-        groups.append(item);
-      }
-      if (!groups.childElementCount) empty(groups, "暂无可汇总的额度快照");
       const accounts = clear("accounts");
       for (const account of value.accounts || []) {
         const item = node("article", null, "card"), header = node("div", null, "row"), status = statuses[account.status] || ["状态未知", ""];
