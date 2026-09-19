@@ -1454,12 +1454,39 @@ run_target() {
     ! jq -e --argjson expected "$expected_requests" '
       .total == $expected and (.entries | length) == $expected and
       all(.entries[]; .scope == "" and (has("auth_index") | not) and has("cost")) and
-      any(.entries[]; has("executor_type")) and any(.entries[]; has("source"))
+      any(.entries[]; has("executor_type")) and all(.entries[]; (has("source") | not) and (has("account") | not))
     ' "$account_events_file" >/dev/null; then
     echo "CLIProxyAPI ${host_label} 的 API Key 自助查询范围或响应字段不正确。" >&2
     return 1
   fi
   log_step "API Key 自助查询已验证：仅返回当前 Key 的 35 条请求事件"
+  local page user_status
+  for page in usage quota; do
+    curl -fsS "http://127.0.0.1:$port/v0/resource/plugins/cpa-key-billing/$page.html" >"$runtime_dir/$page.html"
+    if ! grep -q '<html lang="zh-CN">' "$runtime_dir/$page.html"; then
+      echo "独立用户页面未正确加载：$page" >&2
+      return 1
+    fi
+  done
+  account_call "$port" "/v0/resource/plugins/cpa-key-billing/quota-summary" >"$runtime_dir/quota-summary.json"
+  if ! jq -e 'has("subscription") and has("concurrency") and (.accounts | type == "array") and (.groups | type == "array")' "$runtime_dir/quota-summary.json" >/dev/null; then
+    echo "只读配额汇总返回字段不正确" >&2
+    return 1
+  fi
+  user_status="$(curl -sS -o "$runtime_dir/unauthorized-summary.json" -w '%{http_code}' \
+    "http://127.0.0.1:$port/v0/resource/plugins/cpa-key-billing/quota-summary")"
+  if [[ "$user_status" != 401 ]]; then
+    echo "无 Key 的配额查询应返回 401，实际为 $user_status" >&2
+    return 1
+  fi
+  user_status="$(curl -sS -H 'Authorization: Bearer invalid-self-service-test-key' \
+    -o "$runtime_dir/invalid-key-summary.json" -w '%{http_code}' \
+    "http://127.0.0.1:$port/v0/resource/plugins/cpa-key-billing/quota-summary?refresh=true")"
+  if [[ "$user_status" != 401 ]]; then
+    echo "无效 Key 的配额查询应返回 401，实际为 $user_status" >&2
+    return 1
+  fi
+  log_step "独立 HTML、只读配额汇总及宿主 Key 鉴权已验证"
   management_call GET "$port" "/v0/management/plugins/cpa-key-billing/analysis" >"$runtime_dir/analysis.json"
   if ! jq -e '
       .usage_distribution.models as $models |

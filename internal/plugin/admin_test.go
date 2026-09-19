@@ -587,7 +587,7 @@ func TestConfigCredentialSyncSurvivesRestartAndRollsBack(t *testing.T) {
 	response = callAccount(t, app, routeRouting, accountTestKeyA, nil)
 	var routing accountRoutingResponse
 	if err := json.Unmarshal(response.Body, &routing); err != nil || response.StatusCode != http.StatusOK ||
-		!routing.RoutingValid || len(routing.Credentials) != 1 || routing.Credentials[0].Name != billing.PreviewKey(rawKey) ||
+		!routing.RoutingValid || len(routing.Credentials) != 1 || routing.Credentials[0].Name == "" || strings.Contains(string(response.Body), billing.PreviewKey(rawKey)) ||
 		routing.Credentials[0].Status != "active" || len(routing.Warnings) != 0 {
 		t.Fatalf("routing after restart = %+v, response = %+v, err = %v", routing, response, err)
 	}

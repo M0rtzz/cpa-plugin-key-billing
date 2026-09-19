@@ -3,6 +3,7 @@ package plugin
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -29,6 +30,7 @@ func TestAccountMissingProviderWarningsHaveTranslationMetadata(t *testing.T) {
 
 func callAccount(t *testing.T, app *App, path, apiKey string, query url.Values) ManagementResponse {
 	t.Helper()
+	configureAccountTestAuthority(t, app)
 	headers := http.Header{}
 	if apiKey != "" {
 		headers.Set("Authorization", "Bearer "+apiKey)
@@ -42,6 +44,30 @@ func callAccount(t *testing.T, app *App, path, apiKey string, query url.Values) 
 	var response ManagementResponse
 	decodeResult(t, raw, &response)
 	return response
+}
+
+// Existing account fixtures model a CPA with these three installed keys.
+// Authentication failure tests supply their own authority and use the real router.
+func configureAccountTestAuthority(t *testing.T, app *App) {
+	t.Helper()
+	cfg := app.store.Config()
+	if cfg.AccountAPIBaseURL != "" {
+		return
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Header.Get("Authorization") {
+		case "Bearer " + accountTestKeyA, "Bearer " + accountTestKeyB, "Bearer sk-valid-but-untracked-0003":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"object":"list","data":[]}`))
+		default:
+			w.WriteHeader(http.StatusUnauthorized)
+		}
+	}))
+	t.Cleanup(server.Close)
+	cfg.AccountAPIBaseURL = server.URL
+	if err := app.store.Configure(cfg); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func configuredAccountApp(t *testing.T) *App {
@@ -153,7 +179,7 @@ func TestAccountRequestEventsUseSharedShapeWithoutCrossingScopes(t *testing.T) {
 		t.Fatalf("view = %+v", view)
 	}
 	if view.Filters == nil || len(view.Filters.Models) != 1 || view.Filters.Models[0] != "gpt-5.5" ||
-		len(view.Filters.Sources) != 1 || view.Filters.Sources[0] != "openai" {
+		len(view.Filters.Sources) != 0 {
 		t.Fatalf("account request event filter options = %+v", view.Filters)
 	}
 	from := view.Entries[0].At.Format(time.RFC3339Nano)
@@ -224,7 +250,7 @@ func TestAccountAnalysisCannotCrossScopesOrExposeScope(t *testing.T) {
 	}
 }
 
-func TestAccountRequestEventsUseTheAdministratorSource(t *testing.T) {
+func TestAccountRequestEventsHideTheAdministratorSource(t *testing.T) {
 	app := newAppWithPrice(t, true)
 	if _, errSync := app.store.SyncKeys([]string{accountTestKeyA}, false); errSync != nil {
 		t.Fatal(errSync)
@@ -242,14 +268,14 @@ func TestAccountRequestEventsUseTheAdministratorSource(t *testing.T) {
 		t.Fatal(errDecode)
 	}
 	if len(view.Entries) != 1 || view.Entries[0].ExecutorType != "CodexExecutor" ||
-		view.Entries[0].Source != "codex · private@example.com" {
+		view.Entries[0].Source != "" || view.Entries[0].Account != "" {
 		t.Fatalf("account request event = %+v", view)
 	}
-	if view.Filters == nil || len(view.Filters.Sources) != 1 || view.Filters.Sources[0] != "codex · private@example.com" {
+	if view.Filters == nil || len(view.Filters.Sources) != 0 {
 		t.Fatalf("account request event source filters = %+v", view.Filters)
 	}
 	filtered := callAccount(t, app, routeEvents, accountTestKeyA,
-		url.Values{"source": {"codex · private@example.com"}})
+		url.Values{"source": {"codex · unknown@example.com"}})
 	if errDecode := json.Unmarshal(filtered.Body, &view); errDecode != nil || view.Total != 1 {
 		t.Fatalf("source-filtered account request events = %+v, err = %v", view, errDecode)
 	}
@@ -312,7 +338,7 @@ func TestAccountRoutingAndPricesRespectItsScope(t *testing.T) {
 		access.Models[0] != "gpt-5.5" || access.Models[1] != "missing-model" {
 		t.Fatalf("route access = %+v", access)
 	}
-	if !access.RoutingValid || len(access.Credentials) != 1 || access.Credentials[0].Name != "user@example.com" {
+	if !access.RoutingValid || len(access.Credentials) != 1 || access.Credentials[0].Name == "" || strings.Contains(string(response.Body), "user@example.com") {
 		t.Fatalf("credential access = %+v", access)
 	}
 	if strings.Contains(string(response.Body), `"bindings"`) || strings.Contains(string(response.Body), `"kind"`) {

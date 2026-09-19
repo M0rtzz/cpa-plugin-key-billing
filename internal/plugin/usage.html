@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>我的用量 · CPA Key Billing</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6fa;
+    --panel: #fff;
+    --ink: #18253d;
+    --muted: #65738a;
+    --line: #dce3ed;
+    --accent: #4262d7;
+    --soft: #edf1ff;
+    --ok: #16745d;
+    --warn: #9b660d;
+    --bad: #b7404b;
+    --shadow: 0 8px 28px #26365a08;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #101622;
+      --panel: #182132;
+      --ink: #e4eaf5;
+      --muted: #9daac0;
+      --line: #303c52;
+      --accent: #93aaff;
+      --soft: #263250;
+      --ok: #69d1ac;
+      --warn: #e6bd65;
+      --bad: #ff9a9f;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101622;
+    --panel: #182132;
+    --ink: #e4eaf5;
+    --muted: #9daac0;
+    --line: #303c52;
+    --accent: #93aaff;
+    --soft: #263250;
+    --ok: #69d1ac;
+    --warn: #e6bd65;
+    --bad: #ff9a9f;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, input, select { font: inherit; }
+  button, a, input, select { touch-action: manipulation; }
+  button, a { -webkit-tap-highlight-color: transparent; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  button {
+    cursor: pointer;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 14px;
+  }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--accent); color: var(--panel); border-color: var(--accent); font-weight: 650; }
+  input, select {
+    min-width: 0;
+    max-width: 100%;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 12px;
+  }
+  input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  h1, h2, h3, p { margin: 0; }
+  h1 { font-size: 27px; line-height: 1.3; letter-spacing: -0.6px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 14px; }
+  small, .muted { color: var(--muted); }
+  [hidden] { display: none !important; }
+  .shell { width: min(1220px, 100%); padding: 30px 26px 40px; margin: auto; }
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: var(--soft);
+    color: var(--accent);
+  }
+  .brand-mark svg { width: 24px; height: 24px; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.7px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .nav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .nav a[aria-current="page"] { font-weight: 700; }
+  .intro { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; }
+  .intro p { margin-top: 8px; }
+  .panel, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  .panel { padding: 22px; margin-bottom: 20px; }
+  .auth { max-width: 650px; margin: 46px auto; padding: 30px; }
+  .auth h2 { font-size: 20px; margin-bottom: 8px; }
+  .auth form { margin-top: 24px; }
+  .auth label { display: block; font-weight: 650; margin-bottom: 8px; }
+  .auth-row { display: flex; gap: 10px; }
+  .auth input { flex: 1; }
+  .auth small { display: block; margin-top: 13px; }
+  .notice {
+    padding: 13px 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 18px;
+    background: var(--soft);
+    overflow-wrap: anywhere;
+  }
+  .notice.error { color: var(--bad); background: var(--panel); border-color: var(--bad); }
+  .grid { display: grid; gap: 16px; }
+  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 20px; }
+  .card { padding: 19px; }
+  .card .label { color: var(--muted); font-size: 12px; }
+  .card .value {
+    font-size: 27px;
+    line-height: 1.3;
+    margin: 9px 0 5px;
+    font-weight: 720;
+    letter-spacing: -0.7px;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .card .detail { font-size: 12px; color: var(--muted); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+  .badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 99px;
+    font-size: 12px;
+    white-space: nowrap;
+    background: var(--soft);
+    color: var(--accent);
+  }
+  .badge.ok { color: var(--ok); }
+  .badge.warn { color: var(--warn); }
+  .badge.bad { color: var(--bad); }
+  .empty { color: var(--muted); padding: 25px 10px; text-align: center; }
+  .bar { height: 7px; border-radius: 5px; background: var(--line); overflow: hidden; margin-top: 9px; }
+  .bar i { height: 100%; display: block; background: var(--accent); border-radius: 5px; }
+  .footer { font-size: 12px; text-align: center; color: var(--muted); margin-top: 30px; }
+  .two { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+  .filters { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+  .filters label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 12px; }
+  .filters input { color: var(--ink); }
+  .chart { width: 100%; height: 220px; display: block; color: var(--accent); }
+  .chart-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+  .distribution-row { margin-bottom: 18px; }
+  .distribution-row .row { align-items: start; }
+  .model-name { overflow-wrap: anywhere; font-weight: 600; }
+  .table-scroll { overflow: auto; margin: 0 -22px; }
+  .table-scroll table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 12px; }
+  th, td { text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 550; background: var(--bg); }
+  td.message { min-width: 180px; max-width: 380px; white-space: normal; overflow-wrap: anywhere; }
+  .pager { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+  .pager .buttons { display: flex; gap: 8px; }
+  .tabs { display: flex; gap: 7px; }
+  .tabs button[aria-selected="true"] { background: var(--soft); border-color: var(--accent); color: var(--accent); }
+  .account-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .account-grid .card { box-shadow: none; }
+  .account-name { overflow-wrap: anywhere; font-size: 15px; }
+  .quota-row { margin-top: 17px; }
+  .quota-row .row { font-size: 12px; align-items: start; }
+  .quota-row small { display: block; margin-top: 5px; font-size: 11px; }
+  .account-meta { margin-top: 7px; color: var(--muted); font-size: 12px; }
+  .timestamp { margin-top: 17px; color: var(--muted); font-size: 11px; }
+  .status-line { display: flex; gap: 7px; flex-wrap: wrap; }
+  .subscription-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .window { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 15px; }
+  .metric-list { margin-top: 10px; }
+  .scope-note { margin: 10px 0 18px; color: var(--muted); font-size: 12px; }
+  .busy { opacity: 0.6; pointer-events: none; }
+  @media (max-width: 850px) {
+    .two { grid-template-columns: 1fr; }
+    .account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .top { align-items: flex-start; }
+    .nav { gap: 10px; }
+  }
+  @media (max-width: 540px) {
+    .shell { padding: 18px 15px 28px; }
+    .top { flex-direction: column; gap: 16px; margin-bottom: 23px; padding-bottom: 19px; }
+    .nav { width: 100%; }
+    .nav #theme { margin-left: auto; }
+    .brand-mark { width: 36px; height: 36px; }
+    .intro { align-items: start; }
+    h1 { font-size: 23px; }
+    .panel { padding: 17px; }
+    .auth { margin: 25px auto; padding: 23px 18px; }
+    .auth-row { flex-direction: column; }
+    .stats { gap: 10px; }
+    .card { padding: 15px; }
+    .card .value { font-size: 23px; }
+    .account-grid, .subscription-grid { grid-template-columns: 1fr; }
+    .table-scroll { margin: 0 -17px; }
+    .filters { gap: 10px; }
+    .filters label { flex: 1 1 130px; }
+    .filters input { width: 100%; }
+    .filters button { width: 100%; }
+    .section-head { flex-wrap: wrap; }
+    .chart { height: 190px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="top"><a class="brand" href="usage.html"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19V9m8 10V4m8 15v-7" stroke-linecap="round"/></svg></span><span><strong>CPA Key Billing</strong><br><small>账户自助查询</small></span></a><nav class="nav" aria-label="页面导航"><a href="usage.html" aria-current="page">我的用量</a><a href="quota.html">额度总览</a><button id="theme" type="button" aria-label="切换明暗主题">明暗</button><button id="logout" type="button" hidden>退出</button></nav></header>
+<div id="message" class="notice" role="status" aria-live="polite" hidden></div>
+
+<div class="intro"><div><div class="eyebrow">Your usage, at a glance</div><h1>我的用量</h1><p class="muted">查看当前 API Key 的请求、Token、费用与错误记录。</p></div><span id="identity" class="badge"></span></div>
+<section id="auth" class="panel auth"><h2>查看自己的用量</h2><p class="muted">输入服务管理员提供的 API Key，查看对应的使用记录。</p><form id="login"><label for="key">API Key</label><div class="auth-row"><input id="key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="8192"><button class="primary" type="submit">查看用量</button></div><small>Key 仅用于当前页面请求，不写入浏览器存储。关闭页面或退出后需要重新输入。</small></form></section>
+<div id="dashboard" hidden>
+<section class="panel"><form id="filter" class="filters"><label for="from">开始日期<input id="from" type="date" required></label><label for="to">结束日期<input id="to" type="date" required></label><button class="primary" type="submit">查询</button><small>按本地时区统计，结束日期包含当天。</small></form></section>
+<div id="stats" class="grid stats" data-private></div>
+<div class="grid two"><section class="panel"><div class="section-head"><h2>用量趋势</h2><select id="trend-metric" aria-label="趋势指标"><option value="requests">请求数</option><option value="total_tokens">Token 数</option><option value="total_cost">费用（USD）</option></select></div><div id="trend" data-private></div></section><section class="panel"><div class="section-head"><h2>模型分布</h2><span class="muted">按 Token 占比</span></div><div id="models" data-private></div></section></div>
+<section class="panel"><div class="section-head"><h2>请求明细</h2><div class="tabs" role="tablist" aria-label="记录类型"><button id="events-tab" type="button" role="tab" aria-selected="true">全部请求</button><button id="errors-tab" type="button" role="tab" aria-selected="false">错误记录</button></div></div><div id="records" class="table-scroll" data-private></div><div class="pager"><span id="page-label" class="muted" data-private></span><div class="buttons"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button></div></div></section>
+</div>
+
+<footer class="footer">CPA Key Billing · 账户自助查询 · 页面关闭后清除 Key</footer>
+</div>
+<script>
+  (() => {
+    "use strict";
+    const BASE = "/v0/resource/plugins/cpa-key-billing";
+    const $ = (id) => document.getElementById(id);
+    const integer = (value) => Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+    const money = (value) => "$" + Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    const percent = (value) => (Number.isFinite(Number(value)) && value != null ? Number(value).toFixed(1) + "%" : "未提供");
+    const when = (value) =>
+      value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "尚无记录";
+    function node(tag, text, cls) {
+      const value = document.createElement(tag);
+      if (text != null) value.textContent = String(text);
+      if (cls) value.className = cls;
+      return value;
+    }
+    function clear(id) {
+      const value = $(id);
+      value.replaceChildren();
+      return value;
+    }
+    function card(parent, label, value, detail) {
+      const item = node("article", null, "card");
+      item.append(node("div", label, "label"), node("div", value, "value"), node("div", detail, "detail"));
+      parent.append(item);
+    }
+    function empty(parent, text = "所选范围内暂无记录") { parent.append(node("p", text, "empty")); }
+    function bar(parent, value, label) {
+      const item = node("div", null, "bar");
+      const fill = node("i");
+      const valid = value != null && Number.isFinite(Number(value));
+      fill.style.width = (valid ? Math.max(0, Math.min(100, Number(value))) : 0) + "%";
+      item.setAttribute("role", "progressbar");
+      item.setAttribute("aria-label", label);
+      item.setAttribute("aria-valuemin", "0");
+      item.setAttribute("aria-valuemax", "100");
+      if (valid) item.setAttribute("aria-valuenow", String(Number(value)));
+      item.append(fill);
+      parent.append(item);
+    }
+    let apiKey = "", generation = 0, controllers = new Set();
+    function message(text, error = false) {
+      $("message").textContent = text;
+      $("message").hidden = !text;
+      $("message").classList.toggle("error", error);
+    }
+    function stopRequests() {
+      generation++;
+      for (const controller of controllers) controller.abort();
+      controllers.clear();
+    }
+    function logout() {
+      stopRequests();
+      apiKey = "";
+      $("key").value = "";
+      $("dashboard").hidden = true;
+      $("dashboard").querySelectorAll("[data-private]").forEach((item) => item.replaceChildren());
+      $("auth").hidden = false;
+      $("logout").hidden = true;
+      $("identity").textContent = "";
+      message("");
+      $("key").focus();
+    }
+    async function api(path) {
+      if (!apiKey) throw new Error("请先输入 API Key");
+      const controller = new AbortController();
+      controllers.add(controller);
+      const version = generation;
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch(BASE + path, {
+          method: "GET",
+          headers: { Authorization: "Bearer " + apiKey },
+          credentials: "omit",
+          cache: "no-store",
+          redirect: "error",
+          signal: controller.signal
+        });
+        let data;
+        try { data = await response.json(); } catch (_) { throw new Error("服务器未返回有效数据（HTTP " + response.status + "）"); }
+        if (version !== generation) throw new DOMException("Cancelled", "AbortError");
+        if (!response.ok) {
+          if (response.status === 401) {
+            logout();
+            throw new Error("API Key 无效或已失效，请重新输入");
+          }
+          throw new Error(data?.error?.message || "请求失败（HTTP " + response.status + "）");
+        }
+        return data;
+      } finally {
+        clearTimeout(timeout);
+        controllers.delete(controller);
+      }
+    }
+    function showDashboard() {
+      $("auth").hidden = true;
+      $("dashboard").hidden = false;
+      $("logout").hidden = false;
+      $("key").value = "";
+    }
+    $("logout").onclick = logout;
+    $("theme").onclick = () => {
+      const root = document.documentElement;
+      const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      root.dataset.theme = dark ? "light" : "dark";
+      $("theme").textContent = dark ? "深色" : "浅色";
+    };
+    window.addEventListener("pagehide", () => {
+      stopRequests();
+      apiKey = "";
+      $("key").value = "";
+    });
+    window.addEventListener("pageshow", (event) => { if (event.persisted) logout(); });
+
+    let analysis = null, range = "", tab = "events", offset = 0, snapshot = "", total = 0, busy = false;
+    const PAGE_SIZE = 20;
+    function dateValue(date) {
+      return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+    }
+    const today = new Date(), start = new Date();
+    start.setDate(start.getDate() - 29);
+    $("from").value = dateValue(start);
+    $("to").value = dateValue(today);
+    function selectedRange() {
+      const from = new Date($("from").value + "T00:00:00"), to = new Date($("to").value + "T00:00:00");
+      to.setDate(to.getDate() + 1);
+      if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from >= to || from > new Date())
+        throw new Error("请选择有效的开始、结束日期");
+      return new URLSearchParams({
+        from: from.toISOString(),
+        to: to.toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+      }).toString();
+    }
+    function renderAnalysis(value) {
+      analysis = value;
+      const summary = value.summary || {}, stats = clear("stats");
+      card(stats, "请求总数", integer(summary.requests), "成功 " + integer(summary.succeeded) + " · 失败 " + integer(summary.failed));
+      card(
+        stats,
+        "Token 总量",
+        integer(summary.total_tokens),
+        "输入 " + integer(summary.input_tokens) + " · 输出 " + integer(summary.output_tokens)
+      );
+      card(stats, "累计费用 · USD", money(summary.cost?.total_usd), "采用实际计费记录");
+      card(stats, "请求成功率", percent(summary.success_rate), "缓存命中率 " + percent(summary.cache_rate));
+      renderTrend();
+      const models = clear("models"), values = value.usage_distribution?.models || [];
+      if (!values.length) empty(models);
+      for (const item of values) {
+        const row = node("div", null, "distribution-row"), line = node("div", null, "row");
+        line.append(node("span", item.label || item.key || "未知模型", "model-name"), node("span", percent(item.percent), "muted"));
+        row.append(line);
+        bar(row, item.percent, (item.label || item.key) + "占比");
+        row.append(node("small", integer(item.requests) + " 次请求 · " + integer(item.total_tokens) + " Token · " + money(item.cost_usd)));
+        models.append(row);
+      }
+    }
+    function renderTrend() {
+      const parent = clear("trend"), metric = $("trend-metric").value, points = analysis?.trends?.[metric] || [];
+      if (!points.length) {
+        empty(parent);
+        return;
+      }
+      const max = Math.max(1, ...points.map((item) => Number(item.value) || 0)), ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", "0 0 600 210");
+      svg.setAttribute("class", "chart");
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", $("trend-metric").selectedOptions[0].textContent + "趋势");
+      const line = document.createElementNS(ns, "polyline");
+      line.setAttribute(
+        "points",
+        points.map(
+          (point, index) =>
+            20 + (index * 560) / Math.max(1, points.length - 1) + "," + (185 - (Math.max(0, Number(point.value) || 0) / max) * 155)
+        )
+          .join(" ")
+      );
+      line.setAttribute("fill", "none");
+      line.setAttribute("stroke", "currentColor");
+      line.setAttribute("stroke-width", "2.5");
+      line.setAttribute("stroke-linejoin", "round");
+      svg.append(line);
+      for (let i = 0; i < points.length; i++) {
+        const point = points[i], dot = document.createElementNS(ns, "circle"), title = document.createElementNS(ns, "title");
+        dot.setAttribute("cx", String(20 + (i * 560) / Math.max(1, points.length - 1)));
+        dot.setAttribute("cy", String(185 - (Math.max(0, Number(point.value) || 0) / max) * 155));
+        dot.setAttribute("r", points.length > 60 ? "1.8" : "3");
+        dot.setAttribute("fill", "currentColor");
+        title.textContent = when(point.time) + " · " + (metric === "total_cost" ? money(point.value) : integer(point.value));
+        dot.append(title);
+        svg.append(dot);
+      }
+      parent.append(
+        node(
+          "small",
+          "峰值 " +
+            (metric === "total_cost"
+              ? money(Math.max(...points.map((p) => Number(p.value) || 0)))
+              : integer(Math.max(...points.map((p) => Number(p.value) || 0))))
+        ),
+        svg
+      );
+      const labels = node("div", null, "chart-labels");
+      labels.append(node("span", when(points[0].time)), node("span", when(points[points.length - 1].time)));
+      parent.append(labels);
+    }
+    function renderRecords(value) {
+      total = Number(value.total) || 0;
+      snapshot = String(value.snapshot_id || snapshot);
+      const parent = clear("records"), entries = value.entries || [];
+      if (!entries.length) empty(parent, tab === "errors" ? "所选范围内暂无错误记录" : "所选范围内暂无请求记录");
+      else {
+        const table = node("table"), head = node("thead"), row = node("tr");
+        for (const label of tab === "errors" ? ["时间", "模型", "HTTP 状态", "错误类型", "错误说明"] : ["时间", "模型", "状态", "Token", "费用（USD）", "耗时"])
+          row.append(node("th", label));
+        head.append(row);
+        table.append(head);
+        const body = node("tbody");
+        for (const entry of entries) {
+          const tr = node("tr"),
+            cost = entry.cost || {},
+            tokens = [cost.uncached_input_tokens, cost.cache_read_tokens, cost.cache_write_tokens, cost.billed_output_tokens].reduce(
+              (sum, item) => sum + (Number(item) || 0),
+              0
+            );
+          const values =
+            tab === "errors"
+              ? [
+                  when(entry.at),
+                  entry.billing_model || entry.upstream_model || "—",
+                  entry.status_code || "—",
+                  entry.error_type || "未提供",
+                  entry.reason || "未提供错误说明"
+                ]
+              : [
+                  when(entry.at),
+                  entry.billing_model || entry.upstream_model || "—",
+                  entry.failed ? "失败" : "成功",
+                  integer(tokens),
+                  money(cost.total_usd),
+                  entry.latency_ms == null ? "—" : integer(entry.latency_ms) + " ms"
+                ];
+          values.forEach((text, index) => tr.append(node("td", text, tab === "errors" && index === 4 ? "message" : "")));
+          body.append(tr);
+        }
+        table.append(body);
+        parent.append(table);
+      }
+      $("page-label").textContent =
+        "共 " + integer(total) + " 条 · 第 " + (Math.floor(offset / PAGE_SIZE) + 1) + " / " + Math.max(1, Math.ceil(total / PAGE_SIZE)) + " 页";
+      $("previous").disabled = offset === 0;
+      $("next").disabled = offset + PAGE_SIZE >= total;
+    }
+    async function loadRecords() {
+      const params = new URLSearchParams(range);
+      params.set("offset", offset);
+      params.set("limit", PAGE_SIZE);
+      if (snapshot) params.set("snapshot_id", snapshot);
+      renderRecords(await api("/" + tab + "?" + params));
+    }
+    async function operation(callback) {
+      if (busy) return;
+      busy = true;
+      const version = generation;
+      $("dashboard").classList.add("busy");
+      message("正在加载…");
+      try {
+        await callback();
+        if (version === generation) message("");
+      } catch (error) {
+        if (error.name !== "AbortError") message(error.message, true); else if (version === generation) message("请求超时，请稍后重试", true);
+      } finally {
+        busy = false;
+        $("dashboard").classList.remove("busy");
+      }
+    }
+    $("login").onsubmit = (event) => {
+      event.preventDefault();
+      if (busy) return;
+      apiKey = $("key").value.trim();
+      $("key").value = "";
+      if (!apiKey) return;
+      stopRequests();
+      operation(async () => {
+        const profile = await api("/profile");
+        if (!profile.tracked) throw new Error("该 API Key 暂无可用账单，请联系管理员");
+        $("identity").textContent = profile.identity?.label || profile.identity?.preview || "当前 API Key";
+        range = selectedRange();
+        offset = 0;
+        snapshot = "";
+        const value = await api("/analysis?" + range);
+        renderAnalysis(value);
+        await loadRecords();
+        showDashboard();
+      });
+    };
+    $("filter").onsubmit = (event) => {
+      event.preventDefault();
+      operation(async () => {
+        range = selectedRange();
+        offset = 0;
+        snapshot = "";
+        clear("records");
+        clear("page-label");
+        renderAnalysis(await api("/analysis?" + range));
+        await loadRecords();
+      });
+    };
+    $("trend-metric").onchange = renderTrend;
+    for (const value of ["events", "errors"])
+      $(value + "-tab").onclick = () =>
+        operation(async () => {
+          tab = value;
+          offset = 0;
+          snapshot = "";
+          for (const name of ["events", "errors"]) $(name + "-tab").setAttribute("aria-selected", String(name === tab));
+          clear("records");
+          await loadRecords();
+        });
+    $("previous").onclick = () =>
+      operation(async () => {
+        offset = Math.max(0, offset - PAGE_SIZE);
+        await loadRecords();
+      });
+    $("next").onclick = () =>
+      operation(async () => {
+        if (offset + PAGE_SIZE < total) offset += PAGE_SIZE;
+        await loadRecords();
+      });
+  })();
+</script>
+</body>
+</html>

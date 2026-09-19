@@ -9,6 +9,14 @@ import (
 //go:embed ui.html i18n.js locales/*.json
 var uiFiles embed.FS
 
+// These files are also exported unchanged for same-origin static hosting.
+//
+//go:embed usage.html
+var usageHTML []byte
+
+//go:embed quota.html
+var quotaHTML []byte
+
 // Assemble once. The browser receives one self-contained HTML resource.
 var uiHTML = buildUI()
 

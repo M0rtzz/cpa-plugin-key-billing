@@ -63,9 +63,6 @@ func (a *App) accountProfile(access viewAccess) ManagementResponse {
 }
 
 func (a *App) accountSubscription(access viewAccess) ManagementResponse {
-	if !access.Tracked {
-		return apiKeyUnauthorized()
-	}
 	view := access.Key
 	return apiKeyJSON(http.StatusOK, accountSubscriptionResponse{
 		Subscription: accountSubscription{Name: view.PlanName, QuotaView: view.QuotaView},
@@ -74,9 +71,6 @@ func (a *App) accountSubscription(access viewAccess) ManagementResponse {
 }
 
 func (a *App) accountRouting(access viewAccess) ManagementResponse {
-	if !access.Tracked {
-		return apiKeyUnauthorized()
-	}
 	decision := a.store.ResolveRouting(access.Scope, "", "")
 	response := accountRoutingResponse{
 		Models: decision.Models, DeniedModels: decision.DeniedModels,
@@ -95,6 +89,10 @@ func (a *App) accountRouting(access viewAccess) ManagementResponse {
 		response.WarningMessages = append(response.WarningMessages, messages.New("Failed to load upstream credentials"))
 	}
 	inventory := a.credentialInventory()
+	for i := range inventory {
+		_, inventory[i].DisplayName = a.accountCredentialIdentity(inventory[i].Ref, inventory[i].Provider, access.Scope)
+		inventory[i].DisplayMessage = messages.Message{}
+	}
 	var warnings []messages.Message
 	response.Credentials, warnings = accountRoutingCredentials(inventory, decision.CredentialIDs, decision.CredentialProviders, decision)
 	for _, warning := range warnings {

@@ -88,6 +88,7 @@ plugins:
       debug: false # 是否记录 debug 日志，例如路由日志、匹配参考价日志
       codex_fast_mode_billing: false # 开启后，Codex 的 priority 请求按 2.5 倍计费
       state_file: "plugins/cpa-key-billing-state-v1.db"
+      account_api_base_url: "http://127.0.0.1:18316" # 普通用户鉴权地址，端口改为当前 CPA 监听端口
 ```
 
 `codex_fast_mode_billing` 开启后，请求 Codex 上游时在请求中指定 `service_tier=priority`，按普通费用的 **2.5 倍**结算。
@@ -101,6 +102,10 @@ plugins:
 重启 CLIProxyAPI 后，在管理中心打开「API Key Billing」。确认模型定价后，创建订阅计划并绑定需要限制的 API Key。
 
 ## 页面访问
+
+独立普通用户页面：`/v0/resource/plugins/cpa-key-billing/usage.html`（用量费用）和 `/v0/resource/plugins/cpa-key-billing/quota.html`（只读额度）。用户输入本人 API Key，无需管理密码。上游账号匿名显示，保留 Plus、Pro 20x 等类型；上游额度仅由计费插件管理员查询更新。构建、配置、缓存行为及回滚见 [普通用户页面部署文档](docs/self-service-deployment.md)。
+
+包括旧入口在内的用户 JSON 接口均需配置 `account_api_base_url`，否则返回 `503`。HTML 和管理员入口不受影响。
 
 管理员可以从 CLIProxyAPI 管理中心的「API Key Billing」菜单进入，也可以直接打开：
 

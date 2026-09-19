@@ -43,6 +43,7 @@ const (
 	routePluginLogs             = "/plugin-logs"
 	routeAuthFiles              = "/auth-files"
 	routeAuthQuota              = "/auth-files/quota"
+	routeQuotaSummary           = "/quota-summary"
 )
 
 type managementEndpoint struct {
@@ -116,14 +117,18 @@ var resourceEndpoints = []resourceEndpoint{
 	{routeErrors, (*App).listRequestErrors},
 	{routeAuthFiles, func(a *App, _ ManagementRequest, access viewAccess) ManagementResponse { return a.authFiles(access) }},
 	{routeAuthQuota, (*App).authQuota},
+	{routeQuotaSummary, (*App).accountQuotaSummary},
 }
 
 func managementRegistration() ManagementRegistrationResponse {
 	registration := ManagementRegistrationResponse{
 		Routes:    make([]ManagementRoute, 0, len(managementEndpoints)),
-		Resources: make([]ResourceRoute, 1, len(resourceEndpoints)+1),
+		Resources: make([]ResourceRoute, 1, len(resourceEndpoints)+3),
 	}
 	registration.Resources[0] = ResourceRoute{Path: resourceBase + resourceUIPath, Menu: MenuLabel, Description: MenuDescription}
+	for _, path := range []string{"/usage.html", "/quota.html"} {
+		registration.Resources = append(registration.Resources, ResourceRoute{Path: resourceBase + path})
+	}
 	for _, endpoint := range managementEndpoints {
 		registration.Routes = append(registration.Routes, ManagementRoute{
 			Method: endpoint.method, Path: managementBase + endpoint.path, Description: endpoint.description,
@@ -143,6 +148,22 @@ func (a *App) handleManagement(raw []byte) ([]byte, error) {
 	path := strings.TrimRight(req.Path, "/")
 	if path == "" {
 		path = req.Path
+	}
+	if req.Method == http.MethodGet {
+		var page []byte
+		switch path {
+		case resourceBase + "/usage.html":
+			page = usageHTML
+		case resourceBase + "/quota.html":
+			page = quotaHTML
+		}
+		if page != nil {
+			response := ManagementResponse{StatusCode: http.StatusOK, Headers: http.Header{}, Body: page}
+			secureAPIKeyResponse(&response)
+			response.Headers.Set("Content-Type", "text/html; charset=utf-8")
+			response.Headers.Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'")
+			return OKEnvelope(response)
+		}
 	}
 
 	if req.Method == http.MethodGet && path == resourceBase+resourceUIPath {

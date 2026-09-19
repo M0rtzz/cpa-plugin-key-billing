@@ -20,6 +20,7 @@ plugins:
     cpa-key-billing:
       enabled: true
       debug: true
+      account_api_base_url: "http://127.0.0.1:__PORT__"
       state_file: "__RUNTIME_DIR__/state.db"
 
 # Keep the prefixed and bare model routes on distinct upstreams.

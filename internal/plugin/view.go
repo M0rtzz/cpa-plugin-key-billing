@@ -30,6 +30,9 @@ func (a *App) apiKeyViewAccess(req ManagementRequest) (viewAccess, bool) {
 		return viewAccess{}, false
 	}
 	view, tracked := a.store.KeyViewForScope(scope)
+	if !tracked {
+		view.QuotaView = billing.QuotaView{Unlimited: true, Windows: []billing.QuotaWindowView{}}
+	}
 	return viewAccess{APIKey: true, Scope: scope, Tracked: tracked, Key: view}, true
 }
 
@@ -46,6 +49,9 @@ func (a *App) routeResource(req ManagementRequest, suffix string) ManagementResp
 	}
 	if handler == nil {
 		return apiKeyJSONError(http.StatusNotFound, "not_found", "Resource route not found: "+req.Method+" "+req.Path)
+	}
+	if response := a.validateAccountRequest(req); response != nil {
+		return *response
 	}
 	access, ok := a.apiKeyViewAccess(req)
 	if !ok {
@@ -66,6 +72,9 @@ func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) Manage
 	}
 	if !access.APIKey {
 		query.KeyScope = strings.TrimSpace(req.Query.Get("api_key"))
+	} else {
+		// Source is a historical upstream identity, never a user-selectable filter.
+		query.Source = ""
 	}
 	switch raw := strings.TrimSpace(req.Query.Get("failed")); raw {
 	case "":
@@ -89,6 +98,11 @@ func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) Manage
 			view.Entries[i].AuthIndex = ""
 			view.Entries[i].Preview = ""
 			view.Entries[i].Label = ""
+			view.Entries[i].Account = ""
+			view.Entries[i].Source = ""
+		}
+		if view.Filters != nil {
+			view.Filters.Sources = []string{}
 		}
 	}
 	return viewJSON(access, http.StatusOK, view)
@@ -114,6 +128,9 @@ func (a *App) listRequestErrors(req ManagementRequest, access viewAccess) Manage
 	}
 	if !access.APIKey {
 		query.KeyScope = strings.TrimSpace(req.Query.Get("api_key"))
+	} else {
+		query.Source, query.ErrorType = "", ""
+		query.ErrorTypeEmpty = false
 	}
 	if err := requestPageParams(req.Query, &query.Offset, &query.Limit, &query.From, &query.To, &query.SnapshotID); err != nil {
 		return viewErrorResponse(access, err)
@@ -127,6 +144,15 @@ func (a *App) listRequestErrors(req ManagementRequest, access viewAccess) Manage
 		for i := range view.Entries {
 			view.Entries[i].Scope, view.Entries[i].AuthIndex = "", ""
 			view.Entries[i].Preview, view.Entries[i].Label = "", ""
+			view.Entries[i].Source, view.Entries[i].Body, view.Entries[i].ErrorType = "", "", ""
+			view.Entries[i].Reason = http.StatusText(view.Entries[i].StatusCode)
+			if view.Entries[i].Reason == "" {
+				view.Entries[i].Reason = "Request failed"
+			}
+		}
+		view.ErrorTypeCounts = map[string]int{"": view.Total}
+		if view.Filters != nil {
+			view.Filters.Sources, view.Filters.ErrorTypes = []string{}, []string{}
 		}
 	}
 	return viewJSON(access, http.StatusOK, view)
@@ -165,6 +191,9 @@ func (a *App) analysis(req ManagementRequest, access viewAccess) ManagementRespo
 	}
 	if access.APIKey || query.KeyScope != "" {
 		view.UsageDistribution.APIKeys = []billing.AnalysisComposition{}
+	}
+	if access.APIKey {
+		view.UsageDistribution.Sources = []billing.AnalysisComposition{}
 	}
 	return viewJSON(access, http.StatusOK, view)
 }
@@ -241,14 +270,16 @@ func viewJSONError(access viewAccess, status int, code, message string) Manageme
 }
 
 func viewDetailedError(access viewAccess, status int, code string, err error) ManagementResponse {
-	response := jsonMessageError(status, code, messages.FromError(err))
 	if access.APIKey {
-		secureAPIKeyResponse(&response)
+		return apiKeyJSONError(status, code, "Unable to read account data; contact your administrator")
 	}
-	return response
+	return jsonMessageError(status, code, messages.FromError(err))
 }
 
 func viewErrorResponse(access viewAccess, err error) ManagementResponse {
+	if access.APIKey && billing.KindOf(err) != billing.KindInvalid {
+		return apiKeyJSONError(http.StatusInternalServerError, "account_data_unavailable", "Unable to read account data; contact your administrator")
+	}
 	response := errorResponse(err)
 	if access.APIKey {
 		secureAPIKeyResponse(&response)

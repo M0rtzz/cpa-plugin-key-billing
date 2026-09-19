@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>额度总览 · CPA Key Billing</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6fa;
+    --panel: #fff;
+    --ink: #18253d;
+    --muted: #65738a;
+    --line: #dce3ed;
+    --accent: #4262d7;
+    --soft: #edf1ff;
+    --ok: #16745d;
+    --warn: #9b660d;
+    --bad: #b7404b;
+    --shadow: 0 8px 28px #26365a08;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #101622;
+      --panel: #182132;
+      --ink: #e4eaf5;
+      --muted: #9daac0;
+      --line: #303c52;
+      --accent: #93aaff;
+      --soft: #263250;
+      --ok: #69d1ac;
+      --warn: #e6bd65;
+      --bad: #ff9a9f;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #101622;
+    --panel: #182132;
+    --ink: #e4eaf5;
+    --muted: #9daac0;
+    --line: #303c52;
+    --accent: #93aaff;
+    --soft: #263250;
+    --ok: #69d1ac;
+    --warn: #e6bd65;
+    --bad: #ff9a9f;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, input, select { font: inherit; }
+  button, a, input, select { touch-action: manipulation; }
+  button, a { -webkit-tap-highlight-color: transparent; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  button {
+    cursor: pointer;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 14px;
+  }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--accent); color: var(--panel); border-color: var(--accent); font-weight: 650; }
+  input, select {
+    min-width: 0;
+    max-width: 100%;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 9px 12px;
+  }
+  input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  h1, h2, h3, p { margin: 0; }
+  h1 { font-size: 27px; line-height: 1.3; letter-spacing: -0.6px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 14px; }
+  small, .muted { color: var(--muted); }
+  [hidden] { display: none !important; }
+  .shell { width: min(1220px, 100%); padding: 30px 26px 40px; margin: auto; }
+  .top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 28px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: var(--soft);
+    color: var(--accent);
+  }
+  .brand-mark svg { width: 24px; height: 24px; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.7px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .nav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .nav a[aria-current="page"] { font-weight: 700; }
+  .intro { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; }
+  .intro p { margin-top: 8px; }
+  .panel, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+  .panel { padding: 22px; margin-bottom: 20px; }
+  .auth { max-width: 650px; margin: 46px auto; padding: 30px; }
+  .auth h2 { font-size: 20px; margin-bottom: 8px; }
+  .auth form { margin-top: 24px; }
+  .auth label { display: block; font-weight: 650; margin-bottom: 8px; }
+  .auth-row { display: flex; gap: 10px; }
+  .auth input { flex: 1; }
+  .auth small { display: block; margin-top: 13px; }
+  .notice {
+    padding: 13px 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin-bottom: 18px;
+    background: var(--soft);
+    overflow-wrap: anywhere;
+  }
+  .notice.error { color: var(--bad); background: var(--panel); border-color: var(--bad); }
+  .grid { display: grid; gap: 16px; }
+  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 20px; }
+  .card { padding: 19px; }
+  .card .label { color: var(--muted); font-size: 12px; }
+  .card .value {
+    font-size: 27px;
+    line-height: 1.3;
+    margin: 9px 0 5px;
+    font-weight: 720;
+    letter-spacing: -0.7px;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .card .detail { font-size: 12px; color: var(--muted); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+  .badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 99px;
+    font-size: 12px;
+    white-space: nowrap;
+    background: var(--soft);
+    color: var(--accent);
+  }
+  .badge.ok { color: var(--ok); }
+  .badge.warn { color: var(--warn); }
+  .badge.bad { color: var(--bad); }
+  .empty { color: var(--muted); padding: 25px 10px; text-align: center; }
+  .bar { height: 7px; border-radius: 5px; background: var(--line); overflow: hidden; margin-top: 9px; }
+  .bar i { height: 100%; display: block; background: var(--accent); border-radius: 5px; }
+  .footer { font-size: 12px; text-align: center; color: var(--muted); margin-top: 30px; }
+  .two { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+  .filters { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+  .filters label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 12px; }
+  .filters input { color: var(--ink); }
+  .chart { width: 100%; height: 220px; display: block; color: var(--accent); }
+  .chart-labels { display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; }
+  .distribution-row { margin-bottom: 18px; }
+  .distribution-row .row { align-items: start; }
+  .model-name { overflow-wrap: anywhere; font-weight: 600; }
+  .table-scroll { overflow: auto; margin: 0 -22px; }
+  .table-scroll table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 12px; }
+  th, td { text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 550; background: var(--bg); }
+  td.message { min-width: 180px; max-width: 380px; white-space: normal; overflow-wrap: anywhere; }
+  .pager { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
+  .pager .buttons { display: flex; gap: 8px; }
+  .tabs { display: flex; gap: 7px; }
+  .tabs button[aria-selected="true"] { background: var(--soft); border-color: var(--accent); color: var(--accent); }
+  .account-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .account-grid .card { box-shadow: none; }
+  .account-name { overflow-wrap: anywhere; font-size: 15px; }
+  .quota-row { margin-top: 17px; }
+  .quota-row .row { font-size: 12px; align-items: start; }
+  .quota-row small { display: block; margin-top: 5px; font-size: 11px; }
+  .account-meta { margin-top: 7px; color: var(--muted); font-size: 12px; }
+  .timestamp { margin-top: 17px; color: var(--muted); font-size: 11px; }
+  .status-line { display: flex; gap: 7px; flex-wrap: wrap; }
+  .subscription-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .window { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 15px; }
+  .metric-list { margin-top: 10px; }
+  .scope-note { margin: 10px 0 18px; color: var(--muted); font-size: 12px; }
+  .busy { opacity: 0.6; pointer-events: none; }
+  @media (max-width: 850px) {
+    .two { grid-template-columns: 1fr; }
+    .account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .top { align-items: flex-start; }
+    .nav { gap: 10px; }
+  }
+  @media (max-width: 540px) {
+    .shell { padding: 18px 15px 28px; }
+    .top { flex-direction: column; gap: 16px; margin-bottom: 23px; padding-bottom: 19px; }
+    .nav { width: 100%; }
+    .nav #theme { margin-left: auto; }
+    .brand-mark { width: 36px; height: 36px; }
+    .intro { align-items: start; }
+    h1 { font-size: 23px; }
+    .panel { padding: 17px; }
+    .auth { margin: 25px auto; padding: 23px 18px; }
+    .auth-row { flex-direction: column; }
+    .stats { gap: 10px; }
+    .card { padding: 15px; }
+    .card .value { font-size: 23px; }
+    .account-grid, .subscription-grid { grid-template-columns: 1fr; }
+    .table-scroll { margin: 0 -17px; }
+    .filters { gap: 10px; }
+    .filters label { flex: 1 1 130px; }
+    .filters input { width: 100%; }
+    .filters button { width: 100%; }
+    .section-head { flex-wrap: wrap; }
+    .chart { height: 190px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="top"><a class="brand" href="usage.html"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19V9m8 10V4m8 15v-7" stroke-linecap="round"/></svg></span><span><strong>CPA Key Billing</strong><br><small>账户自助查询</small></span></a><nav class="nav" aria-label="页面导航"><a href="usage.html">我的用量</a><a href="quota.html" aria-current="page">额度总览</a><button id="theme" type="button" aria-label="切换明暗主题">明暗</button><button id="logout" type="button" hidden>退出</button></nav></header>
+<div id="message" class="notice" role="status" aria-live="polite" hidden></div>
+
+<div class="intro"><div><div class="eyebrow">Capacity & availability</div><h1>额度总览</h1><p class="muted">查看自己的订阅，以及可用上游账户的共享额度快照。</p></div><span id="identity" class="badge"></span></div>
+<section id="auth" class="panel auth"><h2>查看当前额度</h2><p class="muted">输入服务管理员提供的 API Key，查看当前可见的额度信息。</p><form id="login"><label for="key">API Key</label><div class="auth-row"><input id="key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="8192"><button class="primary" type="submit">查看额度</button></div><small>Key 仅保存在当前页面内存中，不写入浏览器存储。</small></form></section>
+<div id="dashboard" hidden>
+<div class="notice">此页只读，展示服务器已有的额度快照。数据不会自动更新，账户额度由管理员维护。</div>
+<div id="stats" class="grid stats" data-private></div>
+<section class="panel"><div class="section-head"><h2>我的订阅与并发</h2><span id="subscription-status" class="badge" data-private></span></div><div id="subscription" data-private></div></section>
+<section class="panel"><div class="section-head"><h2>共享额度概览</h2><span class="muted">按提供商、套餐和额度窗口分组</span></div><p id="scope" class="scope-note" data-private></p><div id="groups" class="grid account-grid" data-private></div><p class="scope-note">百分比为组内已缓存快照的平均值，不等于可用请求数；不同套餐与额度窗口不相加。历史快照会标记为过期，不能视为实时可用额度；停用或不可用账户不计入汇总。</p></section>
+<section class="panel"><div class="section-head"><h2>匿名账户明细</h2><span class="muted">不展示邮箱和认证文件名</span></div><div id="accounts" class="grid account-grid" data-private></div></section>
+</div>
+
+<footer class="footer">CPA Key Billing · 账户自助查询 · 页面关闭后清除 Key</footer>
+</div>
+<script>
+  (() => {
+    "use strict";
+    const BASE = "/v0/resource/plugins/cpa-key-billing";
+    const $ = (id) => document.getElementById(id);
+    const integer = (value) => Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+    const money = (value) => "$" + Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    const percent = (value) => (Number.isFinite(Number(value)) && value != null ? Number(value).toFixed(1) + "%" : "未提供");
+    const when = (value) =>
+      value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "尚无记录";
+    function node(tag, text, cls) {
+      const value = document.createElement(tag);
+      if (text != null) value.textContent = String(text);
+      if (cls) value.className = cls;
+      return value;
+    }
+    function clear(id) {
+      const value = $(id);
+      value.replaceChildren();
+      return value;
+    }
+    function card(parent, label, value, detail) {
+      const item = node("article", null, "card");
+      item.append(node("div", label, "label"), node("div", value, "value"), node("div", detail, "detail"));
+      parent.append(item);
+    }
+    function empty(parent, text = "所选范围内暂无记录") { parent.append(node("p", text, "empty")); }
+    function bar(parent, value, label) {
+      const item = node("div", null, "bar");
+      const fill = node("i");
+      const valid = value != null && Number.isFinite(Number(value));
+      fill.style.width = (valid ? Math.max(0, Math.min(100, Number(value))) : 0) + "%";
+      item.setAttribute("role", "progressbar");
+      item.setAttribute("aria-label", label);
+      item.setAttribute("aria-valuemin", "0");
+      item.setAttribute("aria-valuemax", "100");
+      if (valid) item.setAttribute("aria-valuenow", String(Number(value)));
+      item.append(fill);
+      parent.append(item);
+    }
+    let apiKey = "", generation = 0, controllers = new Set();
+    function message(text, error = false) {
+      $("message").textContent = text;
+      $("message").hidden = !text;
+      $("message").classList.toggle("error", error);
+    }
+    function stopRequests() {
+      generation++;
+      for (const controller of controllers) controller.abort();
+      controllers.clear();
+    }
+    function logout() {
+      stopRequests();
+      apiKey = "";
+      $("key").value = "";
+      $("dashboard").hidden = true;
+      $("dashboard").querySelectorAll("[data-private]").forEach((item) => item.replaceChildren());
+      $("auth").hidden = false;
+      $("logout").hidden = true;
+      $("identity").textContent = "";
+      message("");
+      $("key").focus();
+    }
+    async function api(path) {
+      if (!apiKey) throw new Error("请先输入 API Key");
+      const controller = new AbortController();
+      controllers.add(controller);
+      const version = generation;
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch(BASE + path, {
+          method: "GET",
+          headers: { Authorization: "Bearer " + apiKey },
+          credentials: "omit",
+          cache: "no-store",
+          redirect: "error",
+          signal: controller.signal
+        });
+        let data;
+        try { data = await response.json(); } catch (_) { throw new Error("服务器未返回有效数据（HTTP " + response.status + "）"); }
+        if (version !== generation) throw new DOMException("Cancelled", "AbortError");
+        if (!response.ok) {
+          if (response.status === 401) {
+            logout();
+            throw new Error("API Key 无效或已失效，请重新输入");
+          }
+          throw new Error(data?.error?.message || "请求失败（HTTP " + response.status + "）");
+        }
+        return data;
+      } finally {
+        clearTimeout(timeout);
+        controllers.delete(controller);
+      }
+    }
+    function showDashboard() {
+      $("auth").hidden = true;
+      $("dashboard").hidden = false;
+      $("logout").hidden = false;
+      $("key").value = "";
+    }
+    $("logout").onclick = logout;
+    $("theme").onclick = () => {
+      const root = document.documentElement;
+      const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+      root.dataset.theme = dark ? "light" : "dark";
+      $("theme").textContent = dark ? "深色" : "浅色";
+    };
+    window.addEventListener("pagehide", () => {
+      stopRequests();
+      apiKey = "";
+      $("key").value = "";
+    });
+    window.addEventListener("pageshow", (event) => { if (event.persisted) logout(); });
+
+    const statuses = {
+      ready: ["已缓存", "ok"],
+      stale: ["快照已过期", "warn"],
+      not_loaded: ["尚未获取", "warn"],
+      disabled: ["已停用", ""],
+      unsupported: ["不支持查询", ""],
+      failed: ["获取失败", "bad"],
+      unavailable: ["暂不可用", "bad"],
+      scope_unknown: ["模型范围不明", "warn"]
+    };
+    function planName(value) {
+      return (
+        { free: "Free", plus: "Plus", pro: "Pro 20x", "pro-5x": "Pro 5x", "pro-20x": "Pro 20x", team: "Team", enterprise: "Enterprise" }[
+          String(value || "").toLowerCase()
+        ] ||
+        value ||
+        "套餐未知"
+      );
+    }
+    function quotaRow(parent, value) {
+      const row = node("div", null, "quota-row"),
+        line = node("div", null, "row"),
+        label = [value.group_label, value.label].filter(Boolean).join(" · ") || "额度窗口";
+      line.append(node("span", label), node("strong", "剩余 " + percent(value.remaining_percent)));
+      row.append(line);
+      bar(row, value.remaining_percent, label + "剩余比例");
+      if (value.used != null && value.limit != null)
+        row.append(
+          node(
+            "small",
+            "已用 " + Number(value.used).toLocaleString("zh-CN") + " / " + Number(value.limit).toLocaleString("zh-CN") +
+              (value.currency ? " " + value.currency : "")
+          )
+        );
+      if (value.reset_at) row.append(node("small", "重置时间 " + when(value.reset_at)));
+      parent.append(row);
+    }
+    function renderQuota(value) {
+      const counts = value.counts || {}, stats = clear("stats");
+      card(stats, "可见账户", integer(counts.total), "当前 API Key 可见的上游账户");
+      card(stats, "已缓存", integer(counts.ready), "已过期 " + integer(counts.stale));
+      card(stats, "尚未获取", integer(counts.not_loaded), "由管理员获取上游额度");
+      card(
+        stats,
+        "未计入汇总",
+        integer(counts.excluded_from_summary),
+        "停用 " + integer(counts.disabled) + " · 不支持 " + integer(counts.unsupported) + " · 不可用 " + integer(counts.unavailable) + " · 失败 " +
+          integer(counts.failed)
+      );
+      const subscription = value.subscription || {}, concurrency = value.concurrency || {}, sub = clear("subscription");
+      $("subscription-status").textContent = subscription.blocked ? "额度已用尽" : "正常";
+      $("subscription-status").className = "badge " + (subscription.blocked ? "bad" : "ok");
+      const own = node("div", null, "grid subscription-grid");
+      card(
+        own,
+        "订阅",
+        subscription.name || (subscription.unlimited ? "不限额" : "未设置"),
+        subscription.unlimited ? "当前订阅未设置用量额度限制" : "仅属于当前 API Key"
+      );
+      card(
+        own,
+        "当前并发",
+        integer(concurrency.current) + " / " + (Number(concurrency.limit) > 0 ? integer(concurrency.limit) : "不限"),
+        "正在处理的请求 / 并发上限"
+      );
+      sub.append(own);
+      for (const window of subscription.windows || []) {
+        const item = node("div", null, "window");
+        item.append(node("h3", window.name || "订阅窗口"));
+        for (const dimension of window.dimensions || []) {
+          const label = { amount_usd: "费用（USD）", tokens: "Token", requests: "请求数" }[dimension.metric] || dimension.metric;
+          const row = node("div", null, "quota-row"), line = node("div", null, "row");
+          line.append(
+            node("span", label),
+            node("strong", "剩余 " + (dimension.metric === "amount_usd" ? money(dimension.remaining) : integer(dimension.remaining)))
+          );
+          row.append(line);
+          bar(row, 100 - Number(dimension.used_percent || 0), label + "剩余比例");
+          row.append(
+            node(
+              "small",
+              "已用 " + (dimension.metric === "amount_usd" ? money(dimension.used) : integer(dimension.used)) + " / " +
+                (dimension.metric === "amount_usd" ? money(dimension.limit) : integer(dimension.limit))
+            )
+          );
+          item.append(row);
+        }
+        item.append(node("small", window.started ? "窗口结束 " + when(window.end_at) : "首次使用后开始计时"));
+        sub.append(item);
+      }
+      if (subscription.retry_at) sub.append(node("p", "预计恢复 " + when(subscription.retry_at), "scope-note"));
+      const scope = value.model_scope || {};
+      $("scope").textContent = scope.restricted ? "当前 API Key 存在模型限制；无法确认适用范围的上游额度不予展示。" : "展示当前 API Key 可见的上游账户快照。";
+      if (scope.complete === false) $("scope").textContent += " 当前快照无法完整表达模型可用范围。";
+      const groups = clear("groups");
+      for (const group of value.groups || []) {
+        const item = node("article", null, "card");
+        item.append(
+          node("h3", [group.provider, planName(group.plan)].filter(Boolean).join(" · ")),
+          node("p", [group.group, group.window].filter(Boolean).join(" · ") || "额度窗口", "muted"),
+          node("div", "剩余 " + percent(group.remaining_percent), "value")
+        );
+        bar(item, group.remaining_percent, "组内平均剩余比例");
+        item.append(node("small", "百分比样本 " + integer(group.sample_count)));
+        if (group.stale) item.append(node("div", "包含历史快照", "badge warn"));
+        if (group.next_reset_at) item.append(node("p", "下次重置 " + when(group.next_reset_at), "timestamp"));
+        if (group.remaining != null)
+          item.append(
+            node("p", "绝对剩余额度 " + Number(group.remaining).toLocaleString("zh-CN") + (group.unit ? " " + group.unit : ""), "account-meta")
+          );
+        if (group.absolute_sample_count) item.append(node("small", "绝对值样本 " + integer(group.absolute_sample_count)));
+        groups.append(item);
+      }
+      if (!groups.childElementCount) empty(groups, "暂无可汇总的额度快照");
+      const accounts = clear("accounts");
+      for (const account of value.accounts || []) {
+        const item = node("article", null, "card"), header = node("div", null, "row"), status = statuses[account.status] || ["状态未知", ""];
+        header.append(node("h3", account.name || "匿名账户", "account-name"), node("span", status[0], "badge " + status[1]));
+        item.append(header, node("div", [account.provider, planName(account.plan)].filter(Boolean).join(" · "), "account-meta"));
+        if (account.stale && account.status !== "stale") item.append(node("span", "历史快照已过期", "badge warn"));
+        for (const quota of account.quota || []) quotaRow(item, quota);
+        if (!(account.quota || []).length)
+          item.append(
+            node(
+              "p",
+              account.reason === "model_scope_unknown" ? "无法确认配额适用于当前模型权限" : account.status === "not_loaded" ? "等待管理员获取额度快照" : "暂无可展示的额度窗口",
+              "scope-note"
+            )
+          );
+        item.append(node("div", "快照时间 " + when(account.fetched_at), "timestamp"));
+        accounts.append(item);
+      }
+      if (!accounts.childElementCount) empty(accounts, "当前 API Key 没有可见的上游账户");
+    }
+    let loading = false;
+    $("login").onsubmit = async (event) => {
+      event.preventDefault();
+      if (loading) return;
+      apiKey = $("key").value.trim();
+      $("key").value = "";
+      if (!apiKey) return;
+      stopRequests();
+      loading = true;
+      const version = generation, button = $("login").querySelector("button");
+      button.disabled = true;
+      message("正在读取额度快照…");
+      try {
+        renderQuota(await api("/quota-summary"));
+        if (version === generation) {
+          $("identity").textContent = "当前 API Key";
+          showDashboard();
+          message("");
+        }
+      } catch (error) {
+        if (error.name !== "AbortError") message(error.message, true); else if (version === generation) message("读取超时，请稍后重试", true);
+      } finally {
+        loading = false;
+        button.disabled = false;
+      }
+    };
+  })();
+</script>
+</body>
+</html>

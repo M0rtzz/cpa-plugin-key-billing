@@ -14,6 +14,7 @@ import (
 type App struct {
 	store                 *billing.Store
 	hostCaller            HostCaller
+	quotaCache            quotaCacheState
 	admissionsMu          sync.Mutex
 	admissions            map[string]*requestAdmission
 	routingMu             sync.Mutex
@@ -137,6 +138,10 @@ func registration() Registration {
 			Author:           PluginName,
 			GitHubRepository: GitHubRepository,
 			ConfigFields: []ConfigField{
+				{
+					Name: "account_api_base_url", Type: "string",
+					Description: "Local CPA origin used to validate self-service API keys, e.g. http://127.0.0.1:18316",
+				},
 				{
 					Name:        "debug",
 					Type:        "boolean",

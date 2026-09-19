@@ -106,3 +106,6 @@ jobs:
           npm ci --prefix scripts
           npm test --prefix scripts
           node scripts/format_ui.mjs --check
+          node scripts/format_ui.mjs --check internal/plugin/usage.html
+          node scripts/format_ui.mjs --check internal/plugin/quota.html
+          node scripts/check_user_pages.mjs

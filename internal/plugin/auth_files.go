@@ -92,6 +92,9 @@ type quotaRow struct {
 	Currency         string           `json:"currency,omitempty"`
 	ResetAt          string           `json:"reset_at,omitempty"`
 	windowSeconds    int64
+	groupKey         string
+	windowKey        string
+	unit             string
 }
 
 type authQuotaResponse struct {
@@ -103,31 +106,35 @@ type authQuotaResponse struct {
 }
 
 func (a *App) authFiles(access viewAccess) ManagementResponse {
-	if access.APIKey && !access.Tracked {
-		return apiKeyUnauthorized()
-	}
 	files, errList := a.listAuthFiles(access)
 	if errList != nil {
+		if access.APIKey {
+			return apiKeyJSONError(http.StatusBadGateway, "host_unavailable", "Upstream account information is temporarily unavailable")
+		}
 		return viewDetailedError(access, http.StatusBadGateway, "host_unavailable", errList)
 	}
 	return viewJSON(access, http.StatusOK, authFileListResponse{Files: files})
 }
 
 func (a *App) authQuota(req ManagementRequest, access viewAccess) ManagementResponse {
-	if access.APIKey && !access.Tracked {
-		return apiKeyUnauthorized()
-	}
 	authIndex := strings.TrimSpace(req.Query.Get("auth_index"))
 	if authIndex == "" || len(authIndex) > 512 {
 		return viewJSONError(access, http.StatusBadRequest, "invalid", "Invalid auth file identifier")
 	}
 	files, errList := a.listHostAuthFiles()
 	if errList != nil {
+		if access.APIKey {
+			return apiKeyJSONError(http.StatusBadGateway, "host_unavailable", "Upstream account information is temporarily unavailable")
+		}
 		return viewDetailedError(access, http.StatusBadGateway, "host_unavailable", errList)
 	}
 	var selected *hostAuthFile
 	for i := range files {
-		if files[i].AuthIndex == authIndex {
+		identifier := files[i].AuthIndex
+		if access.APIKey {
+			identifier, _ = a.accountAuthIdentity(files[i], access.Scope)
+		}
+		if identifier == authIndex {
 			selected = &files[i]
 			break
 		}
@@ -143,6 +150,11 @@ func (a *App) authQuota(req ManagementRequest, access viewAccess) ManagementResp
 		if decision.ConfigurationError != "" || (decision.RestrictsCredentials() && !routingAllowsAuthFile(*selected, decision)) {
 			return viewJSONError(access, http.StatusNotFound, "not_found", "Auth file does not exist")
 		}
+		observation := a.accountCachedQuota(*selected)
+		if decision.RestrictsModels() {
+			observation = restrictAccountQuotaScope(observation)
+		}
+		return apiKeyJSON(http.StatusOK, observation)
 	}
 	if selected.Disabled {
 		return viewJSONError(access, http.StatusUnprocessableEntity, "disabled", "Auth file is disabled")
@@ -156,8 +168,10 @@ func (a *App) authQuota(req ManagementRequest, access viewAccess) ManagementResp
 	}
 	result, errQuota := a.fetchAuthQuota(req.HostCallbackID, *selected, provider)
 	if errQuota != nil {
+		a.markAuthQuotaFailure(*selected)
 		return viewDetailedError(access, http.StatusBadGateway, "quota_failed", errQuota)
 	}
+	a.storeAuthQuota(*selected, result)
 	return viewJSON(access, http.StatusOK, result)
 }
 
@@ -166,8 +180,10 @@ func (a *App) listAuthFiles(access viewAccess) ([]authFileView, error) {
 	if errList != nil {
 		return nil, errList
 	}
+	restrictedModels := false
 	if access.APIKey {
 		decision := a.store.ResolveRouting(access.Scope, "", "")
+		restrictedModels = decision.RestrictsModels()
 		if decision.ConfigurationError != "" {
 			files = nil
 		} else if decision.RestrictsCredentials() {
@@ -187,12 +203,23 @@ func (a *App) listAuthFiles(access viewAccess) ([]authFileView, error) {
 		}
 		category := authCategory(file.Type)
 		quotaSupported, quotaReason := authQuotaAvailability(file, category)
-		views = append(views, authFileView{
+		view := authFileView{
 			AuthIndex: file.AuthIndex, Name: file.Name, Category: category, Email: cleanText(file.Email),
 			Disabled: file.Disabled, Unavailable: file.Unavailable,
 			QuotaSupported: quotaSupported, QuotaReason: quotaReason, CacheRevision: authFileRevision(file),
 			QuotaReasonMessage: messages.Literal(quotaReason),
-		})
+		}
+		if access.APIKey {
+			view.AuthIndex, view.Name = a.accountAuthIdentity(file, access.Scope)
+			view.Email = ""
+			view.Category = safeQuotaText(view.Category)
+			if view.QuotaSupported && restrictedModels {
+				view.QuotaSupported = false
+				view.QuotaReason = "Quota applicability to permitted models is unknown"
+				view.QuotaReasonMessage = messages.Literal(view.QuotaReason)
+			}
+		}
+		views = append(views, view)
 	}
 	sort.SliceStable(views, func(i, j int) bool {
 		left, right := authCategoryOrder(views[i].Category), authCategoryOrder(views[j].Category)
@@ -467,7 +494,8 @@ func appendCodexRateLimit(result *authQuotaResponse, labelPrefix string, info ma
 		case seconds >= 28*24*60*60 && seconds <= 31*24*60*60:
 			label = "Monthly limit"
 		}
-		row := quotaRow{Label: labelPrefix + label, LabelMessage: messages.Literal(label), LabelPrefix: labelPrefix}
+		row := quotaRow{Label: labelPrefix + label, LabelMessage: messages.Literal(label), LabelPrefix: labelPrefix,
+			groupKey: strings.TrimSpace(labelPrefix), windowKey: window.key, windowSeconds: seconds, unit: "percent"}
 		if used, ok := floatValue(value, "used_percent", "usedPercent"); ok {
 			row.RemainingPercent = remainingPercent(100 - used)
 		} else if hasReached && reached || hasAllowed && !allowed {
@@ -540,7 +568,7 @@ func (a *App) fetchClaudeQuota(callbackID, token string, result *authQuotaRespon
 		if value == nil {
 			continue
 		}
-		row := quotaRow{Label: window.label, LabelMessage: messages.Literal(window.label), ResetAt: quotaResetAt(firstString(value, "resets_at", "resetsAt"))}
+		row := quotaRow{Label: window.label, LabelMessage: messages.Literal(window.label), ResetAt: quotaResetAt(firstString(value, "resets_at", "resetsAt")), windowKey: window.key, unit: "percent"}
 		if percent, ok := floatValue(value, "utilization"); ok {
 			row.RemainingPercent = remainingPercent(100 - percent)
 		}
@@ -778,7 +806,7 @@ func (a *App) fetchAntigravityQuota(callbackID, token, projectID string, result 
 			if windowSeconds > 0 || firstString(bucket, "displayName", "display_name") == "" {
 				labelMessage = messages.Literal(label)
 			}
-			groupRows = append(groupRows, quotaRow{Label: label, GroupLabel: groupLabel, LabelMessage: labelMessage, GroupMessage: groupMessage, RemainingPercent: remainingPercent(remaining * 100), windowSeconds: windowSeconds, ResetAt: quotaResetAt(firstString(bucket, "resetTime", "reset_time"))})
+			groupRows = append(groupRows, quotaRow{Label: label, GroupLabel: groupLabel, LabelMessage: labelMessage, GroupMessage: groupMessage, RemainingPercent: remainingPercent(remaining * 100), windowSeconds: windowSeconds, windowKey: windowName, groupKey: groupLabel, unit: "percent", ResetAt: quotaResetAt(firstString(bucket, "resetTime", "reset_time"))})
 		}
 		sort.SliceStable(groupRows, func(i, j int) bool {
 			return quotaWindowOrder(groupRows[i].windowSeconds) < quotaWindowOrder(groupRows[j].windowSeconds)
@@ -1018,11 +1046,8 @@ func fillQuotaValues(row *quotaRow, object map[string]any) {
 	used, hasUsed := floatValue(object, "used")
 	limit, hasLimit := floatValue(object, "limit")
 	remaining, hasRemaining := floatValue(object, "remaining")
-	if !hasUsed && hasLimit {
-		used = 0
-		if hasRemaining {
-			used = limit - remaining
-		}
+	if !hasUsed && hasLimit && hasRemaining {
+		used = limit - remaining
 		hasUsed = true
 	}
 	if hasUsed {

@@ -76,7 +76,7 @@ func TestNormalizeCodexPlan(t *testing.T) {
 	}
 }
 
-func TestAccountAuthFilesRequireTrackedAPIKey(t *testing.T) {
+func TestAccountAuthFilesAcceptVerifiedUntrackedAPIKey(t *testing.T) {
 	app := newConfiguredApp(t)
 	hostCalls := 0
 	app.SetHostCaller(func(method string, _ any) (json.RawMessage, error) {
@@ -86,31 +86,14 @@ func TestAccountAuthFilesRequireTrackedAPIKey(t *testing.T) {
 		}
 		return json.RawMessage(`{"files":[]}`), nil
 	})
-
-	request := ManagementRequest{Headers: http.Header{"Authorization": {"Bearer " + accountTestKeyA}}}
-	access, ok := app.apiKeyViewAccess(request)
-	if !ok {
-		t.Fatal("valid bearer was rejected")
-	}
-	if response := app.authFiles(access); response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("untracked status = %d, want %d", response.StatusCode, http.StatusUnauthorized)
-	}
-	request.Query = url.Values{"auth_index": {"codex-1"}}
-	if response := app.authQuota(request, access); response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("untracked quota status = %d, want %d", response.StatusCode, http.StatusUnauthorized)
-	}
-	if hostCalls != 0 {
-		t.Fatalf("untracked account made %d host calls", hostCalls)
-	}
-	if _, errSync := app.store.SyncKeys([]string{accountTestKeyA}, false); errSync != nil {
-		t.Fatal(errSync)
-	}
-	access, _ = app.apiKeyViewAccess(request)
+	// The public resource dispatcher validates the live Key before constructing
+	// viewAccess; absence from the historical billing store is not rejection.
+	access := viewAccess{APIKey: true, Scope: billing.CallerScope(accountTestKeyA)}
 	if response := app.authFiles(access); response.StatusCode != http.StatusOK {
-		t.Fatalf("tracked status = %d, body = %s", response.StatusCode, response.Body)
+		t.Fatalf("untracked status = %d, body = %s", response.StatusCode, response.Body)
 	}
 	if hostCalls != 1 {
-		t.Fatalf("tracked account made %d host calls, want 1", hostCalls)
+		t.Fatalf("host calls = %d", hostCalls)
 	}
 }
 
@@ -169,7 +152,9 @@ func TestAccountAuthFilesFollowCredentialRouting(t *testing.T) {
 			for _, file := range payload.Files {
 				got = append(got, file.AuthIndex)
 			}
-			want := []string{"claude-allowed", "codex-allowed"}
+			claudeID, _ := app.accountAuthIdentity(hostAuthFile{ID: "auth-claude", AuthIndex: "claude-allowed", Type: "claude"}, scope)
+			codexID, _ := app.accountAuthIdentity(hostAuthFile{ID: "auth-codex-allowed", AuthIndex: "codex-allowed", Type: "codex"}, scope)
+			want := []string{claudeID, codexID}
 			if strings.Join(got, "|") != strings.Join(want, "|") {
 				t.Fatalf("auth files = %v, want %v", got, want)
 			}
@@ -185,11 +170,10 @@ func TestAccountAuthFilesFollowCredentialRouting(t *testing.T) {
 	}
 }
 
-func TestAccountAuthQuotaUsesPhysicalCredentialWithoutForwardingAPIKey(t *testing.T) {
+func TestAdminAuthQuotaPopulatesReadOnlyAccountCache(t *testing.T) {
 	app := newConfiguredApp(t)
-	if _, errSync := app.store.SyncKeys([]string{accountTestKeyA}, false); errSync != nil {
-		t.Fatal(errSync)
-	}
+	file := hostAuthFile{ID: "auth-codex", AuthIndex: "codex-1", Name: "private@example.com.json", Type: "codex"}
+	secretCalls := 0
 	app.SetHostCaller(func(method string, payload any) (json.RawMessage, error) {
 		encoded, errMarshal := json.Marshal(payload)
 		if errMarshal != nil {
@@ -200,31 +184,49 @@ func TestAccountAuthQuotaUsesPhysicalCredentialWithoutForwardingAPIKey(t *testin
 		}
 		switch method {
 		case hostAuthList:
-			return json.RawMessage(`{"files":[{"auth_index":"codex-1","name":"codex.json","type":"codex"}]}`), nil
+			return mustJSONRaw(t, hostAuthListResponse{Files: []hostAuthFile{file}}), nil
 		case hostAuthGet:
-			return json.RawMessage(`{"auth_index":"codex-1","json":{"access_token":"dummy-upstream-token"}}`), nil
+			secretCalls++
+			return json.RawMessage(`{"json":{"access_token":"dummy-upstream-token"}}`), nil
 		case hostHTTPDo:
+			secretCalls++
 			request := payload.(hostHTTPRequest)
 			if request.Headers.Get("Authorization") != "Bearer dummy-upstream-token" {
 				t.Fatalf("authorization = %q", request.Headers.Get("Authorization"))
 			}
-			return mustJSONRaw(t, hostHTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"rate_limit":{}}`)}), nil
+			return mustJSONRaw(t, hostHTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"plan_type":"pro","rate_limit":{"primary_window":{"used_percent":30,"limit_window_seconds":18000}}}`)}), nil
 		default:
 			t.Fatalf("unexpected host method %q", method)
 			return nil, nil
 		}
 	})
-	request := ManagementRequest{
-		Headers: http.Header{"Authorization": {"Bearer " + accountTestKeyA}},
-		Query:   url.Values{"auth_index": {"codex-1"}},
+	request := ManagementRequest{Query: url.Values{"auth_index": {"codex-1"}}}
+	if response := app.authQuota(request, viewAccess{}); response.StatusCode != http.StatusOK {
+		t.Fatalf("admin status = %d, body = %s", response.StatusCode, response.Body)
 	}
-	access, ok := app.apiKeyViewAccess(request)
-	if !ok {
-		t.Fatal("valid bearer was rejected")
+	if secretCalls != 2 {
+		t.Fatalf("admin secret calls = %d", secretCalls)
 	}
+	access := viewAccess{APIKey: true, Scope: billing.CallerScope(accountTestKeyA)}
+	opaqueID, _ := app.accountAuthIdentity(file, access.Scope)
+	request.Query = url.Values{"auth_index": {opaqueID}, "refresh": {"true"}, "force": {"true"}}
 	response := app.authQuota(request, access)
 	if response.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", response.StatusCode, response.Body)
+		t.Fatalf("user status = %d, body = %s", response.StatusCode, response.Body)
+	}
+	var result accountQuotaObservation
+	if err := json.Unmarshal(response.Body, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "ready" || result.Plan != "pro-20x" || len(result.Quota) != 1 || result.Stale {
+		t.Fatalf("result = %+v", result)
+	}
+	if secretCalls != 2 {
+		t.Fatalf("user triggered secret calls: %d", secretCalls)
+	}
+	request.Query.Set("auth_index", file.AuthIndex)
+	if result := app.authQuota(request, access); result.StatusCode != http.StatusNotFound {
+		t.Fatalf("raw auth index accepted: %s", result.Body)
 	}
 }
 

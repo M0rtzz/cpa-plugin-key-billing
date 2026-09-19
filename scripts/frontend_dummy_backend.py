@@ -883,6 +883,54 @@ def account_auth_files(index):
             and ("auth-files", item["category"]) not in denied_providers]
 
 
+
+def quota_summary(index, scenario=""):
+    key = LIVE_KEYS[index]
+    refresh_key_quota(key)
+    accounts = []
+    for item in account_auth_files(index):
+        identifier = hashlib.sha256((key["scope"] + item["auth_index"]).encode()).hexdigest()[:16]
+        cached = AUTH_FILE_QUOTAS.get(item["auth_index"])
+        status = "disabled" if item["disabled"] else "unavailable" if item["unavailable"] else "ready" if cached else "not_loaded"
+        account = dict(id=identifier, name=item["category"].title() + " account " + identifier[:8], provider=item["category"],
+                       plan=(cached or {}).get("plan", ""), status=status, stale=False, quota=[])
+        if cached:
+            account.update(fetched_at=iso(NOW), quota=cached["quota"] if status == "ready" else [])
+        accounts.append(account)
+    if scenario == "states":
+        for status in ("stale", "not_loaded", "disabled", "unsupported", "failed"):
+            accounts.append(dict(id="dummy-" + status, name="Codex account " + status, provider="codex", plan="plus",
+                                 status="ready" if status == "stale" else status, stale=status == "stale", fetched_at=iso(NOW - timedelta(days=2)) if status == "stale" else None,
+                                 quota=[quota_row("5 小时限额", 55, 3600)] if status == "stale" else []))
+    if scenario == "model-restricted":
+        for item in accounts:
+            if item["status"] != "disabled": item.update(status="unsupported", reason="model_scope_unknown", quota=[])
+    if scenario == "empty": accounts = []
+    counts = {name: sum(account["status"] == name for account in accounts)
+              for name in ("disabled", "unavailable", "unsupported", "failed", "not_loaded", "ready", "stale")}
+    counts.update(total=len(accounts), stale=sum(account["stale"] for account in accounts), excluded_from_summary=sum(account["status"] != "ready" for account in accounts))
+    grouped = {}
+    for account in accounts:
+        if account["status"] != "ready": continue
+        for row in account["quota"]:
+            group_key = account["provider"], account["plan"], row.get("group_label", ""), row["label"], row.get("currency", "percent")
+            group = grouped.setdefault(group_key, dict(provider=group_key[0], plan=group_key[1], group=group_key[2], window=group_key[3], unit=group_key[4], sample_count=0, absolute_sample_count=0, stale=False))
+            group["stale"] = group["stale"] or account["stale"]
+            if row.get("remaining_percent") is not None:
+                group["remaining_percent"] = group.get("remaining_percent", 0) + row["remaining_percent"]
+                group["sample_count"] += 1
+            if row.get("used") is not None and row.get("limit") is not None:
+                for field in ("used", "limit"): group[field] = group.get(field, 0) + row[field]
+                group["remaining"] = group.get("remaining", 0) + max(0, row["limit"] - row["used"])
+                group["absolute_sample_count"] += 1
+    for group in grouped.values():
+        if group["sample_count"]: group["remaining_percent"] /= group["sample_count"]
+    return dict(subscription={"name": key["plan_name"], "unlimited": key["unlimited"], "blocked": key["blocked"], "windows": key["windows"], "retry_at": key.get("retry_at")},
+                concurrency={"limit": key["concurrency_limit"], "current": key["current_concurrency"]}, accounts=accounts,
+                groups=list(grouped.values()), counts=counts,
+                model_scope={"restricted": scenario == "model-restricted", "complete": scenario != "model-restricted"})
+
+
 def refresh_route_counts():
     for route in ROUTES:
         bound = [key for key in KEYS if route["id"] in key["route_bindings"]["route_ids"]]
@@ -1384,6 +1432,9 @@ class Handler(BaseHTTPRequestHandler):
             )
             self.send_html(body)
             return
+        if parsed.path in (f"{RESOURCE_BASE}/usage.html", f"{RESOURCE_BASE}/quota.html", "/usage.html", "/quota.html"):
+            self.send_html((UI_PATH.parent / parsed.path.rsplit("/", 1)[-1]).read_text())
+            return
         if parsed.path in ("/", "/ui"):
             body = UI_PATH.read_text()
             catalogs = {language: json.loads((UI_PATH.parent / "locales" / f"{language}.json").read_text())
@@ -1406,6 +1457,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(401, {"error": {"message": "API Key 无效"}})
                 return
         resource_paths = {
+            f"{RESOURCE_BASE}/quota-summary",
             f"{RESOURCE_BASE}/profile",
             f"{RESOURCE_BASE}/subscription",
             f"{RESOURCE_BASE}/routing",
@@ -1421,7 +1473,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(401, {"error": {"message": "API Key 无效"}})
                 return
             index = api_keys.index(authorization[7:])
-            if parsed.path.endswith("/profile"):
+            if parsed.path.endswith("/quota-summary"):
+                scenario = parse_qs(parsed.query).get("scenario", [""])[0]
+                self.send_json(200, quota_summary(index, scenario))
+            elif parsed.path.endswith("/profile"):
                 key = LIVE_KEYS[index]
                 self.send_json(200, {"tracked": True, "identity": {"preview": key["preview"], "label": key["label"]}})
             elif parsed.path.endswith("/subscription"):

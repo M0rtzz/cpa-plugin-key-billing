@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/netip"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -16,6 +19,7 @@ type Config struct {
 	Debug                bool   `yaml:"debug"`
 	StateFile            string `yaml:"state_file"`
 	CodexFastModeBilling bool   `yaml:"codex_fast_mode_billing"`
+	AccountAPIBaseURL    string `yaml:"account_api_base_url"`
 }
 
 func DefaultConfig() Config {
@@ -44,7 +48,51 @@ func DecodeConfig(raw []byte) (Config, error) {
 		}
 		cfg = document.Config
 	}
-	return cfg.normalized(), nil
+	cfg = cfg.normalized()
+	origin, err := ValidateAccountAPIBaseURL(cfg.AccountAPIBaseURL)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.AccountAPIBaseURL = origin
+	return cfg, nil
+}
+
+// Config returns a snapshot without holding the store lock during HTTP calls.
+func (s *Store) Config() Config {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.cfg
+}
+
+// ValidateAccountAPIBaseURL confines user-key checks to an explicitly configured
+// loopback origin. Hostnames, URL credentials and request-controlled paths are
+// deliberately unsupported: the user's key must never leave this machine.
+func ValidateAccountAPIBaseURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	invalid := func() (string, error) {
+		return "", fmt.Errorf("account_api_base_url must be an HTTP or HTTPS numeric loopback origin without credentials, path, query, or fragment")
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Opaque != "" ||
+		(u.Path != "" && u.Path != "/") || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || strings.Contains(raw, "#") {
+		return invalid()
+	}
+	address, err := netip.ParseAddr(u.Hostname())
+	if err != nil || address.Zone() != "" || !address.Unmap().IsLoopback() {
+		return invalid()
+	}
+	if port := u.Port(); port != "" {
+		number, err := strconv.Atoi(port)
+		if err != nil || number < 1 || number > 65535 {
+			return invalid()
+		}
+	} else if strings.HasSuffix(u.Host, ":") {
+		return invalid()
+	}
+	return u.Scheme + "://" + u.Host, nil
 }
 
 func (c Config) describe() string {
@@ -55,6 +103,7 @@ func (c Config) describe() string {
 }
 
 func (c Config) normalized() Config {
+	c.AccountAPIBaseURL = strings.TrimSpace(c.AccountAPIBaseURL)
 	c.StateFile = strings.TrimSpace(c.StateFile)
 	if c.StateFile == "" {
 		c.StateFile = DefaultStateFile

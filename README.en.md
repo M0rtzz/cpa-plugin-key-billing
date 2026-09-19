@@ -90,6 +90,7 @@ plugins:
       debug: false # Include routing and reference-price matching in debug logs
       codex_fast_mode_billing: false # Charge 2.5× for Codex priority requests
       state_file: "plugins/cpa-key-billing-state-v1.db"
+      account_api_base_url: "http://127.0.0.1:18316" # Use this CPA instance's actual loopback port
 ```
 
 When `codex_fast_mode_billing` is enabled, requests to the Codex upstream with `service_tier=priority` are billed at **2.5 times** the standard cost.
@@ -103,6 +104,10 @@ When `codex_fast_mode_billing` is enabled, requests to the Codex upstream with `
 Restart CLIProxyAPI and open **API Key Billing** in the management panel. Review model pricing, create subscription plans, and bind the API keys whose quotas you want to enforce.
 
 ## Access
+
+Standalone user pages are available at `/v0/resource/plugins/cpa-key-billing/usage.html` (usage and costs) and `/v0/resource/plugins/cpa-key-billing/quota.html` (read-only quotas). Users enter their own API key; no management password is needed. Accounts are anonymous but retain their plan types, including Plus and Pro 20x. Only quota queries from the billing plugin's administrator interface update the upstream quota cache.
+
+Set `account_api_base_url` to this CPA instance's numeric loopback origin. All user JSON endpoints, including the existing account UI endpoints, return `503` without it. Administrators and public HTML remain available. User quota endpoints are cache-only; emails, file names, raw upstream error details, and account source filters are no longer exposed. See the [deployment and rollback guide](docs/self-service-deployment.md) for building the two HTML files and the plugin, configuration, and compatibility details.
 
 Administrators can open the plugin from the management panel or visit it directly:
 
