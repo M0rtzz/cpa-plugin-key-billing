@@ -15,6 +15,7 @@ type App struct {
 	store                 *billing.Store
 	hostCaller            HostCaller
 	quotaCache            quotaCacheState
+	accountSessions       accountSessionState
 	admissionsMu          sync.Mutex
 	admissions            map[string]*requestAdmission
 	routingMu             sync.Mutex
@@ -96,6 +97,7 @@ func (a *App) Shutdown() {
 	if a == nil || a.store == nil {
 		return
 	}
+	a.accountSessions.clear()
 	a.store.Close()
 }
 

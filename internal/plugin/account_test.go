@@ -120,7 +120,7 @@ func TestAccountProfileAuthenticatesByAPIKeyScope(t *testing.T) {
 
 	response := callAccount(t, app, routeProfile, accountTestKeyA, nil)
 	if response.StatusCode != http.StatusOK || response.Headers.Get("Cache-Control") != "private, no-store" ||
-		response.Headers.Get("Vary") != "Authorization" {
+		response.Headers.Get("Vary") != "Authorization, Cookie" {
 		t.Fatalf("response = %+v", response)
 	}
 	var access accountProfileResponse

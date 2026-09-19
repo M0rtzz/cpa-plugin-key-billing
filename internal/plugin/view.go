@@ -50,7 +50,9 @@ func (a *App) routeResource(req ManagementRequest, suffix string) ManagementResp
 	if handler == nil {
 		return apiKeyJSONError(http.StatusNotFound, "not_found", "Resource route not found: "+req.Method+" "+req.Path)
 	}
-	if response := a.validateAccountRequest(req); response != nil {
+	var response *ManagementResponse
+	req, response = a.authorizeAccountRequest(req)
+	if response != nil {
 		return *response
 	}
 	access, ok := a.apiKeyViewAccess(req)

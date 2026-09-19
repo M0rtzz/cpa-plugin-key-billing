@@ -108,7 +108,7 @@ plugins:
 
 ## 页面访问
 
-独立普通用户页面：`/v0/resource/plugins/cpa-key-billing/usage.html`（用量费用）和 `/v0/resource/plugins/cpa-key-billing/quota.html`（只读额度）。用户输入本人 API Key，无需管理密码。上游账号匿名显示，保留 Plus、Pro 20x 等类型；上游额度仅由计费插件管理员查询更新。构建、配置、缓存行为及回滚见 [普通用户页面部署文档](docs/self-service-deployment.md)。
+独立普通用户页面：`/v0/resource/plugins/cpa-key-billing/usage.html`（用量费用）和 `/v0/resource/plugins/cpa-key-billing/quota.html`（只读额度）。用户输入本人 API Key，无需管理密码；插件使用服务端 `HttpOnly` 会话支持刷新和重新进入。号池账号保留 Plus、Pro 20x 等类型；上游额度仅由计费插件管理员查询更新。构建、配置、会话、缓存行为及回滚见 [普通用户页面部署文档](docs/self-service-deployment.md)。
 
 包括旧入口在内的用户 JSON 接口均需配置 `account_api_base_url`，否则返回 `503`。HTML 和管理员入口不受影响。
 

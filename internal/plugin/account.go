@@ -228,7 +228,7 @@ func apiKeyJSONError(status int, code, message string) ManagementResponse {
 func secureAPIKeyResponse(response *ManagementResponse) {
 	response.Headers.Set("Cache-Control", "private, no-store")
 	response.Headers.Set("Pragma", "no-cache")
-	response.Headers.Set("Vary", "Authorization")
+	response.Headers.Set("Vary", "Authorization, Cookie")
 	response.Headers.Set("Referrer-Policy", "no-referrer")
 	response.Headers.Set("X-Content-Type-Options", "nosniff")
 }

@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>我的用量 · CPA Key Billing</title>
+<script>
+  (() => {
+    const key = "cpa-key-billing.theme";
+    let mode = "system";
+    try {
+      const stored = localStorage.getItem(key);
+      if (["system", "dark", "light"].includes(stored)) mode = stored;
+    } catch (_) {}
+    document.documentElement.dataset.themeMode = mode;
+    document.documentElement.dataset.theme = mode === "dark" || (mode === "system" && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  })();
+</script>
 <style>
   :root {
     color-scheme: light;
@@ -108,6 +120,9 @@
   .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.7px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
   .nav { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .nav a[aria-current="page"] { font-weight: 700; }
+  .theme-picker { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel); }
+  .theme-picker button { padding: 5px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); }
+  .theme-picker button[aria-pressed="true"] { background: var(--soft); color: var(--accent); font-weight: 650; }
   .intro { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; }
   .intro p { margin-top: 8px; }
   .panel, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
@@ -203,7 +218,7 @@
     .shell { padding: 18px 15px 28px; }
     .top { flex-direction: column; gap: 16px; margin-bottom: 23px; padding-bottom: 19px; }
     .nav { width: 100%; }
-    .nav #theme { margin-left: auto; }
+    .nav .theme-picker { margin-left: auto; }
     .brand-mark { width: 36px; height: 36px; }
     .intro { align-items: start; }
     h1 { font-size: 23px; }
@@ -226,11 +241,11 @@
 </head>
 <body>
 <div class="shell">
-<header class="top"><a class="brand" href="usage.html"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19V9m8 10V4m8 15v-7" stroke-linecap="round"/></svg></span><span><strong>CPA Key Billing</strong><br><small>账户自助查询</small></span></a><nav class="nav" aria-label="页面导航"><a href="usage.html" aria-current="page">我的用量</a><a href="quota.html">额度总览</a><button id="theme" type="button" aria-label="切换明暗主题">明暗</button><button id="logout" type="button" hidden>退出</button></nav></header>
+<header class="top"><a class="brand" href="usage.html"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19V9m8 10V4m8 15v-7" stroke-linecap="round"/></svg></span><span><strong>CPA Key Billing</strong><br><small>账户自助查询</small></span></a><nav class="nav" aria-label="页面导航"><a href="usage.html" aria-current="page">我的用量</a><a href="quota.html">额度总览</a><div class="theme-picker" role="group" aria-label="主题"><button type="button" data-theme-mode="system" aria-pressed="true">系统</button><button type="button" data-theme-mode="dark" aria-pressed="false">暗色</button><button type="button" data-theme-mode="light" aria-pressed="false">亮色</button></div><button id="logout" type="button" hidden>退出</button></nav></header>
 <div id="message" class="notice" role="status" aria-live="polite" hidden></div>
 
 <div class="intro"><div><div class="eyebrow">Your usage, at a glance</div><h1>我的用量</h1><p class="muted">查看当前 API Key 的请求、Token、费用与错误记录。</p></div><span id="identity" class="badge"></span></div>
-<section id="auth" class="panel auth"><h2>查看自己的用量</h2><p class="muted">输入服务管理员提供的 API Key，查看对应的使用记录。</p><form id="login"><label for="key">API Key</label><div class="auth-row"><input id="key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="8192"><button class="primary" type="submit">查看用量</button></div><small>Key 仅用于当前页面请求，不写入浏览器存储。关闭页面或退出后需要重新输入。</small></form></section>
+<section id="auth" class="panel auth"><h2>查看自己的用量</h2><p class="muted">输入服务管理员提供的 API Key，查看对应的使用记录。</p><form id="login"><label for="key">API Key</label><div class="auth-row"><input id="key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="8192"><button class="primary" type="submit">查看用量</button></div><small>Key 不写入浏览器存储；登录会话保存在服务器内存中，最长保留 7 天。</small></form></section>
 <div id="dashboard" hidden>
 <section id="billing-policy" class="panel" data-private aria-label="计费倍率"></section>
 <section class="panel"><form id="filter" class="filters"><label for="from">开始日期<input id="from" type="date" required></label><label for="to">结束日期<input id="to" type="date" required></label><button class="primary" type="submit">查询</button><small>按本地时区统计，结束日期包含当天。</small></form></section>
@@ -239,7 +254,7 @@
 <section class="panel"><div class="section-head"><h2>请求明细</h2><div class="tabs" role="tablist" aria-label="记录类型"><button id="events-tab" type="button" role="tab" aria-selected="true">全部请求</button><button id="errors-tab" type="button" role="tab" aria-selected="false">错误记录</button></div></div><div id="records" class="table-scroll" data-private></div><div class="pager"><span id="page-label" class="muted" data-private></span><div class="buttons"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button></div></div></section>
 </div>
 
-<footer class="footer">CPA Key Billing · 账户自助查询 · 页面关闭后清除 Key</footer>
+<footer class="footer">CPA Key Billing · 账户自助查询 · API Key 不写入浏览器存储</footer>
 </div>
 <script>
   (() => {
@@ -291,7 +306,23 @@
       item.append(fill);
       parent.append(item);
     }
-    let apiKey = "", generation = 0, controllers = new Set();
+    const THEME_STORAGE_KEY = "cpa-key-billing.theme";
+    const themeMedia = matchMedia("(prefers-color-scheme: dark)");
+    let themeMode = document.documentElement.dataset.themeMode || "system", generation = 0, controllers = new Set();
+    function applyTheme(mode, persist = false) {
+      themeMode = ["system", "dark", "light"].includes(mode) ? mode : "system";
+      document.documentElement.dataset.themeMode = themeMode;
+      document.documentElement.dataset.theme = themeMode === "dark" || (themeMode === "system" && themeMedia.matches) ? "dark" : "light";
+      document.querySelectorAll(".theme-picker [data-theme-mode]").forEach((button) =>
+        button.setAttribute("aria-pressed", String(button.dataset.themeMode === themeMode))
+      );
+      if (persist) try { localStorage.setItem(THEME_STORAGE_KEY, themeMode); } catch (_) {}
+    }
+    document.querySelectorAll(".theme-picker [data-theme-mode]").forEach((button) => {
+      button.onclick = () => applyTheme(button.dataset.themeMode, true);
+    });
+    themeMedia.addEventListener?.("change", () => { if (themeMode === "system") applyTheme("system"); });
+    applyTheme(themeMode);
     function message(text, error = false) {
       $("message").textContent = text;
       $("message").hidden = !text;
@@ -302,9 +333,8 @@
       for (const controller of controllers) controller.abort();
       controllers.clear();
     }
-    function logout() {
+    function resetView() {
       stopRequests();
-      apiKey = "";
       $("key").value = "";
       $("dashboard").hidden = true;
       $("dashboard").querySelectorAll("[data-private]").forEach((item) => item.replaceChildren());
@@ -314,17 +344,18 @@
       message("");
       $("key").focus();
     }
-    async function api(path) {
-      if (!apiKey) throw new Error("请先输入 API Key");
+    async function requestJSON(path, authorization = "") {
       const controller = new AbortController();
       controllers.add(controller);
       const version = generation;
       const timeout = setTimeout(() => controller.abort(), 30000);
       try {
+        const headers = { Accept: "application/json" };
+        if (authorization) headers.Authorization = authorization;
         const response = await fetch(BASE + path, {
           method: "GET",
-          headers: { Authorization: "Bearer " + apiKey },
-          credentials: "omit",
+          headers,
+          credentials: "same-origin",
           cache: "no-store",
           redirect: "error",
           signal: controller.signal
@@ -333,11 +364,13 @@
         try { data = await response.json(); } catch (_) { throw new Error("服务器未返回有效数据（HTTP " + response.status + "）"); }
         if (version !== generation) throw new DOMException("Cancelled", "AbortError");
         if (!response.ok) {
+          const error = new Error(data?.error?.message || "请求失败（HTTP " + response.status + "）");
+          error.status = response.status;
           if (response.status === 401) {
-            logout();
-            throw new Error("API Key 无效或已失效，请重新输入");
+            resetView();
+            error.message = "API Key 无效、登录已过期或服务已重启，请重新输入";
           }
-          throw new Error(data?.error?.message || "请求失败（HTTP " + response.status + "）");
+          throw error;
         }
         return data;
       } finally {
@@ -345,25 +378,29 @@
         controllers.delete(controller);
       }
     }
+    const api = (path) => requestJSON(path);
+    const establishSession = (key) => requestJSON("/session", "Bearer " + key);
+    async function endSession() {
+      try {
+        await fetch(BASE + "/logout", { method: "GET", credentials: "same-origin", cache: "no-store", redirect: "error" });
+      } catch (_) {}
+    }
+    async function logout() {
+      stopRequests();
+      await endSession();
+      resetView();
+    }
     function showDashboard() {
       $("auth").hidden = true;
       $("dashboard").hidden = false;
       $("logout").hidden = false;
       $("key").value = "";
     }
-    $("logout").onclick = logout;
-    $("theme").onclick = () => {
-      const root = document.documentElement;
-      const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-      root.dataset.theme = dark ? "light" : "dark";
-      $("theme").textContent = dark ? "深色" : "浅色";
-    };
+    $("logout").onclick = () => { void logout(); };
     window.addEventListener("pagehide", () => {
       stopRequests();
-      apiKey = "";
       $("key").value = "";
     });
-    window.addEventListener("pageshow", (event) => { if (event.persisted) logout(); });
 
     let analysis = null, range = "", tab = "events", offset = 0, snapshot = "", total = 0, busy = false;
     const PAGE_SIZE = 20;
@@ -520,40 +557,51 @@
       if (snapshot) params.set("snapshot_id", snapshot);
       renderRecords(await api("/" + tab + "?" + params));
     }
-    async function operation(callback) {
+    async function operation(callback, silentUnauthorized = false) {
       if (busy) return;
       busy = true;
       const version = generation;
+      const loginButton = $("login").querySelector("button");
+      loginButton.disabled = true;
       $("dashboard").classList.add("busy");
       message("正在加载…");
       try {
         await callback();
         if (version === generation) message("");
       } catch (error) {
-        if (error.name !== "AbortError") message(error.message, true); else if (version === generation) message("请求超时，请稍后重试", true);
+        if (error.name !== "AbortError" && !(silentUnauthorized && error.status === 401)) message(error.message, true);
+        else if (error.name === "AbortError" && version === generation) message("请求超时，请稍后重试", true);
       } finally {
         busy = false;
+        loginButton.disabled = false;
         $("dashboard").classList.remove("busy");
       }
+    }
+    async function loadDashboard() {
+      const profile = await api("/profile");
+      if (!profile.tracked) {
+        await endSession();
+        resetView();
+        throw new Error("该 API Key 暂无可用账单，请联系管理员");
+      }
+      $("identity").textContent = profile.identity?.label || profile.identity?.preview || "当前 API Key";
+      range = selectedRange();
+      offset = 0;
+      snapshot = "";
+      renderAnalysis(await api("/analysis?" + range));
+      await loadRecords();
+      showDashboard();
     }
     $("login").onsubmit = (event) => {
       event.preventDefault();
       if (busy) return;
-      apiKey = $("key").value.trim();
+      const apiKey = $("key").value.trim();
       $("key").value = "";
       if (!apiKey) return;
       stopRequests();
       operation(async () => {
-        const profile = await api("/profile");
-        if (!profile.tracked) throw new Error("该 API Key 暂无可用账单，请联系管理员");
-        $("identity").textContent = profile.identity?.label || profile.identity?.preview || "当前 API Key";
-        range = selectedRange();
-        offset = 0;
-        snapshot = "";
-        const value = await api("/analysis?" + range);
-        renderAnalysis(value);
-        await loadRecords();
-        showDashboard();
+        await establishSession(apiKey);
+        await loadDashboard();
       });
     };
     $("filter").onsubmit = (event) => {
@@ -589,6 +637,7 @@
         if (offset + PAGE_SIZE < total) offset += PAGE_SIZE;
         await loadRecords();
       });
+    operation(loadDashboard, true);
   })();
 </script>
 </body>

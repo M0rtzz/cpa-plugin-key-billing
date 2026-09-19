@@ -11,9 +11,11 @@ import (
 )
 
 const (
-	managementBase = "/v0/management/plugins/" + PluginID
-	resourceBase   = "/v0/resource/plugins/" + PluginID
-	resourceUIPath = "/ui"
+	managementBase      = "/v0/management/plugins/" + PluginID
+	resourceBase        = "/v0/resource/plugins/" + PluginID
+	resourceUIPath      = "/ui"
+	resourceSessionPath = "/session"
+	resourceLogoutPath  = "/logout"
 )
 
 const (
@@ -123,10 +125,10 @@ var resourceEndpoints = []resourceEndpoint{
 func managementRegistration() ManagementRegistrationResponse {
 	registration := ManagementRegistrationResponse{
 		Routes:    make([]ManagementRoute, 0, len(managementEndpoints)),
-		Resources: make([]ResourceRoute, 1, len(resourceEndpoints)+3),
+		Resources: make([]ResourceRoute, 1, len(resourceEndpoints)+5),
 	}
 	registration.Resources[0] = ResourceRoute{Path: resourceBase + resourceUIPath, Menu: MenuLabel, Description: MenuDescription}
-	for _, path := range []string{"/usage.html", "/quota.html"} {
+	for _, path := range []string{"/usage.html", "/quota.html", resourceSessionPath, resourceLogoutPath} {
 		registration.Resources = append(registration.Resources, ResourceRoute{Path: resourceBase + path})
 	}
 	for _, endpoint := range managementEndpoints {
@@ -182,6 +184,14 @@ func (a *App) handleManagement(raw []byte) ([]byte, error) {
 			},
 			Body: uiHTML,
 		})
+	}
+	if req.Method == http.MethodGet {
+		switch path {
+		case resourceBase + resourceSessionPath:
+			return OKEnvelope(a.createAccountSession(req))
+		case resourceBase + resourceLogoutPath:
+			return OKEnvelope(a.endAccountSession(req))
+		}
 	}
 	if path != resourceBase && strings.HasPrefix(path, resourceBase+"/") {
 		return OKEnvelope(a.routeResource(req, strings.TrimPrefix(path, resourceBase)))

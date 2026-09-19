@@ -4,8 +4,10 @@ import argparse
 import hashlib
 import json
 import random
+import secrets
 import time
 from datetime import datetime, timedelta, timezone
+from http.cookies import SimpleCookie
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,6 +21,7 @@ RESOURCE_BASE = "/v0/resource/plugins/cpa-key-billing"
 BILLING_POLICY = {"billing_multiplier": 0.2, "codex_fast_mode_billing": True}
 NOW = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
 CALLER_SCOPE_SALT = b"cli-proxy-api:caller-scope:v1\0"
+SELF_SERVICE_SESSIONS = {}
 
 
 HOST_SHELL = r"""<!doctype html>
@@ -1399,7 +1402,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
-    def send_json(self, status, payload):
+    def send_json(self, status, payload, headers=None):
         if 200 <= status < 300 and getattr(self, "mutation_view", None) is not None:
             path = urlparse(self.path).path
             view = {}
@@ -1419,6 +1422,8 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -1459,6 +1464,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         authorization = self.headers.get("Authorization", "")
         api_keys = [f"sk-demo-{index:04d}" for index in range(1, len(LIVE_KEYS) + 1)]
+        if parsed.path == f"{RESOURCE_BASE}/session":
+            if not authorization.startswith("Bearer ") or authorization[7:] not in api_keys:
+                self.send_json(401, {"error": {"message": "API Key 无效"}})
+                return
+            token = secrets.token_urlsafe(32)
+            SELF_SERVICE_SESSIONS[token] = authorization[7:]
+            self.send_json(200, {"authenticated": True}, {
+                "Set-Cookie": f"cpa_key_billing_session={token}; Path={RESOURCE_BASE}/; Max-Age=604800; HttpOnly; SameSite=Strict"
+            })
+            return
+        if parsed.path == f"{RESOURCE_BASE}/logout":
+            cookies = SimpleCookie(self.headers.get("Cookie", ""))
+            if "cpa_key_billing_session" in cookies:
+                SELF_SERVICE_SESSIONS.pop(cookies["cpa_key_billing_session"].value, None)
+            self.send_json(200, {"authenticated": False}, {
+                "Set-Cookie": f"cpa_key_billing_session=; Path={RESOURCE_BASE}/; Max-Age=0; HttpOnly; SameSite=Strict"
+            })
+            return
         if parsed.path == "/v1/models":
             if not authorization.startswith("Bearer ") or authorization[7:] not in api_keys:
                 self.send_json(401, {"error": {"message": "API Key 无效"}})
@@ -1476,10 +1499,15 @@ class Handler(BaseHTTPRequestHandler):
             f"{RESOURCE_BASE}/auth-files/quota",
         }
         if parsed.path in resource_paths:
-            if not authorization.startswith("Bearer ") or authorization[7:] not in api_keys:
+            api_key = authorization[7:] if authorization.startswith("Bearer ") else ""
+            if not api_key:
+                cookies = SimpleCookie(self.headers.get("Cookie", ""))
+                if "cpa_key_billing_session" in cookies:
+                    api_key = SELF_SERVICE_SESSIONS.get(cookies["cpa_key_billing_session"].value, "")
+            if api_key not in api_keys:
                 self.send_json(401, {"error": {"message": "API Key 无效"}})
                 return
-            index = api_keys.index(authorization[7:])
+            index = api_keys.index(api_key)
             if parsed.path.endswith("/quota-summary"):
                 scenario = parse_qs(parsed.query).get("scenario", [""])[0]
                 self.send_json(200, quota_summary(index, scenario))

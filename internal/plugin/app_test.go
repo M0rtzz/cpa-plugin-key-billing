@@ -123,7 +123,7 @@ func TestManagementRegistrationExposesOnlyCurrentEndpoints(t *testing.T) {
 	}
 
 	wantResources := map[string]bool{
-		"/usage.html": false, "/quota.html": false, "/quota-summary": false,
+		"/usage.html": false, "/quota.html": false, "/session": false, "/logout": false, "/quota-summary": false,
 		"/ui": false, "/profile": false, "/subscription": false, "/routing": false, "/prices": false,
 		"/analysis": false, "/events": false, "/errors": false,
 		"/auth-files": false, "/auth-files/quota": false,
