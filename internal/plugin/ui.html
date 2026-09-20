@@ -5881,9 +5881,11 @@
         if (currentRole === "admin") view = keyDirectory.resolve(view);
         const scope = String(view.scope || view.key || "");
         const preview = String(view.preview || "");
-        const candidate = String(view.label || "");
-        const label = candidate && candidate !== preview && candidate !== scope ? candidate : "";
-        const primary = !scope ? m("ui.unassigned") : label || preview || "unknown";
+        const candidate = view.label || "";
+        const name = String(candidate);
+        // Account views identify the caller by label and preview alone, without a scope.
+        const label = name && name !== preview && name !== scope ? candidate : "";
+        const primary = label || preview || (scope ? "unknown" : m("ui.unassigned"));
         const secondary = label ? preview : "";
         return { primary, secondary, text: displayLabel(secondary ? primary + DISPLAY_SEPARATOR + secondary : primary) };
       }
