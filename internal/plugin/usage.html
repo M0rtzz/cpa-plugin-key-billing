@@ -266,7 +266,11 @@
     const BASE = "/v0/resource/plugins/cpa-key-billing";
     const $ = (id) => document.getElementById(id);
     const integer = (value) => Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 0 });
-    const money = (value) => "$" + Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    const money = (value) => {
+      const amount = Number(value || 0);
+      const maximumFractionDigits = amount !== 0 && Math.abs(amount) < 0.01 ? 10 : 4;
+      return "$" + amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits });
+    };
     const percent = (value) => (Number.isFinite(Number(value)) && value != null ? Number(value).toFixed(1) + "%" : "未提供");
     const when = (value) =>
       value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "尚无记录";
