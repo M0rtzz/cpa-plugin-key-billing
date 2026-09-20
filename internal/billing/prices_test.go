@@ -30,6 +30,19 @@ func TestResolveBuiltinPrice(t *testing.T) {
 	if price.Source != PriceSourceBuiltin || price.InputPer1M != 5 || price.OutputPer1M != 32 || price.CacheReadPer1M != 1.25 {
 		t.Fatalf("gpt-image-1.5 builtin price = %+v", price)
 	}
+	price = ResolveBuiltinPrice("vendor/gpt-image-2.5")
+	if price.Source != PriceSourceBuiltin || price.InputPer1M != 5 || price.OutputPer1M != 30 || price.CacheReadPer1M != 1.25 {
+		t.Fatalf("gpt-image-2.5 builtin price = %+v", price)
+	}
+	for _, model := range []string{"deepseek-flash", "vendor/nested/deepseek-flash"} {
+		price = ResolveBuiltinPrice(model)
+		if price.Source != PriceSourceBuiltin || price.InputPer1M != 0.15 || price.OutputPer1M != 0.6 || price.CacheReadPer1M != 0.003 {
+			t.Fatalf("%s builtin price = %+v", model, price)
+		}
+	}
+	if price := ResolveBuiltinPrice("vendor/deepseek-flash-v2"); price.Source != PriceSourceNone {
+		t.Fatalf("non-exact model matched builtin price: %+v", price)
+	}
 	price = ResolveBuiltinPrice("codex-auto-review")
 	if price.Source != PriceSourceBuiltin || price.InputPer1M != 2.5 || price.OutputPer1M != 15 ||
 		price.CacheReadPer1M != 0.25 || price.CacheWritePer1M != 2.5 {
