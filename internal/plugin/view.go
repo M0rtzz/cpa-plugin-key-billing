@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -16,6 +18,39 @@ const (
 	defaultEventPageSize = 50
 	maxEventPageSize     = 1000
 )
+
+func sourceFilterToken(scope, source string) string {
+	digest := sha256.Sum256([]byte("filter:v1\x00source\x00" + scope + "\x00" + source))
+	return hex.EncodeToString(digest[:])
+}
+
+func validSourceFilterToken(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
+func resolveSourceFilter(scope, token string, sources []string) (string, bool) {
+	for _, source := range sources {
+		if sourceFilterToken(scope, source) == token {
+			return source, true
+		}
+	}
+	return "", false
+}
+
+func sourceFilterOptions(scope string, sources []string) []billing.RequestSourceOption {
+	options := make([]billing.RequestSourceOption, 0, len(sources))
+	for _, source := range sources {
+		options = append(options, billing.RequestSourceOption{
+			Value: sourceFilterToken(scope, source),
+			Label: source,
+		})
+	}
+	return options
+}
 
 type viewAccess struct {
 	APIKey  bool
@@ -78,6 +113,26 @@ func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) Manage
 	if errQuery := requestPageParams(req.Query, &query.Offset, &query.Limit, &query.From, &query.To, &query.SnapshotID); errQuery != nil {
 		return viewErrorResponse(access, errQuery)
 	}
+	if query.Source != "" {
+		if !validSourceFilterToken(query.Source) {
+			return viewJSONError(access, http.StatusBadRequest, "invalid_filter", "Invalid source filter; refresh the page")
+		}
+		probe, err := a.store.RequestEvents(billing.RequestEventQuery{
+			Scope: access.Scope, From: query.From, To: query.To, SnapshotID: query.SnapshotID, IncludeFilters: true, Limit: 1,
+		})
+		if err != nil {
+			return viewErrorResponse(access, err)
+		}
+		query.SnapshotID = &probe.SnapshotID
+		if probe.Filters == nil {
+			return viewJSONError(access, http.StatusBadRequest, "expired_filter", "Source filter expired; refresh the page")
+		}
+		var found bool
+		query.Source, found = resolveSourceFilter(access.Scope, query.Source, probe.Filters.Sources)
+		if !found {
+			return viewJSONError(access, http.StatusBadRequest, "expired_filter", "Source filter expired; refresh the page")
+		}
+	}
 	query.IncludeFilters = query.Offset == 0
 	view, err := a.store.RequestEvents(query)
 	if err != nil {
@@ -90,6 +145,9 @@ func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) Manage
 			view.Entries[i].Preview = ""
 			view.Entries[i].Label = ""
 		}
+	}
+	if view.Filters != nil {
+		view.Filters.SourceOptions = sourceFilterOptions(access.Scope, view.Filters.Sources)
 	}
 	return viewJSON(access, http.StatusOK, view)
 }
@@ -118,6 +176,26 @@ func (a *App) listRequestErrors(req ManagementRequest, access viewAccess) Manage
 	if err := requestPageParams(req.Query, &query.Offset, &query.Limit, &query.From, &query.To, &query.SnapshotID); err != nil {
 		return viewErrorResponse(access, err)
 	}
+	if query.Source != "" {
+		if !validSourceFilterToken(query.Source) {
+			return viewJSONError(access, http.StatusBadRequest, "invalid_filter", "Invalid source filter; refresh the page")
+		}
+		probe, err := a.store.RequestErrors(billing.RequestErrorQuery{
+			Scope: access.Scope, From: query.From, To: query.To, SnapshotID: query.SnapshotID, IncludeFilters: true, Limit: 1,
+		})
+		if err != nil {
+			return viewErrorResponse(access, err)
+		}
+		query.SnapshotID = &probe.SnapshotID
+		if probe.Filters == nil {
+			return viewJSONError(access, http.StatusBadRequest, "expired_filter", "Source filter expired; refresh the page")
+		}
+		var found bool
+		query.Source, found = resolveSourceFilter(access.Scope, query.Source, probe.Filters.Sources)
+		if !found {
+			return viewJSONError(access, http.StatusBadRequest, "expired_filter", "Source filter expired; refresh the page")
+		}
+	}
 	query.IncludeFilters = query.Offset == 0
 	view, err := a.store.RequestErrors(query)
 	if err != nil {
@@ -128,6 +206,9 @@ func (a *App) listRequestErrors(req ManagementRequest, access viewAccess) Manage
 			view.Entries[i].Scope, view.Entries[i].AuthIndex = "", ""
 			view.Entries[i].Preview, view.Entries[i].Label = "", ""
 		}
+	}
+	if view.Filters != nil {
+		view.Filters.SourceOptions = sourceFilterOptions(access.Scope, view.Filters.Sources)
 	}
 	return viewJSON(access, http.StatusOK, view)
 }

@@ -5258,7 +5258,7 @@
           (value) => (value || m("ui.uncategorized")) + DISPLAY_SEPARATOR + int(counts[value])
         );
         populateEventFilterSelect($(prefix + "error-model"), m("ui.all_models"), filters.models);
-        populateEventFilterSelect($(prefix + "error-source"), m("ui.all_sources"), filters.sources, undefined, displayLabel);
+        populateSourceFilterSelect($(prefix + "error-source"), filters);
       }
 
       function renderErrors(account) {
@@ -7088,11 +7088,39 @@
         renderSelectOptions(select, options);
       }
 
+      function populateSourceFilterSelect(select, filters) {
+        const values = disambiguateSourceFilterOptions(filters.source_options || []);
+        populateEventFilterSelect(select, m("ui.all_sources"), values, (option) => option.value, (option) => option.label);
+      }
+
+      function disambiguateSourceFilterOptions(options) {
+        const prepared = options.map((option) => ({
+          option,
+          label: String(displayLabel(option.label)),
+          digest: String(option.value || "")
+        }));
+        const groups = new Map();
+        for (const item of prepared) {
+          if (!groups.has(item.label)) groups.set(item.label, []);
+          groups.get(item.label).push(item);
+        }
+        return prepared.map((item) => {
+          const group = groups.get(item.label);
+          if (group.length < 2) return item.option;
+          let length = Math.min(6, item.digest.length);
+          while (
+            length < item.digest.length && group.some((other) => other !== item && other.digest.startsWith(item.digest.slice(0, length)))
+          )
+            length++;
+          return { ...item.option, label: item.label + " · #" + item.digest.slice(0, length).toUpperCase() };
+        });
+      }
+
       function populateRequestEventFilters(filters, account) {
         if (!filters) return;
         const prefix = account ? "account-request-event" : "request-event";
         populateEventFilterSelect($(prefix + "-model"), m("ui.all_models"), filters.models);
-        populateEventFilterSelect($(prefix + "-source"), m("ui.all_sources"), filters.sources, undefined, displayLabel);
+        populateSourceFilterSelect($(prefix + "-source"), filters);
       }
 
       function readEventKeys(reload) {

@@ -71,10 +71,16 @@ type RequestEventView struct {
 }
 
 type RequestEventFilterValues struct {
-	Models    []string `json:"models"`
-	Sources   []string `json:"sources"`
-	Executors []string `json:"executors,omitempty"`
-	Providers []string `json:"providers,omitempty"`
+	Models        []string              `json:"models"`
+	Sources       []string              `json:"-"`
+	SourceOptions []RequestSourceOption `json:"source_options"`
+	Executors     []string              `json:"executors,omitempty"`
+	Providers     []string              `json:"providers,omitempty"`
+}
+
+type RequestSourceOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
 }
 
 type RequestEventStatusCounts struct {

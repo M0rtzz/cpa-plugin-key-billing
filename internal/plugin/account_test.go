@@ -153,7 +153,8 @@ func TestAccountRequestEventsUseSharedShapeWithoutCrossingScopes(t *testing.T) {
 		t.Fatalf("view = %+v", view)
 	}
 	if view.Filters == nil || len(view.Filters.Models) != 1 || view.Filters.Models[0] != "gpt-5.5" ||
-		len(view.Filters.Sources) != 1 || view.Filters.Sources[0] != "openai" {
+		len(view.Filters.SourceOptions) != 1 || view.Filters.SourceOptions[0].Label != "openai" ||
+		!validSourceFilterToken(view.Filters.SourceOptions[0].Value) {
 		t.Fatalf("account request event filter options = %+v", view.Filters)
 	}
 	from := view.Entries[0].At.Format(time.RFC3339Nano)
@@ -245,11 +246,11 @@ func TestAccountRequestEventsUseTheAdministratorSource(t *testing.T) {
 		view.Entries[0].Source != "codex · private@example.com" {
 		t.Fatalf("account request event = %+v", view)
 	}
-	if view.Filters == nil || len(view.Filters.Sources) != 1 || view.Filters.Sources[0] != "codex · private@example.com" {
+	if view.Filters == nil || len(view.Filters.SourceOptions) != 1 || view.Filters.SourceOptions[0].Label != "codex · private@example.com" {
 		t.Fatalf("account request event source filters = %+v", view.Filters)
 	}
 	filtered := callAccount(t, app, routeEvents, accountTestKeyA,
-		url.Values{"source": {"codex · private@example.com"}})
+		url.Values{"source": {view.Filters.SourceOptions[0].Value}})
 	if errDecode := json.Unmarshal(filtered.Body, &view); errDecode != nil || view.Total != 1 {
 		t.Fatalf("source-filtered account request events = %+v, err = %v", view, errDecode)
 	}

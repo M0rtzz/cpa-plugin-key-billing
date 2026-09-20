@@ -785,6 +785,13 @@ def make_request_events():
 
 REQUEST_EVENTS = make_request_events()
 
+def source_filter_token(scope, source):
+    payload = "filter:v1\0source\0" + scope + "\0" + source
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+def source_filter_options(scope, sources):
+    return [{"value": source_filter_token(scope, source), "label": source} for source in sources]
+
 def event_snapshot(query):
     return int(query.get("snapshot_id", [str(max((int(entry["id"]) for entry in REQUEST_EVENTS), default=0))])[0])
 
@@ -801,13 +808,17 @@ def request_event_view(query, scope=""):
     time_matched = filter_event_time([entry for entry in REQUEST_EVENTS
                                      if int(entry["id"]) <= snapshot and (not scope or entry["scope"] == scope)], query)
     time_matched.sort(key=lambda entry: (entry["at"], int(entry["id"])), reverse=True)
+    source_values = sorted({entry.get("source", "") for entry in time_matched} - {""}, key=str.lower)
     filter_options = {
         "models": sorted({entry.get("billing_model") or entry.get("upstream_model", "")
                           for entry in time_matched} - {""}, key=str.lower),
-        "sources": sorted({entry.get("source", "") for entry in time_matched} - {""}, key=str.lower),
+        "source_options": source_filter_options(scope, source_values),
         "providers": sorted({entry.get("provider", "") for entry in time_matched} - {""}, key=str.lower),
         "executors": sorted({entry.get("executor_type", "") for entry in time_matched} - {""}, key=str.lower),
     }
+    if selected_source:
+        selected_source = next((source for source in source_values
+                                if source_filter_token(scope, source) == selected_source), "\0")
     counts = {"all": 0, "normal": 0, "failed": 0}
     matched = []
     for entry in time_matched:
@@ -1017,6 +1028,10 @@ def error_view(query, scope=""):
         "status_code": query.get("status_code", [""])[0],
         "error_type": query.get("error_type", [""])[0],
     }
+    source_values = sorted({entry["source"] for entry in rows})
+    if selected["source"]:
+        selected["source"] = next((source for source in source_values
+                                   if source_filter_token(scope, source) == selected["source"]), "\0")
     filtered = []
     counts = {}
     empty_type = query.get("error_type_empty", [""])[0] == "true"
@@ -1051,7 +1066,7 @@ def error_view(query, scope=""):
     if offset == 0:
         result["filter_options"] = {
             "models": sorted({entry["billing_model"] for entry in rows}),
-            "sources": sorted({entry["source"] for entry in rows}),
+            "source_options": source_filter_options(scope, source_values),
             "providers": sorted({entry["provider"] for entry in rows}),
             "executors": sorted({entry["executor_type"] for entry in rows}),
             "status_codes": sorted({entry["status_code"] for entry in rows if entry["status_code"]}),
