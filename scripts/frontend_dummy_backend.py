@@ -443,7 +443,11 @@ def quota_row(label, remaining_percent, reset_seconds, **extra):
 AUTH_FILE_QUOTAS = {
     "auth-demo-codex-pro": {
         "plan": "pro-20x",
-        "rate_limit_reset_credits_available_count": 1,
+        "rate_limit_reset_credits_available_count": 2,
+        "rate_limit_reset_credits": [
+            {"expires_at": iso(NOW + timedelta(days=13, hours=14))},
+            {"expires_at": iso(NOW + timedelta(days=14, hours=10))},
+        ],
         "quota": [
             quota_row("周限额", 62, 432000),
             quota_row(
@@ -461,6 +465,7 @@ AUTH_FILE_QUOTAS = {
     "auth-demo-codex-plus": {
         "plan": "plus",
         "rate_limit_reset_credits_available_count": 1,
+        "rate_limit_reset_credits": [{"expires_at": iso(NOW + timedelta(days=7))}],
         "quota": [
             quota_row("5 小时限额", 35, 14400),
             quota_row("周限额", 90, 518400),
@@ -1509,6 +1514,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, {"status_code": 409, "body": '{"error":{"message":"No reset credits available"}}'})
             else:
                 quota["rate_limit_reset_credits_available_count"] -= 1
+                if quota.get("rate_limit_reset_credits"):
+                    quota["rate_limit_reset_credits"].pop(0)
                 for row in quota["quota"]:
                     row["remaining_percent"] = 100
                 self.send_json(200, {"status_code": 204, "body": ""})

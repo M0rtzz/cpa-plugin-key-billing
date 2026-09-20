@@ -328,6 +328,9 @@ func TestCodexQuotaPreservesAdditionalDynamicWindows(t *testing.T) {
 			return json.RawMessage(`{"auth_index":"codex-1","json":{"access_token":"dummy-token","account_id":"dummy-account"}}`), nil
 		case hostHTTPDo:
 			request := payload.(hostHTTPRequest)
+			if strings.HasSuffix(request.URL, "/rate-limit-reset-credits") {
+				return mustJSONRaw(t, hostHTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2026-10-04T02:27:00Z"}]}`)}), nil
+			}
 			endpoint = request.URL
 			if request.Headers.Get("Authorization") != "Bearer dummy-token" || request.Headers.Get("Chatgpt-Account-Id") != "dummy-account" {
 				t.Fatalf("headers = %#v", request.Headers)
@@ -353,6 +356,9 @@ func TestCodexQuotaPreservesAdditionalDynamicWindows(t *testing.T) {
 	if result.Plan != "pro-20x" || len(result.Quota) != 3 {
 		t.Fatalf("quota = %+v", result)
 	}
+	if len(result.RateLimitResetCredits) != 1 || result.RateLimitResetCredits[0].ExpiresAt != "2026-10-04T02:27:00Z" {
+		t.Fatalf("reset credits = %+v", result.RateLimitResetCredits)
+	}
 	if result.Quota[0].RemainingPercent == nil || *result.Quota[0].RemainingPercent != 62 {
 		t.Fatalf("remaining percent = %+v", result.Quota[0].RemainingPercent)
 	}
@@ -361,6 +367,77 @@ func TestCodexQuotaPreservesAdditionalDynamicWindows(t *testing.T) {
 		if result.Quota[index].Label != want {
 			t.Fatalf("quota[%d].Label = %q, want %q", index, result.Quota[index].Label, want)
 		}
+	}
+}
+
+func TestCodexResetCreditExpiry(t *testing.T) {
+	for _, tc := range []struct {
+		name, usage, credits           string
+		status, wantCount, wantCredits int
+		unavailable                    bool
+	}{
+		{"available only", `{"available_count":9}`, `{"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2026-10-04T10:27:00+08:00"},{"resetType":"codex_rate_limits","status":"available","expiresAt":"2026-10-05T06:45:00+08:00"},{"reset_type":"codex_rate_limits","status":"consumed","expires_at":"2026-10-04T02:27:00Z"},{"reset_type":"other","status":"available","expires_at":"2026-10-04T02:27:00Z"},{"reset_type":"codex_rate_limits","status":"available","expires_at":""}]}`, 200, 2, 2, false},
+		{"failure preserves windows and usage count", `{"available_count":1}`, `{}`, 503, 1, 0, true},
+		{"invalid response", `{"available_count":1}`, `{}`, 200, 1, 0, true},
+		{"no available credits", `{"available_count":0}`, `{"credits":[]}`, 200, 0, 0, false},
+		{"unknown count stays unknown", `{}`, `{"credits":[]}`, 200, -1, 0, false},
+		{"empty details preserve usage count", `{"available_count":2}`, `{"credits":[]}`, 200, 2, 0, false},
+		{"detail count wins", `{"available_count":9}`, `{"availableCount":"3","credits":[]}`, 200, 3, 0, false},
+		{"explicit zero wins", `{"available_count":9}`, `{"available_count":0,"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2026-10-04T10:27:00+08:00"}]}`, 200, 0, 1, false},
+		{"missing usage count still queries details", `{}`, `{"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2026-10-04T10:27:00+08:00"}]}`, 200, 1, 1, false},
+		{"zero usage count still queries details", `{"available_count":0}`, `{"available_count":2}`, 200, 2, 0, false},
+		{"applicable count is not total count", `{"available_count":2}`, `{"applicable_available_count":0}`, 200, 2, 0, false},
+		{"nonfinite detail count falls back", `{"available_count":2}`, `{"available_count":"NaN"}`, 200, 2, 0, false},
+		{"failure without usage count", `{}`, `{}`, 503, -1, 0, true},
+		{"malformed JSON", `{"available_count":1}`, `{`, 200, 1, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := newConfiguredApp(t)
+			calls := 0
+			app.SetHostCaller(func(method string, payload any) (json.RawMessage, error) {
+				request := payload.(hostHTTPRequest)
+				calls++
+				if method != hostHTTPDo || request.Method != http.MethodGet || request.HostCallbackID != "dummy-callback" || request.Headers.Get("Chatgpt-Account-Id") != "dummy-account" || request.Headers.Get("Authorization") != "Bearer dummy-token" {
+					t.Fatalf("unexpected request: %s %+v", method, request)
+				}
+				if strings.HasSuffix(request.URL, "/usage") {
+					body := `{"rate_limit":{"primary_window":{"used_percent":38}},"rate_limit_reset_credits":` + tc.usage + `}`
+					return mustJSONRaw(t, hostHTTPResponse{StatusCode: 200, Body: []byte(body)}), nil
+				}
+				if request.URL != "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits" || request.Headers.Get("OpenAI-Beta") != "codex-1" || request.Headers.Get("Originator") != "Codex Desktop" {
+					t.Fatalf("unexpected expiry request: %+v", request)
+				}
+				return mustJSONRaw(t, hostHTTPResponse{StatusCode: tc.status, Body: []byte(tc.credits)}), nil
+			})
+			result := authQuotaResponse{}
+			if err := app.fetchCodexQuota("dummy-callback", "dummy-token", "dummy-account", &result); err != nil {
+				t.Fatal(err)
+			}
+			if calls != 2 || len(result.RateLimitResetCredits) != tc.wantCredits || result.RateLimitResetCreditsUnavailable != tc.unavailable || len(result.Quota) != 1 || *result.Quota[0].RemainingPercent != 62 {
+				t.Fatalf("calls = %d, result = %+v", calls, result)
+			}
+			if tc.wantCount < 0 {
+				if result.RateLimitResetCreditsAvailableCount != nil {
+					t.Fatalf("unexpected count: %d", *result.RateLimitResetCreditsAvailableCount)
+				}
+			} else if result.RateLimitResetCreditsAvailableCount == nil || *result.RateLimitResetCreditsAvailableCount != tc.wantCount {
+				t.Fatalf("count = %v, want %d", result.RateLimitResetCreditsAvailableCount, tc.wantCount)
+			}
+			if tc.wantCredits > 0 && result.RateLimitResetCredits[0].ExpiresAt != "2026-10-04T10:27:00+08:00" {
+				t.Fatalf("expiry not preserved: %+v", result.RateLimitResetCredits)
+			}
+		})
+	}
+}
+
+func TestCodexResetCreditPreservesUnknownDateFormat(t *testing.T) {
+	var object map[string]any
+	if err := json.Unmarshal([]byte(`{"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"unknown-date-format"}]}`), &object); err != nil {
+		t.Fatal(err)
+	}
+	result := normalizeCodexResetCredits(object)
+	if result.invalidPayload || len(result.credits) != 1 || result.credits[0].ExpiresAt != "unknown-date-format" {
+		t.Fatalf("summary = %+v", result)
 	}
 }
 

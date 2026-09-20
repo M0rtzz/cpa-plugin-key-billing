@@ -95,11 +95,17 @@ type quotaRow struct {
 }
 
 type authQuotaResponse struct {
-	AuthRevision                        string     `json:"auth_revision,omitempty"`
-	FetchedAt                           time.Time  `json:"fetched_at"`
-	Plan                                string     `json:"plan,omitempty"`
-	RateLimitResetCreditsAvailableCount *int       `json:"rate_limit_reset_credits_available_count,omitempty"`
-	Quota                               []quotaRow `json:"quota"`
+	AuthRevision                        string              `json:"auth_revision,omitempty"`
+	FetchedAt                           time.Time           `json:"fetched_at"`
+	Plan                                string              `json:"plan,omitempty"`
+	RateLimitResetCreditsAvailableCount *int                `json:"rate_limit_reset_credits_available_count,omitempty"`
+	RateLimitResetCredits               []resetCreditExpiry `json:"rate_limit_reset_credits,omitempty"`
+	RateLimitResetCreditsUnavailable    bool                `json:"rate_limit_reset_credits_unavailable,omitempty"`
+	Quota                               []quotaRow          `json:"quota"`
+}
+
+type resetCreditExpiry struct {
+	ExpiresAt string `json:"expires_at"`
 }
 
 func (a *App) authFiles(access viewAccess) ManagementResponse {
@@ -419,13 +425,57 @@ func (a *App) fetchCodexQuota(callbackID, token, accountID string, result *authQ
 		}
 		appendCodexRateLimit(result, name+" ", objectMap(additional, "rate_limit", "rateLimit"))
 	}
-	if credits := objectMap(object, "rate_limit_reset_credits", "rateLimitResetCredits"); credits != nil {
-		if count, ok := intValue(credits, "available_count", "availableCount"); ok {
-			value := int(count)
-			result.RateLimitResetCreditsAvailableCount = &value
-		}
+	usageCredits := normalizeCodexResetCredits(objectMap(object, "rate_limit_reset_credits", "rateLimitResetCredits"))
+	result.RateLimitResetCreditsAvailableCount = usageCredits.availableCount
+	headers.Set("Accept", "application/json")
+	headers.Set("OpenAI-Beta", "codex-1")
+	headers.Set("Originator", "Codex Desktop")
+	credits, err := a.upstream(callbackID, http.MethodGet, "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits", token, headers, nil)
+	details := normalizeCodexResetCredits(credits)
+	result.RateLimitResetCreditsUnavailable = err != nil || details.invalidPayload
+	if result.RateLimitResetCreditsUnavailable {
+		return nil
+	}
+	result.RateLimitResetCredits = details.credits
+	// Match CPAMC: detail count, then non-empty available details, then usage count.
+	if details.availableCount != nil {
+		result.RateLimitResetCreditsAvailableCount = details.availableCount
+	} else if count := len(details.credits); count > 0 {
+		result.RateLimitResetCreditsAvailableCount = &count
 	}
 	return nil
+}
+
+type codexResetCreditsSummary struct {
+	availableCount *int
+	credits        []resetCreditExpiry
+	invalidPayload bool
+}
+
+func normalizeCodexResetCredits(object map[string]any) codexResetCreditsSummary {
+	result := codexResetCreditsSummary{invalidPayload: true}
+	for _, key := range []string{"credits", "available_count", "availableCount", "applicable_available_count", "applicableAvailableCount"} {
+		if _, ok := object[key]; ok {
+			result.invalidPayload = false
+			break
+		}
+	}
+	if count, ok := floatValue(object, "available_count", "availableCount"); ok && !math.IsNaN(count) && !math.IsInf(count, 0) {
+		value := int(count)
+		result.availableCount = &value
+	}
+	for _, raw := range objectSlice(object, "credits") {
+		credit, ok := raw.(map[string]any)
+		if !ok || firstString(credit, "reset_type", "resetType") != "codex_rate_limits" || firstString(credit, "status") != "available" {
+			continue
+		}
+		expiresAt := firstString(credit, "expires_at", "expiresAt")
+		if expiresAt != "" {
+			// Preserve non-empty dates as CPAMC does, even if their format is unknown.
+			result.credits = append(result.credits, resetCreditExpiry{ExpiresAt: expiresAt})
+		}
+	}
+	return result
 }
 
 func appendCodexRateLimit(result *authQuotaResponse, labelPrefix string, info map[string]any) {

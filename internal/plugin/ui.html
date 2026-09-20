@@ -1167,6 +1167,24 @@
       }
       .auth-file-quota { display: grid; gap: 11px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
       .auth-quota-summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text-secondary); font-size: 12px; }
+      .auth-reset-credits {
+        display: grid;
+        gap: 6px;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 12px;
+      }
+      .auth-reset-credits-title { color: var(--text-tertiary); font-weight: 600; }
+      .auth-reset-credit {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        color: var(--text-secondary);
+      }
+      .auth-reset-credit-time { margin-left: auto; color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
       .auth-quota-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 11px; }
       .auth-quota-row { display: grid; gap: 4px; min-width: 0; }
       .auth-quota-line { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
@@ -5336,7 +5354,7 @@
         };
       }
 
-      const AUTH_QUOTA_CACHE_PREFIX = "cpa-key-billing.auth-quotas.v3.";
+      const AUTH_QUOTA_CACHE_PREFIX = "cpa-key-billing.auth-quotas.v4.";
 
       function resetAuthQuotaMemory(account) {
         const role = account ? "account" : "admin";
@@ -5544,6 +5562,37 @@
         );
       }
 
+      function renderAuthResetCredits(file, result) {
+        if (file.category !== "codex") return null;
+        const credits = result.rate_limit_reset_credits || [];
+        if (!credits.length) {
+          return result.rate_limit_reset_credits_unavailable
+            ? el("div", { class: "muted small", text: m("ui.reset_credits_expiry_unavailable") })
+            : null;
+        }
+        const timezone =
+          new Intl.DateTimeFormat("en", { timeZoneName: "shortOffset" }).formatToParts(new Date())
+            .find((part) => part.type === "timeZoneName")?.value || "";
+        return el(
+          "div",
+          { class: "auth-reset-credits" },
+          el("div", { class: "auth-reset-credits-title", text: m("ui.reset_credits_expiry", { v0: timezone }) }),
+          credits.map((credit, index) => {
+            const expiresAt = new Date(credit.expires_at);
+            const remaining = (expiresAt.getTime() - Date.now()) / 1000;
+            const time = Number.isFinite(remaining)
+              ? compactResetDate(expiresAt) + DISPLAY_SEPARATOR + (remaining <= 0 ? m("ui.expired") : compactResetAfter(remaining))
+              : credit.expires_at || "—";
+            return el(
+              "div",
+              { class: "auth-reset-credit" },
+              el("span", { text: m("ui.reset_credit_number", { v0: index + 1 }) }),
+              el("span", { class: "auth-reset-credit-time", text: time })
+            );
+          })
+        );
+      }
+
       function renderAuthFileQuota(file, account) {
         const owner = account ? accountUIState : adminUIState;
         const index = file.auth_index;
@@ -5555,7 +5604,10 @@
         const result = owner.authQuotas.get(index);
         if (!result) return null;
         const summary = [];
-        if (Number.isFinite(Number(result.rate_limit_reset_credits_available_count))) {
+        if (
+          result.rate_limit_reset_credits_available_count != null &&
+          Number.isFinite(Number(result.rate_limit_reset_credits_available_count))
+        ) {
           summary.push(el("span", { text: m("ui.available_resets_value", { v0: int(result.rate_limit_reset_credits_available_count) }) }));
           if (!account && file.category === "codex") {
             summary.push(
@@ -5569,13 +5621,12 @@
             );
           }
         }
-        if (result.fetched_at)
-          summary.push(el("span", { class: "muted", text: m("ui.last_checked_value", { v0: when(result.fetched_at) }) }));
         const rows = result.quota;
         return el(
           "div",
           { class: "auth-file-quota" },
           summary.length ? el("div", { class: "auth-quota-summary" }, summary) : null,
+          renderAuthResetCredits(file, result),
           rows.length
             ? el("div", { class: "auth-quota-list" }, rows.map(renderQuotaRow))
             : el("div", { class: "muted small", text: m("ui.the_upstream_returned_no_displayable_quota") })
