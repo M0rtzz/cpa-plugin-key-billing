@@ -32,7 +32,8 @@ func usageFailureDetails(failure UsageFailure) usageFailureView {
 	statusCode := validFailureStatus(failure.StatusCode)
 	raw := strings.TrimSpace(failure.Body)
 	normalized, qualifier := parseJSONFailure(raw)
-	if normalized == (normalizedFailure{}) {
+	structured := normalized != (normalizedFailure{})
+	if !structured {
 		normalized.Message = raw
 	}
 	reason := formatFailureReason(statusCode, qualifyFailure(normalized.Message, qualifier))
@@ -44,11 +45,28 @@ func usageFailureDetails(failure UsageFailure) usageFailureView {
 	if errorType == "" {
 		errorType = normalized.Type
 	}
+	if errorType == "" && structured {
+		errorType = inferredFailureType(normalized.Message)
+	}
 	return usageFailureView{
 		StatusCode: statusCode,
 		ErrorType:  errorType,
 		Reason:     reason,
 		Body:       marshalNormalizedFailure(normalized),
+	}
+}
+
+// Infer a stable category only for distinctive executor messages. Structured
+// upstream codes and types always take precedence over these fallbacks.
+func inferredFailureType(message string) string {
+	message = strings.ToLower(strings.TrimSpace(message))
+	switch {
+	case message == "websocket: close 1006" || strings.HasPrefix(message, "websocket: close 1006 "):
+		return "websocket_abnormal_closure"
+	case message == "context canceled":
+		return "context_canceled"
+	default:
+		return ""
 	}
 }
 
