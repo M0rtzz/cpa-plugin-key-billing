@@ -18,7 +18,7 @@ import (
 )
 
 const authQuotaCacheLimit = 512
-const authQuotaFreshFor = 60 * time.Second
+const authQuotaFreshFor = 24 * time.Hour
 
 // The cache contains normalized observations only. All maintenance runs inside
 // host calls; no credentials, background refreshes, or timers are retained.

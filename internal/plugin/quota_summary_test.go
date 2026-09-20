@@ -59,7 +59,7 @@ func TestAccountQuotaSummaryReadOnlyDisabledAndStale(t *testing.T) {
 		{ID: "three", AuthIndex: "three", Type: "codex"},
 	}
 	quotaTestHost(t, app, files)
-	app.storeAuthQuota(files[0], authQuotaResponse{Plan: "pro", FetchedAt: time.Now().Add(-2 * time.Minute), Quota: []quotaRow{{Label: "5-hour limit", RemainingPercent: floatPointer(30)}}})
+	app.storeAuthQuota(files[0], authQuotaResponse{Plan: "pro", FetchedAt: time.Now().Add(-25 * time.Hour), Quota: []quotaRow{{Label: "5-hour limit", RemainingPercent: floatPointer(30)}}})
 	response := app.accountQuotaSummary(ManagementRequest{Query: url.Values{"refresh": {"true"}}}, viewAccess{APIKey: true, Scope: "scope"})
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("summary = %d %s", response.StatusCode, response.Body)
