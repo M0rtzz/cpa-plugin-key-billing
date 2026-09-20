@@ -256,6 +256,45 @@ func TestAccountRequestEventsUseTheAdministratorSource(t *testing.T) {
 	}
 }
 
+func TestAccountEmailMasking(t *testing.T) {
+	app, path := newAppWithPriceAndState(t, true)
+	raw, errHandle := app.HandleMethod(MethodPluginReconfigure, mustMarshal(t, LifecycleRequest{ConfigYAML: []byte(
+		"enabled: true\nmask_api_key_view_emails: true\nstate_file: \"" + path + "\"\n",
+	)}))
+	if errHandle != nil {
+		t.Fatal(errHandle)
+	}
+	decodeResult(t, raw, nil)
+	if _, errSync := app.store.SyncKeys([]string{accountTestKeyA}, false); errSync != nil {
+		t.Fatal(errSync)
+	}
+	if errLabel := app.store.SetLabel(billing.CallerScope(accountTestKeyA), "owner@example.com"); errLabel != nil {
+		t.Fatal(errLabel)
+	}
+	publishUsageRecord(t, app, UsageRecord{
+		Provider: "codex", Model: "gpt-5.5", Alias: "gpt-5.5", APIKey: accountTestKeyA,
+		AuthType: "oauth", Source: "private@example.com", Failed: true,
+		Failure: UsageFailure{Body: `{"error":{"message":"contact private@example.com"}}`},
+	})
+	profile := callAccount(t, app, routeProfile, accountTestKeyA, nil)
+	if strings.Contains(string(profile.Body), "owner@example.com") || !strings.Contains(string(profile.Body), "ow**r@example.com") {
+		t.Fatalf("masked profile = %s", profile.Body)
+	}
+	response := callAccount(t, app, routeEvents, accountTestKeyA, nil)
+	if strings.Contains(string(response.Body), "private@example.com") || !strings.Contains(string(response.Body), "pr****e@example.com") {
+		t.Fatalf("masked events = %s", response.Body)
+	}
+	var view billing.RequestEventView
+	if errDecode := json.Unmarshal(response.Body, &view); errDecode != nil {
+		t.Fatal(errDecode)
+	}
+	if len(view.Entries) != 1 || view.Entries[0].Source != "codex · pr****e@example.com" ||
+		view.Filters == nil || len(view.Filters.SourceOptions) != 1 ||
+		view.Filters.SourceOptions[0].Label != "codex · pr****e@example.com" {
+		t.Fatalf("masked event view = %+v", view)
+	}
+}
+
 func TestAccountRoutingAndPricesRespectItsScope(t *testing.T) {
 	app := configuredAccountApp(t)
 	hostCalls := 0

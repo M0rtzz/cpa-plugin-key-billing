@@ -87,6 +87,7 @@ plugins:
       enabled: true
       debug: false # 是否记录 debug 日志，例如路由日志、匹配参考价日志
       codex_fast_mode_billing: false # 开启后，Codex 的 priority 请求按 2.5 倍计费
+      mask_api_key_view_emails: false # 对 API Key 查询页面返回的邮箱进行掩码脱敏
       state_file: "plugins/cpa-key-billing-state-v1.db"
 ```
 

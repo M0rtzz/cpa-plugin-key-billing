@@ -16,6 +16,7 @@ type Config struct {
 	Debug                bool   `yaml:"debug"`
 	StateFile            string `yaml:"state_file"`
 	CodexFastModeBilling bool   `yaml:"codex_fast_mode_billing"`
+	MaskAPIKeyViewEmails bool   `yaml:"mask_api_key_view_emails"`
 }
 
 func DefaultConfig() Config {

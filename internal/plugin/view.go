@@ -53,10 +53,11 @@ func sourceFilterOptions(scope string, sources []string) []billing.RequestSource
 }
 
 type viewAccess struct {
-	APIKey  bool
-	Scope   string
-	Tracked bool
-	Key     billing.KeyView
+	APIKey     bool
+	Scope      string
+	Tracked    bool
+	MaskEmails bool
+	Key        billing.KeyView
 }
 
 func (a *App) apiKeyViewAccess(req ManagementRequest) (viewAccess, bool) {
@@ -65,7 +66,7 @@ func (a *App) apiKeyViewAccess(req ManagementRequest) (viewAccess, bool) {
 		return viewAccess{}, false
 	}
 	view, tracked := a.store.KeyViewForScope(scope)
-	return viewAccess{APIKey: true, Scope: scope, Tracked: tracked, Key: view}, true
+	return viewAccess{APIKey: true, Scope: scope, Tracked: tracked, MaskEmails: a.store.MaskAPIKeyViewEmails(), Key: view}, true
 }
 
 func (a *App) routeResource(req ManagementRequest, suffix string) ManagementResponse {
@@ -309,14 +310,19 @@ func countParam(query url.Values, name string, target *int) error {
 
 func viewJSON(access viewAccess, status int, payload any) ManagementResponse {
 	if access.APIKey {
-		return apiKeyJSON(status, payload)
+		handled := false
+		if access.MaskEmails {
+			payload, handled = maskAPIKeyPayload(payload)
+		}
+		response := apiKeyJSON(status, payload)
+		return protectAPIKeyResponse(access, response, handled)
 	}
 	return JSONResponse(status, payload)
 }
 
 func viewJSONError(access viewAccess, status int, code, message string) ManagementResponse {
 	if access.APIKey {
-		return apiKeyJSONError(status, code, message)
+		return protectAPIKeyResponse(access, apiKeyJSONError(status, code, message), false)
 	}
 	return JSONError(status, code, message)
 }
@@ -324,7 +330,7 @@ func viewJSONError(access viewAccess, status int, code, message string) Manageme
 func viewDetailedError(access viewAccess, status int, code string, err error) ManagementResponse {
 	response := jsonMessageError(status, code, messages.FromError(err))
 	if access.APIKey {
-		secureAPIKeyResponse(&response)
+		response = protectAPIKeyResponse(access, response, false)
 	}
 	return response
 }
@@ -332,7 +338,17 @@ func viewDetailedError(access viewAccess, status int, code string, err error) Ma
 func viewErrorResponse(access viewAccess, err error) ManagementResponse {
 	response := errorResponse(err)
 	if access.APIKey {
+		response = protectAPIKeyResponse(access, response, false)
+	}
+	return response
+}
+
+func protectAPIKeyResponse(access viewAccess, response ManagementResponse, handled bool) ManagementResponse {
+	if access.APIKey {
 		secureAPIKeyResponse(&response)
+		if access.MaskEmails && !handled {
+			response.Body = []byte(maskEmails(string(response.Body)))
+		}
 	}
 	return response
 }

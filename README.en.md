@@ -89,6 +89,7 @@ plugins:
       enabled: true
       debug: false # Include routing and reference-price matching in debug logs
       codex_fast_mode_billing: false # Charge 2.5× for Codex priority requests
+      mask_api_key_view_emails: false # Mask email addresses in API key account views
       state_file: "plugins/cpa-key-billing-state-v1.db"
 ```
 

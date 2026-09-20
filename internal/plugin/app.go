@@ -148,6 +148,11 @@ func registration() Registration {
 					Description: "Bill Codex priority requests at 2.5 times the standard cost",
 				},
 				{
+					Name:        "mask_api_key_view_emails",
+					Type:        "boolean",
+					Description: "Mask email addresses in API key account responses",
+				},
+				{
 					Name:        "state_file",
 					Type:        "string",
 					Description: "Billing database file path",
