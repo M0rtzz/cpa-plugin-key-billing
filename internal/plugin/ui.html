@@ -189,7 +189,7 @@
         --bg-tertiary: var(--app-surface-muted, #f6faff);
         --bg-hover: var(--app-accent-soft, var(--bg-tertiary));
         --floating-surface: var(--app-surface-strong, var(--bg-primary));
-        --floating-shadow: var(--glass-shadow, none);
+        --floating-shadow: 0 12px 28px rgb(15 23 42 / 0.16);
         --text-primary: var(--app-text-primary, #2c3e50);
         --text-secondary: var(--app-text-regular, #5f6c7b);
         --text-tertiary: var(--app-text-muted, #8b95a6);
@@ -236,6 +236,7 @@
         --analysis-color-6: var(--data-cyan-base, #23a6c7);
         --analysis-segment-border: var(--app-surface, var(--bg-primary));
       }
+      :root[data-cpamp-plugin-host="true"][data-theme="dark"] { --floating-shadow: 0 16px 34px rgb(0 0 0 / 0.55); }
       * { box-sizing: border-box; }
       body {
         margin: 0;
@@ -801,7 +802,7 @@
         color: var(--text-secondary);
         line-height: 0;
       }
-      .standalone-actions .icon-action:hover:not(:disabled) {
+      .standalone-actions .icon-action:hover:not(:disabled), .standalone-actions .icon-action[aria-expanded="true"] {
         border-color: transparent;
         background: color-mix(in srgb, var(--text-primary) 8%, transparent);
         color: var(--text-primary);
@@ -827,15 +828,6 @@
       }
       .icon-action .lucide-icon { width: 16px; height: 16px; }
       body.embedded .standalone-actions { display: none; }
-      .standalone-actions .language-select {
-        width: auto;
-        min-width: 92px;
-        max-width: 112px;
-        min-height: 36px;
-        padding: 4px 8px;
-        border-color: transparent;
-        background: transparent;
-      }
       .account-subscription-stats { margin-bottom: 16px; }
       .account-plan { display: grid; align-content: start; gap: 10px; margin: 0; }
       .account-plan-value { font-size: 24px; }
@@ -1554,8 +1546,8 @@
       }
       .time-range-trigger[aria-expanded="true"] .time-range-chevron { transform: rotate(180deg); }
       .time-range-popover { position: absolute; top: calc(100% + 6px); right: 0; }
-      .date-time-popover { position: fixed; margin: 0; inset: auto; color: var(--text-primary); }
-      .time-range-popover, .date-time-popover {
+      .date-time-popover, .language-menu { position: fixed; margin: 0; inset: auto; color: var(--text-primary); }
+      .time-range-popover, .date-time-popover, .language-menu {
         z-index: 1200;
         width: min(360px, calc(100vw - 24px));
         overflow: auto;
@@ -1566,6 +1558,28 @@
         box-shadow: var(--floating-shadow);
         transform-origin: top right;
         animation: time-range-in 150ms ease-out both;
+      }
+      .language-menu { gap: 2px; width: max-content; min-width: 112px; max-width: calc(100vw - 24px); padding: 6px; }
+      .language-menu:popover-open { display: grid; }
+      :root .language-menu button.language-option {
+        width: 100%;
+        padding: 8px 12px;
+        border-color: transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-secondary);
+        text-align: left;
+      }
+      :root .language-menu button.language-option:hover:not(:disabled) {
+        border-color: transparent;
+        background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+        color: var(--text-primary);
+      }
+      :root .language-menu button.language-option[aria-checked="true"] {
+        border-color: transparent;
+        background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+        color: var(--primary-active);
+        font-weight: 600;
       }
       @media (max-width: 640px) {
         .date-time-popover { inset: auto 12px 12px; margin-inline: auto; max-height: calc(100dvh - 24px); }
@@ -1652,7 +1666,7 @@
         background: var(--app-input-bg-focus, var(--bg-primary));
         box-shadow: inset 0 0 0 1px var(--focus-inset);
       }
-      :root[data-cpamp-plugin-host="true"] .time-range-popover {
+      :root[data-cpamp-plugin-host="true"] .time-range-popover, :root[data-cpamp-plugin-host="true"] .language-menu {
         border-color: color-mix(
           in srgb,
           var(--app-input-border-focus, var(--primary-color)) 28%,
@@ -2129,12 +2143,15 @@
         if (window.matchMedia) { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", sync); }
         window.billingTheme = {
           current: () => appliedTheme,
-          toggle() {
-            const next = appliedTheme === "dark" ? "white" : "dark";
-            selectedTheme = next;
-            try { localStorage.setItem(PLUGIN_STORE_KEY, next); } catch (_) {}
-            apply(next);
-            return next;
+          preference: () => selectedTheme,
+          cycle() {
+            const order = ["", "white", "dark"];
+            selectedTheme = order[(order.indexOf(selectedTheme) + 1) % order.length];
+            try {
+              if (selectedTheme) localStorage.setItem(PLUGIN_STORE_KEY, selectedTheme); else localStorage.removeItem(PLUGIN_STORE_KEY);
+            } catch (_) {}
+            sync();
+            return selectedTheme;
           }
         };
       })();
@@ -8835,6 +8852,7 @@
         x: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
         refresh: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-cw"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`,
         sun: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`,
+        "sun-moon": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun-moon"><path d="M12 2v2"/><path d="M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715"/><path d="M16 12a4 4 0 0 0-4-4"/><path d="m19 5-1.256 1.256"/><path d="M20 12h2"/></svg>`,
         moon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>`,
         logout: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>`,
         download: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>`,
@@ -8842,6 +8860,7 @@
         check: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"/></svg>`,
         chevron: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>`,
         "chevron-down": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>`,
+        globe: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>`,
         clock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
         key: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key-round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>`,
         "party-popper": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-party-popper"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg>`,
@@ -8868,11 +8887,14 @@
         setTextAttribute(button, "aria-label", label);
       }
 
+      const THEME_MODES = {
+        "": { icon: "sun-moon", label: () => m("ui.theme_follows_system") },
+        white: { icon: "sun", label: () => m("ui.theme_light") },
+        dark: { icon: "moon", label: () => m("ui.theme_dark") }
+      };
       function updateThemeButtons() {
-        const dark = window.billingTheme?.current() === "dark";
-        document.querySelectorAll('[data-page-action="theme"]').forEach((button) => {
-          setActionIcon(button, dark ? "sun" : "moon", dark ? m("ui.switch_to_light_theme") : m("ui.switch_to_dark_theme"));
-        });
+        const mode = THEME_MODES[window.billingTheme?.preference()] || THEME_MODES[""];
+        document.querySelectorAll('[data-page-action="theme"]').forEach((button) => setActionIcon(button, mode.icon, mode.label()));
       }
 
       function updateThemedVisuals() {
@@ -8885,7 +8907,10 @@
         button.onclick = () => refreshPage();
       }
       document.querySelectorAll('[data-page-action="theme"]').forEach((button) => {
-        button.onclick = () => { window.billingTheme?.toggle(); };
+        button.onclick = () => {
+          window.billingTheme?.cycle();
+          updateThemeButtons();
+        };
       });
       document.querySelectorAll('[data-page-action="logout"]').forEach((button) => {
         setActionIcon(button, "logout", m("ui.sign_out"));
@@ -8896,6 +8921,63 @@
             showGate(role, "");
           });
       });
+      function addLanguageControl(group) {
+        const menu = el("div", { class: "language-menu", popover: "auto", role: "menu", "aria-label": m("language.select") });
+        const button = el(
+          "button",
+          {
+            type: "button",
+            class: "icon-action",
+            "data-page-action": "language",
+            "aria-haspopup": "menu",
+            "aria-expanded": "false",
+            "aria-label": m("language.select"),
+            title: m("language.select"),
+            onclick: () => {
+              if (menu.matches(":popover-open")) return menu.hidePopover();
+              const current = window.billingI18n.current();
+              menu.replaceChildren(
+                ...window.billingI18n.languages().map((item) =>
+                  el("button", {
+                    type: "button",
+                    class: "language-option",
+                    role: "menuitemradio",
+                    "aria-checked": String(item.value === current),
+                    text: item.label,
+                    onclick: () => {
+                      menu.hidePopover();
+                      button.focus();
+                      window.billingI18n.select(item.value);
+                    }
+                  })
+                )
+              );
+              menu.showPopover();
+              positionAnchoredPopover(menu, button, true);
+              menu.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
+            }
+          },
+          actionIcon("globe")
+        );
+        menu.addEventListener("toggle", (event) => button.setAttribute("aria-expanded", String(event.newState === "open")));
+        menu.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            menu.hidePopover();
+            button.focus();
+            return;
+          }
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          const items = Array.from(menu.querySelectorAll("button"));
+          const index = items.indexOf(document.activeElement);
+          items[(index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+        });
+        group.prepend(button, menu);
+      }
+      document.querySelectorAll(".standalone-actions").forEach(addLanguageControl);
+
       window.addEventListener("billing-theme-change", updateThemedVisuals);
       window.addEventListener("billing-language-change", () => {
         dateFormatter = new Intl.DateTimeFormat(locale());
