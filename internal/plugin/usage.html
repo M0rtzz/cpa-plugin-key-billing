@@ -564,8 +564,7 @@
                 ];
           values.forEach((value, index) => {
             const cell = node("td", null, tab === "errors" && index === 4 ? "message" : "");
-            if (value instanceof Node) cell.append(value);
-            else cell.textContent = String(value);
+            if (value instanceof Node) cell.append(value); else cell.textContent = String(value);
             tr.append(cell);
           });
           body.append(tr);
