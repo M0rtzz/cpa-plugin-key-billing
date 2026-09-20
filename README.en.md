@@ -92,8 +92,6 @@ plugins:
       state_file: "plugins/cpa-key-billing-state-v1.db"
 ```
 
-When `codex_fast_mode_billing` is enabled, requests to the Codex upstream with `service_tier=priority` are billed at **2.5 times** the standard cost.
-
 > [!WARNING]
 > Back up your data file before upgrading.
 >
