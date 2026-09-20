@@ -190,6 +190,9 @@
   th, td { text-align: left; padding: 12px 18px; border-bottom: 1px solid var(--line); }
   th { color: var(--muted); font-weight: 550; background: var(--bg); }
   td.message { min-width: 180px; max-width: 380px; white-space: normal; overflow-wrap: anywhere; }
+  .timing { display: grid; grid-template-columns: auto auto; gap: 1px 10px; }
+  .timing .label { color: var(--muted); }
+  .timing .value { color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
   .pager { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
   .pager .buttons { display: flex; gap: 8px; }
   .tabs { display: flex; gap: 7px; }
@@ -267,6 +270,11 @@
     const percent = (value) => (Number.isFinite(Number(value)) && value != null ? Number(value).toFixed(1) + "%" : "未提供");
     const when = (value) =>
       value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "尚无记录";
+    const duration = (value) => {
+      const milliseconds = Number(value);
+      if (!Number.isFinite(milliseconds) || milliseconds <= 0) return "—";
+      return milliseconds < 1000 ? integer(milliseconds) + " ms" : (milliseconds / 1000).toFixed(2) + "s";
+    };
     const factor = (value, fallback = 1) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback);
     const factorText = (value) => factor(value).toLocaleString("zh-CN", { maximumSignificantDigits: 12 }) + "×";
     function billingPolicy(value) {
@@ -294,6 +302,16 @@
       parent.append(item);
     }
     function empty(parent, text = "所选范围内暂无记录") { parent.append(node("p", text, "empty")); }
+    function timing(entry) {
+      const value = node("div", null, "timing");
+      value.append(
+        node("span", "首字", "label"),
+        node("span", duration(entry.ttft_ms), "value"),
+        node("span", "总耗时", "label"),
+        node("span", duration(entry.latency_ms), "value")
+      );
+      return value;
+    }
     function bar(parent, value, label) {
       const item = node("div", null, "bar");
       const fill = node("i");
@@ -506,7 +524,7 @@
         const table = node("table"), head = node("thead"), row = node("tr");
         for (const label of tab === "errors"
           ? ["时间", "模型", "HTTP 状态", "错误类型", "错误说明"]
-          : ["时间", "模型", "状态", "Token", "费用（USD）", "计费倍率", "耗时"])
+          : ["时间", "模型", "状态", "推理强度", "Token", "费用（USD）", "计费倍率", "耗时"])
           row.append(node("th", label));
         head.append(row);
         table.append(head);
@@ -531,15 +549,21 @@
                   when(entry.at),
                   entry.billing_model || entry.upstream_model || "—",
                   entry.failed ? "失败" : "成功",
+                  entry.reasoning_effort || "—",
                   integer(tokens),
                   money(cost.total_usd),
                   typeof cost.billing_multiplier === "number"
                     ? "全局 " + factorText(cost.billing_multiplier) + " · 快速 " + factorText(cost.service_tier_multiplier) + " = " +
                       factorText(factor(cost.multiplier, factor(cost.billing_multiplier) * factor(cost.service_tier_multiplier)))
                     : "最终 " + factorText(cost.multiplier),
-                  entry.latency_ms == null ? "—" : integer(entry.latency_ms) + " ms"
+                  timing(entry)
                 ];
-          values.forEach((text, index) => tr.append(node("td", text, tab === "errors" && index === 4 ? "message" : "")));
+          values.forEach((value, index) => {
+            const cell = node("td", null, tab === "errors" && index === 4 ? "message" : "");
+            if (value instanceof Node) cell.append(value);
+            else cell.textContent = String(value);
+            tr.append(cell);
+          });
           body.append(tr);
         }
         table.append(body);
