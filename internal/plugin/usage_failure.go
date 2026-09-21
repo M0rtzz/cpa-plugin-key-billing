@@ -8,6 +8,7 @@ import (
 
 const maxFailureReason = 300
 
+// Body stays empty when the failure was a bare transport error, not a response.
 type usageFailureView struct {
 	StatusCode int
 	ErrorType  string
@@ -15,64 +16,54 @@ type usageFailureView struct {
 	Body       string
 }
 
-type normalizedFailureEnvelope struct {
-	Error normalizedFailure `json:"error"`
+// Only feeds the reason and the category; the payload itself is stored verbatim.
+type upstreamFailure struct {
+	Message string
+	Type    string
+	Code    string
 }
 
-type normalizedFailure struct {
-	Message string `json:"message,omitempty"`
-	Type    string `json:"type,omitempty"`
-	Code    string `json:"code,omitempty"`
-	Status  int    `json:"status,omitempty"`
-}
-
-// Keep only the error scalars exposed by usage.handle; unrelated response
-// fields must not enter the stored error event.
 func usageFailureDetails(failure UsageFailure) usageFailureView {
 	statusCode := validFailureStatus(failure.StatusCode)
 	raw := strings.TrimSpace(failure.Body)
-	normalized, qualifier := parseJSONFailure(raw)
-	structured := normalized != (normalizedFailure{})
+	payload, qualifier, structured := parseUpstreamFailure(raw)
 	if !structured {
-		normalized.Message = raw
+		payload = upstreamFailure{Message: raw}
 	}
-	reason := formatFailureReason(statusCode, qualifyFailure(normalized.Message, qualifier))
-	normalized.Message = truncateFailureReason(stripFailureStatus(normalized.Message, statusCode))
-	if statusCode != 0 {
-		normalized.Status = statusCode
+	reason := formatFailureReason(statusCode, qualifyFailure(payload.Message, qualifier))
+	view := usageFailureView{StatusCode: statusCode, ErrorType: payload.errorType(reason), Reason: reason}
+	if structured {
+		view.Body = raw
 	}
-	errorType := normalized.Code
-	if errorType == "" {
-		errorType = normalized.Type
-	}
-	if errorType == "" && structured {
-		errorType = inferredFailureType(normalized.Message)
-	}
-	return usageFailureView{
-		StatusCode: statusCode,
-		ErrorType:  errorType,
-		Reason:     reason,
-		Body:       marshalNormalizedFailure(normalized),
-	}
+	return view
 }
 
-// Infer a stable category only for distinctive executor messages. Structured
-// upstream codes and types always take precedence over these fallbacks.
-func inferredFailureType(message string) string {
-	message = strings.ToLower(strings.TrimSpace(message))
+func (f upstreamFailure) errorType(reason string) string {
+	if f.Code != "" {
+		return f.Code
+	}
+	if f.Type != "" {
+		return f.Type
+	}
+	return inferredFailureType(reason)
+}
+
+// A reason may wrap the signature in an HTTP prefix and a qualifier.
+func inferredFailureType(reason string) string {
+	reason = strings.ToLower(reason)
 	switch {
-	case message == "websocket: close 1006" || strings.HasPrefix(message, "websocket: close 1006 "):
+	case strings.Contains(reason, "websocket: close 1006"):
 		return "websocket_abnormal_closure"
-	case message == "context canceled":
+	case strings.Contains(reason, "context canceled"):
 		return "context_canceled"
 	default:
 		return ""
 	}
 }
 
-func parseJSONFailure(raw string) (normalizedFailure, string) {
+func parseUpstreamFailure(raw string) (payload upstreamFailure, qualifier string, structured bool) {
 	if raw == "" {
-		return normalizedFailure{}, ""
+		return upstreamFailure{}, "", false
 	}
 	if start := strings.IndexByte(raw, '{'); start > 0 {
 		raw = raw[start:]
@@ -81,7 +72,7 @@ func parseJSONFailure(raw string) (normalizedFailure, string) {
 	decoder.UseNumber()
 	var root map[string]any
 	if decoder.Decode(&root) != nil || root == nil {
-		return normalizedFailure{}, ""
+		return upstreamFailure{}, "", false
 	}
 
 	var node map[string]any
@@ -104,11 +95,11 @@ func parseJSONFailure(raw string) (normalizedFailure, string) {
 		rootNode = true
 	}
 	if node == nil {
-		return normalizedFailure{}, ""
+		return upstreamFailure{}, "", false
 	}
 
 	errorType := failureString(node["type"])
-	qualifier := errorType
+	qualifier = errorType
 	if rootNode && strings.EqualFold(errorType, "error") {
 		errorType = ""
 		qualifier = failureString(node["code"])
@@ -118,20 +109,12 @@ func parseJSONFailure(raw string) (normalizedFailure, string) {
 			qualifier = failureString(node["code"])
 		}
 	}
-	return normalizedFailure{
-		Message: message,
-		Type:    errorType,
-		Code:    failureString(node["code"]),
-		Status:  failureStatus(node["status"]),
-	}, qualifier
-}
-
-func marshalNormalizedFailure(failure normalizedFailure) string {
-	if failure == (normalizedFailure{}) {
-		return ""
+	payload = upstreamFailure{Message: message, Type: errorType, Code: failureString(node["code"])}
+	if payload == (upstreamFailure{}) {
+		// No scalars to read; no more usable than plain text.
+		return upstreamFailure{}, "", false
 	}
-	raw, _ := json.Marshal(normalizedFailureEnvelope{Error: failure})
-	return string(raw)
+	return payload, qualifier, true
 }
 
 func validFailureStatus(status int) int {
@@ -139,36 +122,6 @@ func validFailureStatus(status int) int {
 		return 0
 	}
 	return status
-}
-
-func failureStatus(value any) int {
-	var raw string
-	switch value := value.(type) {
-	case json.Number:
-		raw = value.String()
-	case string:
-		raw = strings.TrimSpace(value)
-	default:
-		return 0
-	}
-	status, errStatus := strconv.Atoi(raw)
-	if errStatus != nil {
-		return 0
-	}
-	return validFailureStatus(status)
-}
-
-func stripFailureStatus(message string, statusCode int) string {
-	if statusCode == 0 {
-		return message
-	}
-	for _, separator := range []string{"：", ":"} {
-		prefix := "HTTP " + strconv.Itoa(statusCode) + separator
-		if strings.HasPrefix(message, prefix) {
-			return strings.TrimSpace(strings.TrimPrefix(message, prefix))
-		}
-	}
-	return message
 }
 
 func formatFailureReason(statusCode int, message string) string {

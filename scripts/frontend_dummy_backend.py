@@ -922,19 +922,23 @@ def refresh_route_counts():
         )
 
 
-def request_error(event_index, message, status=0, error_type="", code=""):
+# transport=True is a bare executor error: no upstream payload, so no body.
+def request_error(event_index, message, status=0, error_type="", code="", transport=False):
     event = REQUEST_EVENTS[event_index]
     event["failed"] = True
-    error = {"message": message}
-    if error_type:
-        error["type"] = error_type
-    if code:
-        error["code"] = code
-    if 400 <= status <= 599:
-        error["status"] = status
     reason = (f"HTTP {status}：" if status else "") + message
     if error_type:
         reason += f"（{error_type}）"
+    body = ""
+    if not transport:
+        error = {"message": message}
+        if error_type:
+            error["type"] = error_type
+        if code:
+            error["code"] = code
+        if 400 <= status <= 599:
+            error["status"] = status
+        body = json.dumps({"error": error}, ensure_ascii=False, separators=(",", ":"))
     return {
         "id": event["id"],
         "at": event["at"],
@@ -951,7 +955,7 @@ def request_error(event_index, message, status=0, error_type="", code=""):
         "status_code": status,
         "error_type": code or error_type,
         "reason": reason,
-        "body": json.dumps({"error": error}, ensure_ascii=False, separators=(",", ":")),
+        "body": body,
     }
 
 
@@ -971,6 +975,12 @@ ERRORS = [
         status=504,
         error_type="timeout_error",
         code="upstream_timeout",
+    ),
+    request_error(
+        24,
+        "websocket: close 1006 (abnormal closure): unexpected EOF",
+        code="websocket_abnormal_closure",
+        transport=True,
     ),
 ]
 
