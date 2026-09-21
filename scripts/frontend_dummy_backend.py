@@ -937,6 +937,7 @@ def request_error(event_index, message, status=0, error_type="", code="", transp
         if 400 <= status <= 599:
             error["status"] = status
         body = json.dumps({"error": error}, ensure_ascii=False, separators=(",", ":"))
+    event["error_body"] = body
     return {
         "id": event["id"],
         "at": event["at"],

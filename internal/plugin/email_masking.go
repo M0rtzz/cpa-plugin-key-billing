@@ -72,6 +72,7 @@ func maskAPIKeyPayload(payload any) (any, bool) {
 		for i := range value.Entries {
 			value.Entries[i].Account = maskEmails(value.Entries[i].Account)
 			value.Entries[i].Source = maskEmails(value.Entries[i].Source)
+			value.Entries[i].ErrorBody = maskEmails(value.Entries[i].ErrorBody)
 		}
 		if value.Filters != nil {
 			for i := range value.Filters.SourceOptions {

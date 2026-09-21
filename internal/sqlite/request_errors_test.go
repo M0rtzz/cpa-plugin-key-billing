@@ -133,3 +133,15 @@ func TestRequestErrorTypeCountsIgnoreTypeAndPagination(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestEventsCarryFailureBody(t *testing.T) {
+	database := requestErrorDatabase(t)
+	view, err := database.RequestEvents(billing.RequestEventQuery{Limit: 10}, eventStart.Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(view.Entries) != 3 || view.Entries[0].ErrorBody != `{"error":"bad gateway"}` ||
+		view.Entries[1].ErrorBody != `{"error":"limited"}` || view.Entries[2].ErrorBody != "" {
+		t.Fatalf("entries = %+v", view.Entries)
+	}
+}

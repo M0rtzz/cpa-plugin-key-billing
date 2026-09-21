@@ -172,9 +172,10 @@ func (d *DB) RequestEvents(query billing.RequestEventQuery, since time.Time) (bi
 			r.applied_input_per_1m, r.applied_output_per_1m,
 			r.applied_cache_read_per_1m, r.applied_cache_write_per_1m,
 			coalesce(k.preview, ''), coalesce(k.label, ''), `+requestEventSourceName+`,
-			`+lobotomizedSQL+`
+			`+lobotomizedSQL+`, coalesce(e.body, '')
 		FROM page JOIN request_events r ON r.id = page.id
 		LEFT JOIN api_keys k ON k.scope = r.scope
+		LEFT JOIN request_errors e ON e.request_event_id = r.id
 		ORDER BY r.at DESC, r.id DESC`, pageArgs...)
 	if errQuery != nil {
 		return billing.RequestEventView{}, fmt.Errorf("Read request events: %w", errQuery)
@@ -290,7 +291,7 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 		&row.Cost.Tiered, &row.Cost.LongContext, &row.Cost.ThresholdInputTokens,
 		&row.Cost.AppliedInputPer1M, &row.Cost.AppliedOutputPer1M,
 		&row.Cost.AppliedCacheReadPer1M, &row.Cost.AppliedCacheWritePer1M,
-		&row.Preview, &row.Label, &row.Source, &row.Lobotomized); errScan != nil {
+		&row.Preview, &row.Label, &row.Source, &row.Lobotomized, &row.ErrorBody); errScan != nil {
 		return billing.RequestEventRow{}, fmt.Errorf("Read request events: %w", errScan)
 	}
 	row.At = timeAt(at)

@@ -50,7 +50,8 @@ type RequestEventRow struct {
 	Label   string `json:"label,omitempty"`
 	Source  string `json:"source,omitempty"`
 	// False also covers unreported headers, including reused upstream WebSockets.
-	Lobotomized bool `json:"lobotomized"`
+	Lobotomized bool   `json:"lobotomized"`
+	ErrorBody   string `json:"error_body,omitempty"`
 }
 
 // RequestEventQuery selects one filtered page of request events.

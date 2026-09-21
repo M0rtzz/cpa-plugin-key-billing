@@ -1368,7 +1368,7 @@
       .key-route-line .settings-chip { overflow: hidden; }
       .key-route-line .settings-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .key-route-lines:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; border-radius: 4px; }
-      .key-route-tooltip {
+      .hover-tooltip {
         position: fixed;
         inset: auto;
         margin: 0;
@@ -1387,9 +1387,10 @@
         font-size: 12px;
       }
       /* Block flow avoids WebKit stretching auto-height popover grid rows. */
-      .key-route-tooltip:popover-open { display: block; }
-      .key-route-tooltip > * + * { margin-top: 6px; }
-      .key-route-tooltip-heading { font-size: 11px; color: var(--text-tertiary); }
+      .hover-tooltip:popover-open { display: block; }
+      .hover-tooltip > * + * { margin-top: 6px; }
+      .hover-tooltip-heading { font-size: 11px; color: var(--text-tertiary); }
+      .hover-tooltip-body { margin: 0; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
       .key-route-more { color: var(--text-tertiary); line-height: 1; }
       .key-route-actions { margin-top: 5px; }
       .key-route-actions > button.link { min-height: 22px; font-size: 12px; }
@@ -2626,7 +2627,7 @@
 
     <div id="cost-tooltip" class="cost-tooltip" role="tooltip" aria-hidden="true"></div>
 
-    <div id="key-route-tooltip" class="key-route-tooltip" popover="manual" role="tooltip" tabindex="0"></div>
+    <div id="hover-tooltip" class="hover-tooltip" popover="manual" role="tooltip" tabindex="0"></div>
 
     <dialog id="route-picker" class="settings-dialog route-picker" aria-labelledby="route-picker-title" aria-describedby="route-picker-identity">
       <h2 id="route-picker-title" data-i18n="ui.edit_api_key_routing_rules">Edit API key routing rules</h2>
@@ -6038,7 +6039,7 @@
 
       function renderKeys() {
         if (currentRole !== "admin" || activeTab(false) !== "keys") return false;
-        closeKeyRouteTooltip();
+        closeHoverTooltip();
         if (renderDataPending($("keys-body"), [resources.admin.keys], m("ui.loading"), "empty section-loading")) return;
         const plans = resources.admin.plans.value;
         const filter = $("key-filter").value.trim().toLowerCase();
@@ -6252,30 +6253,19 @@
           .concat(routingDimensionChips(bindings, "credential", view.credential_labels))
           .concat(routingDimensionChips(bindings, "model", view.credential_labels));
         const disabled = !!view.deleted_at || adminUIState.keySubmissions.has(view.scope);
+        const tooltip = () => [
+          el("div", {
+            class: "hover-tooltip-heading",
+            text: m("ui.full_routing_rulesvaluevalue_items", { v0: DISPLAY_SEPARATOR, v1: names.length })
+          }),
+          ...names.map((entry) => settingsChipList([entry]))
+        ];
         return el(
           "div",
           { class: "key-route-cell" },
           el(
             "div",
-            {
-              class: "key-route-lines",
-              tabindex: names.length ? "0" : null,
-              onpointerenter: (event) => {
-                if (event.pointerType !== "touch" && names.length)
-                  showKeyRouteTooltip(event.currentTarget, names, { x: event.clientX, y: event.clientY });
-              },
-              onpointerleave: (event) => scheduleKeyRouteTooltipClose(event.relatedTarget),
-              onfocus: (event) => { if (names.length) showKeyRouteTooltip(event.currentTarget, names); },
-              onblur: (event) => scheduleKeyRouteTooltipClose(event.relatedTarget),
-              onkeydown: (event) => {
-                if (event.key === "Escape") closeKeyRouteTooltip();
-                else if (event.key === "ArrowDown" && names.length) {
-                  event.preventDefault();
-                  showKeyRouteTooltip(event.currentTarget, names);
-                  $("key-route-tooltip").focus({ preventScroll: true });
-                }
-              }
-            },
+            { class: "key-route-lines", ...hoverTooltipProps(tooltip, names.length) },
             ...(names.length
               ? names.slice(0, 3).map((entry) => el("div", { class: "key-route-line" }, settingsChipList([entry])))
               : [el("div", { class: "key-route-line muted", text: m("ui.all_routes") })]),
@@ -6294,7 +6284,7 @@
               "aria-label": m("ui.clear_routing_rules_for_value", { v0: apiKeyIdentity(view).primary }),
               onclick: () =>
                 guard(() => {
-                  closeKeyRouteTooltip();
+                  closeHoverTooltip();
                   return openActionDialog(
                     m("ui.clear_routing_rules_for_value_2", { v0: apiKeyIdentity(view).primary }),
                     m("ui.remove_all_routing_rule_bindings_and_direct_model_and_credential_allowlists_and_denyl"),
@@ -6319,40 +6309,54 @@
         );
       }
 
-      let keyRouteTooltipAnchor = null;
-      let keyRouteTooltipTimer = 0;
+      let hoverTooltipAnchor = null;
+      let hoverTooltipTimer = 0;
 
-      function closeKeyRouteTooltip() {
-        clearTimeout(keyRouteTooltipTimer);
-        keyRouteTooltipTimer = 0;
-        keyRouteTooltipAnchor?.removeAttribute("aria-describedby");
-        keyRouteTooltipAnchor = null;
-        const tooltip = $("key-route-tooltip");
+      function closeHoverTooltip() {
+        clearTimeout(hoverTooltipTimer);
+        hoverTooltipTimer = 0;
+        hoverTooltipAnchor?.removeAttribute("aria-describedby");
+        hoverTooltipAnchor = null;
+        const tooltip = $("hover-tooltip");
         if (tooltip.matches(":popover-open")) tooltip.hidePopover();
       }
 
-      function scheduleKeyRouteTooltipClose(next) {
-        const tooltip = $("key-route-tooltip");
-        if (next && (tooltip.contains(next) || keyRouteTooltipAnchor?.contains(next))) return;
-        clearTimeout(keyRouteTooltipTimer);
-        if (next?.closest?.(".key-route-actions")) closeKeyRouteTooltip();
-        else keyRouteTooltipTimer = setTimeout(closeKeyRouteTooltip, 150);
+      function scheduleHoverTooltipClose(next) {
+        const tooltip = $("hover-tooltip");
+        if (next && (tooltip.contains(next) || hoverTooltipAnchor?.contains(next))) return;
+        clearTimeout(hoverTooltipTimer);
+        if (next?.closest?.(".key-route-actions")) closeHoverTooltip(); else hoverTooltipTimer = setTimeout(closeHoverTooltip, 150);
       }
 
-      function showKeyRouteTooltip(anchor, entries, pointer) {
-        clearTimeout(keyRouteTooltipTimer);
-        if (keyRouteTooltipAnchor === anchor && $("key-route-tooltip").matches(":popover-open")) return;
-        closeKeyRouteTooltip();
-        const tooltip = $("key-route-tooltip");
-        keyRouteTooltipAnchor = anchor;
+      function hoverTooltipProps(content, enabled) {
+        return {
+          tabindex: enabled ? "0" : null,
+          onpointerenter: (event) => {
+            if (event.pointerType !== "touch" && enabled)
+              showHoverTooltip(event.currentTarget, content(), { x: event.clientX, y: event.clientY });
+          },
+          onpointerleave: (event) => scheduleHoverTooltipClose(event.relatedTarget),
+          onfocus: (event) => { if (enabled) showHoverTooltip(event.currentTarget, content()); },
+          onblur: (event) => scheduleHoverTooltipClose(event.relatedTarget),
+          onkeydown: (event) => {
+            if (event.key === "Escape") closeHoverTooltip();
+            else if (event.key === "ArrowDown" && enabled) {
+              event.preventDefault();
+              showHoverTooltip(event.currentTarget, content());
+              $("hover-tooltip").focus({ preventScroll: true });
+            }
+          }
+        };
+      }
+
+      function showHoverTooltip(anchor, content, pointer) {
+        clearTimeout(hoverTooltipTimer);
+        if (hoverTooltipAnchor === anchor && $("hover-tooltip").matches(":popover-open")) return;
+        closeHoverTooltip();
+        const tooltip = $("hover-tooltip");
+        hoverTooltipAnchor = anchor;
         anchor.setAttribute("aria-describedby", tooltip.id);
-        tooltip.replaceChildren(
-          el("div", {
-            class: "key-route-tooltip-heading",
-            text: m("ui.full_routing_rulesvaluevalue_items", { v0: DISPLAY_SEPARATOR, v1: entries.length })
-          }),
-          ...entries.map((entry) => settingsChipList([entry]))
-        );
+        tooltip.replaceChildren(...content);
         tooltip.style.maxHeight = "";
         tooltip.showPopover();
         tooltip.scrollTop = 0;
@@ -6368,8 +6372,8 @@
         if (top + height > innerHeight - margin) top = point.y - gap - height;
         left = Math.max(margin, Math.min(left, viewportWidth - width - margin));
         top = Math.max(margin, Math.min(top, innerHeight - height - margin));
-        const actions = anchor.closest(".key-route-cell").querySelector(".key-route-actions").getBoundingClientRect();
-        if (left < actions.right && left + width > actions.left && top < actions.bottom && top + height > actions.top) {
+        const actions = anchor.closest(".key-route-cell")?.querySelector(".key-route-actions")?.getBoundingClientRect();
+        if (actions && left < actions.right && left + width > actions.left && top < actions.bottom && top + height > actions.top) {
           // Keep the cursor as the anchor; flip above it when its own action
           // links would otherwise be covered. Only the links need clearance.
           const above = point.y - gap - margin;
@@ -6389,7 +6393,7 @@
       let keyRouteSelection = { scope: "" };
 
       function editKeyRoutes(view) {
-        closeKeyRouteTooltip();
+        closeHoverTooltip();
         openEditor("route-picker", "route", (data) => {
           const key = data.keys.find((entry) => entry.scope === view.scope);
           if (!key || key.deleted_at) throw new UIError(m("ui.this_api_key_no_longer_exists_refresh_the_list"));
@@ -7859,6 +7863,16 @@
         return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= EVENT_LOAD_MORE_THRESHOLD_PX;
       }
 
+      function failureTag(entry) {
+        const body = entry.failed ? entry.error_body : "";
+        const content = () => [el("pre", { class: "hover-tooltip-body mono", text: body })];
+        return el("span", {
+          class: "tag " + (entry.failed ? "bad" : "ok"),
+          text: entry.failed ? m("ui.failed") : m("ui.succeeded"),
+          ...hoverTooltipProps(content, body)
+        });
+      }
+
       function renderRequestEvents(account = false) {
         hideCostTooltip();
         const list = pagedList("events", account);
@@ -7930,7 +7944,7 @@
               el(
                 "div",
                 { class: "request-event-tags" },
-                el("span", { class: "tag " + (entry.failed ? "bad" : "ok"), text: entry.failed ? m("ui.failed") : m("ui.succeeded") }),
+                failureTag(entry),
                 entry.lobotomized
                   ? el("span", { class: "tag warn", text: m("ui.lobotomized"), title: m("ui.the_upstream_reported_a_degraded_turn_state") })
                   : null
@@ -9213,22 +9227,22 @@
           notify(id ? m("ui.subscription_plan_saved") : m("ui.subscription_plan_created"));
         });
 
-      $("key-route-tooltip").addEventListener("pointerenter", () => clearTimeout(keyRouteTooltipTimer));
-      $("key-route-tooltip").addEventListener("focus", () => clearTimeout(keyRouteTooltipTimer));
-      $("key-route-tooltip").addEventListener("pointerleave", (event) => scheduleKeyRouteTooltipClose(event.relatedTarget));
-      $("key-route-tooltip").addEventListener("blur", (event) => scheduleKeyRouteTooltipClose(event.relatedTarget));
-      $("key-route-tooltip").addEventListener("keydown", (event) => {
+      $("hover-tooltip").addEventListener("pointerenter", () => clearTimeout(hoverTooltipTimer));
+      $("hover-tooltip").addEventListener("focus", () => clearTimeout(hoverTooltipTimer));
+      $("hover-tooltip").addEventListener("pointerleave", (event) => scheduleHoverTooltipClose(event.relatedTarget));
+      $("hover-tooltip").addEventListener("blur", (event) => scheduleHoverTooltipClose(event.relatedTarget));
+      $("hover-tooltip").addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
-          const anchor = keyRouteTooltipAnchor;
+          const anchor = hoverTooltipAnchor;
           anchor?.focus();
-          closeKeyRouteTooltip();
+          closeHoverTooltip();
         }
       });
       document.addEventListener("pointerdown", (event) => {
-        if (!$("key-route-tooltip").contains(event.target) && !keyRouteTooltipAnchor?.contains(event.target)) closeKeyRouteTooltip();
+        if (!$("hover-tooltip").contains(event.target) && !hoverTooltipAnchor?.contains(event.target)) closeHoverTooltip();
       });
-      window.addEventListener("resize", closeKeyRouteTooltip);
-      document.addEventListener("scroll", (event) => { if (event.target !== $("key-route-tooltip")) closeKeyRouteTooltip(); }, true);
+      window.addEventListener("resize", closeHoverTooltip);
+      document.addEventListener("scroll", (event) => { if (event.target !== $("hover-tooltip")) closeHoverTooltip(); }, true);
 
       $("route-picker-search").addEventListener("input", renderKeyRouteList);
       $("route-picker-all").onclick = () => setVisibleRouteChoices("route-picker", keyRouteSelection, "allow", renderKeyRouteList);
