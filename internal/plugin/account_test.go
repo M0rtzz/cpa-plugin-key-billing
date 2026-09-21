@@ -173,27 +173,6 @@ func TestAccountRequestEventsUseSharedShapeWithoutCrossingScopes(t *testing.T) {
 			t.Fatalf("account request events leaked %q: %s", forbidden, body)
 		}
 	}
-	for _, key := range []string{accountTestKeyA, accountTestKeyB} {
-		publishUsageRecord(t, app, UsageRecord{
-			APIKey: key, Model: "gpt-5.5", RequestedAt: app.store.Now(),
-			ResponseHeaders: http.Header{billing.CodexTurnStateHeader: {strings.Repeat("s", 312)}},
-		})
-	}
-	response = callAccount(t, app, routeEvents, accountTestKeyA, url.Values{
-		"lobotomized": {"true"}, "api_key": {billing.CallerScope(accountTestKeyB)},
-	})
-	if err := json.Unmarshal(response.Body, &view); err != nil || response.StatusCode != http.StatusOK ||
-		view.Total != 1 || len(view.Entries) != 1 || !view.Entries[0].Lobotomized ||
-		view.Statuses.All != 2 || view.Statuses.Lobotomized != 1 {
-		t.Fatalf("account lobotomized filter = %+v, err = %v", view, err)
-	}
-	for _, key := range []string{accountTestKeyA, "sk-valid-but-untracked-0003"} {
-		response := callAccount(t, app, routeEvents, key, url.Values{"failed": {"false"}, "lobotomized": {"true"}})
-		if response.StatusCode != http.StatusBadRequest {
-			t.Fatalf("combined result filters accepted: %+v", response)
-		}
-	}
-
 }
 
 func TestAccountRequestErrorsCannotCrossScopes(t *testing.T) {

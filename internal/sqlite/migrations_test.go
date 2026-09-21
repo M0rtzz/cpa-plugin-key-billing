@@ -585,7 +585,7 @@ func TestResponseHeadersMigrationAndRollback(t *testing.T) {
 						t.Fatal("historical headers must remain unreported", empty, err)
 					}
 					view, err := database.RequestEvents(billing.RequestEventQuery{}, time.Time{})
-					if err != nil || view.Total != 3 || view.Statuses.Failed != 1 || view.Statuses.Lobotomized != 0 {
+					if err != nil || view.Total != 3 || view.Statuses.Failed != 1 {
 						t.Fatalf("migrated view = %+v, err = %v", view, err)
 					}
 				}

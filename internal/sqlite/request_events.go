@@ -2,11 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"maps"
-	"net/http"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -32,8 +28,8 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 			uncached_input_tokens, cache_read_tokens, cache_write_tokens, billed_output_tokens,
 			tiered, long_context, threshold_input_tokens,
 			applied_input_per_1m, applied_output_per_1m,
-			applied_cache_read_per_1m, applied_cache_write_per_1m, response_headers_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			applied_cache_read_per_1m, applied_cache_write_per_1m
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		nanos(entry.At), entry.Scope, entry.AuthIndex, entry.Provider, entry.Account, entry.ExecutorType, entry.ReasoningEffort, entry.ServiceTier,
 		entry.UpstreamModel, entry.BillingModel, entry.Failed,
 		entry.LatencyMS, entry.TTFTMS,
@@ -44,7 +40,7 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 		entry.Cost.CacheWriteTokens, entry.Cost.BilledOutputTokens,
 		entry.Cost.Tiered, entry.Cost.LongContext, entry.Cost.ThresholdInputTokens,
 		entry.Cost.AppliedInputPer1M, entry.Cost.AppliedOutputPer1M,
-		entry.Cost.AppliedCacheReadPer1M, entry.Cost.AppliedCacheWritePer1M, responseHeadersJSON(entry.ResponseHeaders))
+		entry.Cost.AppliedCacheReadPer1M, entry.Cost.AppliedCacheWritePer1M)
 	if errInsert != nil {
 		return 0, fmt.Errorf("Write request event: %w", errInsert)
 	}
@@ -73,31 +69,8 @@ func pruneRequestEvents(exec execer, cutoff time.Time) error {
 	return nil
 }
 
-func responseHeadersJSON(headers http.Header) string {
-	persisted := make(map[string]string)
-	// Stable ordering also handles duplicate names with different casing.
-	for _, name := range slices.Sorted(maps.Keys(headers)) {
-		canonical := http.CanonicalHeaderKey(name)
-		if !slices.Contains(billing.PersistedResponseHeaders, canonical) || persisted[canonical] != "" {
-			continue
-		}
-		for _, value := range headers[name] {
-			if value = strings.TrimSpace(value); value != "" {
-				persisted[canonical] = value
-				break
-			}
-		}
-	}
-	raw, _ := json.Marshal(persisted) // A map of strings cannot fail to encode.
-	return string(raw)
-}
-
 // Model filters and their expression index must use the same expression.
 const eventModelSQL = "coalesce(NULLIF(billing_model, ''), upstream_model)"
-
-// Rows, counts and result filters share SQLite's character-length predicate.
-var lobotomizedSQL = fmt.Sprintf(`coalesce(length(json_extract(r.response_headers_json,
-	'$."%s"')) = %d, 0)`, billing.CodexTurnStateHeader, billing.LobotomizedTurnStateLength)
 
 const requestEventProviderName = `CASE WHEN substr(r.provider, 1, 18) = 'openai-compatible-'
 	THEN substr(r.provider, 19) ELSE r.provider END`
@@ -131,27 +104,22 @@ func (d *DB) RequestEvents(query billing.RequestEventQuery, since time.Time) (bi
 
 	counts := d.db.QueryRow(`
 		SELECT count(*),
-			coalesce(sum(r.failed != 0), 0),
-			coalesce(sum(`+lobotomizedSQL+`), 0)`+where, args...)
-	if errCount := counts.Scan(&view.Statuses.All, &view.Statuses.Failed,
-		&view.Statuses.Lobotomized); errCount != nil {
+			coalesce(sum(r.failed != 0), 0)`+where, args...)
+	if errCount := counts.Scan(&view.Statuses.All, &view.Statuses.Failed); errCount != nil {
 		return billing.RequestEventView{}, fmt.Errorf("Count request events: %w", errCount)
 	}
 	view.Statuses.Normal = view.Statuses.All - view.Statuses.Failed
 	view.Total = view.Statuses.All
 
 	page := where
-	switch {
-	case query.Lobotomized:
-		view.Total = view.Statuses.Lobotomized
-		page += " AND " + lobotomizedSQL
-	case query.Failed == nil:
-	case *query.Failed:
-		view.Total = view.Statuses.Failed
-		page += " AND r.failed != 0"
-	default:
-		view.Total = view.Statuses.Normal
-		page += " AND r.failed = 0"
+	if failed := query.Failed; failed != nil {
+		if *failed {
+			view.Total = view.Statuses.Failed
+			page += " AND r.failed != 0"
+		} else {
+			view.Total = view.Statuses.Normal
+			page += " AND r.failed = 0"
+		}
 	}
 	limit := query.Limit
 	if limit <= 0 {
@@ -172,7 +140,7 @@ func (d *DB) RequestEvents(query billing.RequestEventQuery, since time.Time) (bi
 			r.applied_input_per_1m, r.applied_output_per_1m,
 			r.applied_cache_read_per_1m, r.applied_cache_write_per_1m,
 			coalesce(k.preview, ''), coalesce(k.label, ''), `+requestEventSourceName+`,
-			`+lobotomizedSQL+`, coalesce(e.body, '')
+			coalesce(e.body, '')
 		FROM page JOIN request_events r ON r.id = page.id
 		LEFT JOIN api_keys k ON k.scope = r.scope
 		LEFT JOIN request_errors e ON e.request_event_id = r.id
@@ -291,7 +259,7 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 		&row.Cost.Tiered, &row.Cost.LongContext, &row.Cost.ThresholdInputTokens,
 		&row.Cost.AppliedInputPer1M, &row.Cost.AppliedOutputPer1M,
 		&row.Cost.AppliedCacheReadPer1M, &row.Cost.AppliedCacheWritePer1M,
-		&row.Preview, &row.Label, &row.Source, &row.Lobotomized, &row.ErrorBody); errScan != nil {
+		&row.Preview, &row.Label, &row.Source, &row.ErrorBody); errScan != nil {
 		return billing.RequestEventRow{}, fmt.Errorf("Read request events: %w", errScan)
 	}
 	row.At = timeAt(at)

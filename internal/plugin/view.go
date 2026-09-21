@@ -91,6 +91,9 @@ func (a *App) routeResource(req ManagementRequest, suffix string) ManagementResp
 }
 
 func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) ManagementResponse {
+	if access.APIKey && !access.Tracked {
+		return viewJSON(access, http.StatusOK, billing.RequestEventView{Entries: []billing.RequestEventRow{}})
+	}
 	query := billing.RequestEventQuery{
 		Scope: access.Scope, Model: strings.TrimSpace(req.Query.Get("model")),
 		Source: strings.TrimSpace(req.Query.Get("source")), Executor: strings.TrimSpace(req.Query.Get("executor")),
@@ -108,21 +111,8 @@ func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) Manage
 	default:
 		return viewJSONError(access, http.StatusBadRequest, "invalid", "failed must be true or false")
 	}
-	if req.Query.Has("lobotomized") && req.Query.Has("failed") {
-		return viewJSONError(access, http.StatusBadRequest, "invalid", "lobotomized cannot be combined with failed")
-	}
-	switch raw := strings.TrimSpace(req.Query.Get("lobotomized")); raw {
-	case "", "false":
-	case "true":
-		query.Lobotomized = true
-	default:
-		return viewJSONError(access, http.StatusBadRequest, "invalid", "lobotomized must be true or false")
-	}
 	if errQuery := requestPageParams(req.Query, &query.Offset, &query.Limit, &query.From, &query.To, &query.SnapshotID); errQuery != nil {
 		return viewErrorResponse(access, errQuery)
-	}
-	if access.APIKey && !access.Tracked {
-		return viewJSON(access, http.StatusOK, billing.RequestEventView{Entries: []billing.RequestEventRow{}})
 	}
 	if query.Source != "" {
 		if !validSourceFilterToken(query.Source) {

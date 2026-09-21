@@ -60,8 +60,6 @@
   "ui.all_results": "All results",
   "ui.succeeded": "Succeeded",
   "ui.failed": "Failed",
-  "ui.lobotomized": "Lobotomized",
-  "ui.the_upstream_reported_a_degraded_turn_state": "The upstream reported a degraded turn state",
   "ui.clear_filters": "Clear filters",
   "ui.filter_by_error_type": "Filter by error type",
   "ui.all_error_types": "All error types",

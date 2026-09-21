@@ -203,7 +203,6 @@ func (a *App) handleUsage(raw []byte) ([]byte, error) {
 		Latency:         record.Latency,
 		TTFT:            record.TTFT,
 		Breakdown:       usageBreakdown(record),
-		ResponseHeaders: record.ResponseHeaders,
 		At:              a.store.Now(),
 	}
 	if record.Failed {

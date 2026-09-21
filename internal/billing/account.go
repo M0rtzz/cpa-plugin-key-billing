@@ -1,7 +1,6 @@
 package billing
 
 import (
-	"net/http"
 	"strings"
 	"time"
 )
@@ -22,7 +21,6 @@ type UsageEvent struct {
 	Latency         time.Duration
 	TTFT            time.Duration
 	Breakdown       TokenBreakdown
-	ResponseHeaders http.Header
 	At              time.Time
 }
 
@@ -107,7 +105,6 @@ func (s *Store) recordUsage(event UsageEvent, failure *RequestError) {
 			PriceSource:       price.Source,
 			Cost:              cost,
 			ReasoningTokens:   event.Breakdown.Output.ReasoningTokens,
-			ResponseHeaders:   event.ResponseHeaders,
 		}
 		var changedKeys []string
 		if key := state.ensureKey(scope, event.KeyPreview); key != nil {
