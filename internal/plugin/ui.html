@@ -7919,9 +7919,7 @@
               "td",
               { class: "small" },
               el("div", { class: "request-event-cell-line mono" }, billingModel),
-              showUpstreamModel
-                ? el("div", { class: "request-event-cell-line muted" }, m("ui.upstream_value", { v0: upstreamModel }))
-                : null
+              showUpstreamModel ? el("div", { class: "request-event-cell-line muted" }, "→ " + upstreamModel) : null
             ),
             el(
               "td",

@@ -378,7 +378,6 @@
   "ui.exported_value_value_records": "Export complete — {v1}: {v0}",
   "ui.long_context": "Long context",
   "ui.standard": "Standard",
-  "ui.upstream_value": "Upstream: {v0}",
   "ui.unknown_executor": "Unknown executor",
   "ui.unknown_source": "Unknown source",
   "ui.time_to_first_tokenvaluetotal_latency": "Time to first token{v0}Total latency",

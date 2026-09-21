@@ -378,7 +378,6 @@
   "ui.exported_value_value_records": "导出完成：{v1} {v0} 条",
   "ui.long_context": "长上下文",
   "ui.standard": "标准",
-  "ui.upstream_value": "上游 {v0}",
   "ui.unknown_executor": "执行器未知",
   "ui.unknown_source": "来源未知",
   "ui.time_to_first_tokenvaluetotal_latency": "首字延迟{v0}总延迟",
