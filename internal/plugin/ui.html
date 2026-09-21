@@ -442,7 +442,7 @@
         min-width: 0;
       }
       .page-tabs-row.controls-inline .page-tab-actions { grid-column: 2; grid-row: 1; }
-      .page-tabs-row.controls-inline .shared-time-filter, .page-tab-actions > button { flex: none; }
+      .page-tabs-row.controls-inline .shared-time-filter, .page-tab-actions > button, .page-tab-actions > .toggle-filter { flex: none; }
       .tab-refresh {
         display: none;
         grid-column: 2;
@@ -1068,6 +1068,18 @@
         line-height: 1;
       }
       .toggle-filter.compact-toggle:focus-within { border-color: transparent; box-shadow: none; }
+      /* Keep the blur below a third of the font size so dense scripts retain separate glyphs. */
+      body.privacy-masked .mask-blur { filter: blur(0.28em); }
+      /* Blur selected identities without blurring the native control's border or arrow. */
+      body.privacy-masked .mask-select:not(:has(option[value=""]:checked))::before {
+        content: "";
+        position: absolute;
+        inset: 1px 30px 1px 1px;
+        border-radius: var(--radius-md);
+        backdrop-filter: blur(0.28em);
+        -webkit-backdrop-filter: blur(0.28em);
+        pointer-events: none;
+      }
       .auth-file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; align-items: stretch; }
       .auth-file-card {
         height: 100%;
@@ -1302,7 +1314,7 @@
         border-radius: 6px;
         cursor: pointer;
       }
-      .selection-list label span:not(.checkbox-control):not(.checkbox-box) {
+      .selection-list label > span:not(.checkbox-control):not(.api-key-identity) {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1831,14 +1843,10 @@
         #tab-plugin-logs .section-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) auto; }
         #tab-plugin-logs .section-actions > *, #tab-plugin-logs .section-actions select { width: 100%; min-width: 0; }
         .section-actions.auth-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .auth-filter-bar input[type="search"],
-        .auth-filter-bar .native-select,
-        .auth-filter-bar select,
-        .toggle-filter:not(.compact-toggle) {
+        .auth-filter-bar input[type="search"], .auth-filter-bar .native-select, .auth-filter-bar select, .auth-filter-bar .toggle-filter {
           width: 100%;
           min-width: 0;
         }
-        .key-toolbar-buttons .toggle-filter { width: auto; }
         .auth-file-grid { grid-template-columns: 1fr; }
         .section-actions.event-card-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .section-actions.event-card-actions .native-select, .section-actions.event-card-actions select { width: 100%; min-width: 0; }
@@ -1886,6 +1894,7 @@
       }
       .shared-time-filter { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 1 auto; min-width: 0; }
       .shared-time-filter > .native-select { flex: 0 1 auto; max-width: 320px; }
+      .shared-time-filter > .time-range-control { flex: none; }
       .labeled-icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
       .labeled-icon-button .lucide-icon { width: 15px; height: 15px; color: var(--text-tertiary); }
       .usage-distribution-card { min-height: 360px; }
@@ -2029,9 +2038,12 @@
         .page-tabs-row:not(.controls-inline) .shared-time-filter:has(> .native-select) {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          flex: 1;
         }
         .page-tabs-row:not(.controls-inline) .shared-time-filter select { width: 100%; }
+      }
+      @media (max-width: 640px) {
+        .page-tab-actions { flex-wrap: wrap; }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter { flex: 1 0 100%; }
       }
       @media (max-width: 520px) {
         .usage-distribution-controls { gap: 6px; width: 100%; }
@@ -2206,7 +2218,7 @@
           </div>
           <div class="page-tab-actions hidden">
             <div id="shared-time-filter" class="shared-time-filter hidden">
-              <span class="native-select">
+              <span class="native-select mask-select">
                 <select id="analysis-key" aria-label="Filter by API key" data-i18n-aria-label="ui.filter_by_api_key"> <option value="" data-i18n="ui.all_api_keys">All API keys</option> </select>
               </span>
               <div class="time-range-control">
@@ -2218,6 +2230,10 @@
                 <div id="shared-time-popover" class="time-range-popover hidden" role="dialog" aria-label="Select time range" data-i18n-aria-label="ui.select_time_range"></div>
               </div>
             </div>
+            <label class="toggle-filter" title="Blur API keys, labels, and account emails" data-i18n-title="ui.blur_api_keys_labels_and_account_emails">
+              <input id="privacy-mask" type="checkbox" role="switch" />
+              <span data-i18n="ui.privacy_mask">Privacy mask</span>
+            </label>
             <button id="events-export" class="labeled-icon-button hidden" type="button" data-i18n="ui.export">Export</button>
           </div>
           <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
@@ -2337,7 +2353,7 @@
                 <span class="native-select">
                   <select id="request-event-model" aria-label="Filter by model" data-i18n-aria-label="ui.filter_by_model"> <option value="" data-i18n="ui.all_models">All models</option> </select>
                 </span>
-                <span class="native-select">
+                <span class="native-select mask-select">
                   <select id="request-event-source" aria-label="Filter by source" data-i18n-aria-label="ui.filter_by_source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select>
                 </span>
                 <span class="native-select">
@@ -2362,7 +2378,7 @@
               <h2 data-i18n="ui.error_events">Error events</h2>
               <div class="row section-actions event-card-actions">
                 <span class="native-select"> <select id="error-model" aria-label="Filter by model" data-i18n-aria-label="ui.filter_by_model"> <option value="" data-i18n="ui.all_models">All models</option> </select> </span>
-                <span class="native-select"> <select id="error-source" aria-label="Filter by source" data-i18n-aria-label="ui.filter_by_source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select> </span>
+                <span class="native-select mask-select"> <select id="error-source" aria-label="Filter by source" data-i18n-aria-label="ui.filter_by_source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select> </span>
                 <span class="native-select">
                   <select id="error-type" aria-label="Filter by error type" data-i18n-aria-label="ui.filter_by_error_type"> <option value="" data-i18n="ui.all_error_types">All error types</option> </select>
                 </span>
@@ -2426,7 +2442,7 @@
 
       <main id="account-app" class="hidden">
         <header class="head app-header">
-          <div class="app-title"> <h1 data-i18n="ui.api_key_usage">API Key Usage</h1> <span id="account-identity" class="muted mono"></span> </div>
+          <div class="app-title"> <h1 data-i18n="ui.api_key_usage">API Key Usage</h1> <span id="account-identity" class="muted mono mask-blur"></span> </div>
           <div class="standalone-actions" aria-label="Page actions" data-i18n-aria-label="ui.page_actions">
             <button type="button" class="icon-action" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
             <button type="button" class="icon-action" data-page-action="theme" aria-label="Switch theme" data-i18n-aria-label="ui.switch_theme"></button>
@@ -2466,6 +2482,10 @@
                   <div id="account-shared-time-popover" class="time-range-popover hidden" role="dialog" aria-label="Select time range" data-i18n-aria-label="ui.select_time_range"></div>
                 </div>
               </div>
+              <label class="toggle-filter" title="Blur API keys, labels, and account emails" data-i18n-title="ui.blur_api_keys_labels_and_account_emails">
+                <input id="account-privacy-mask" type="checkbox" role="switch" />
+                <span data-i18n="ui.privacy_mask">Privacy mask</span>
+              </label>
               <button id="account-events-export" class="labeled-icon-button hidden" type="button" data-i18n="ui.export">Export</button>
             </div>
             <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
@@ -2498,7 +2518,7 @@
                   <span class="native-select">
                     <select id="account-request-event-model" aria-label="Filter by model" data-i18n-aria-label="ui.filter_by_model"> <option value="" data-i18n="ui.all_models">All models</option> </select>
                   </span>
-                  <span class="native-select">
+                  <span class="native-select mask-select">
                     <select id="account-request-event-source" aria-label="Filter by source" data-i18n-aria-label="ui.filter_by_source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select>
                   </span>
                   <span class="native-select">
@@ -2522,7 +2542,7 @@
                 <h2 data-i18n="ui.error_events">Error events</h2>
                 <div class="row section-actions event-card-actions">
                   <span class="native-select"> <select id="account-error-model"> <option value="" data-i18n="ui.all_models">All models</option> </select> </span>
-                  <span class="native-select"> <select id="account-error-source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select> </span>
+                  <span class="native-select mask-select"> <select id="account-error-source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select> </span>
                   <span class="native-select">
                     <select id="account-error-type" aria-label="Filter by error type" data-i18n-aria-label="ui.filter_by_error_type"> <option value="" data-i18n="ui.all_error_types">All error types</option> </select>
                   </span>
@@ -2610,7 +2630,7 @@
 
     <dialog id="route-picker" class="settings-dialog route-picker" aria-labelledby="route-picker-title" aria-describedby="route-picker-identity">
       <h2 id="route-picker-title" data-i18n="ui.edit_api_key_routing_rules">Edit API key routing rules</h2>
-      <p id="route-picker-identity" class="route-picker-identity"></p>
+      <p id="route-picker-identity" class="route-picker-identity mask-blur"></p>
       <div id="route-picker-notice" class="editor-state notice hidden"></div>
       <div class="route-form-toolbar">
         <input id="route-picker-search" type="search" placeholder="Search routing rules, upstream credentials, or models" aria-label="Search routing rules, upstream credentials, or models" autocomplete="off"  data-i18n-placeholder="ui.search_routing_rules_upstream_credentials_or_models" data-i18n-aria-label="ui.search_routing_rules_upstream_credentials_or_models"/>
@@ -3258,6 +3278,12 @@
         saveViewPreference(role, id, control.type === "checkbox" ? control.checked : control.value);
       }
 
+      function privacyMasked() { return document.body.classList.contains("privacy-masked"); }
+
+      function applyPrivacyMask(role) {
+        document.body.classList.toggle("privacy-masked", $((role === "account" ? "account-" : "") + "privacy-mask").checked);
+      }
+
       function storedTimeRange(role) {
         const range = viewPreference(role, "time-range", { mode: "30d" });
         if (
@@ -3288,6 +3314,7 @@
         restoreChoice(role, prefix + "request-event-status", "");
         restoreChoice(role, prefix + "auth-enabled-only", true);
         restoreChoice(role, prefix + "auth-provider", "");
+        restoreChoice(role, prefix + "privacy-mask", false);
         if (!account) {
           restoreChoice(role, "analysis-key", "", true);
           restoreChoice(role, "keys-include-deleted", false);
@@ -3305,6 +3332,7 @@
         const metric = viewPreference(role, "analysis-metric", "total_tokens");
         analysisMetrics[role] = Object.hasOwn(DISTRIBUTION_METRICS, metric) ? metric : "total_tokens";
         updateSharedTimeControl(account);
+        applyPrivacyMask(role);
         updateFilterClearButton($(prefix + "request-events-filter-clear"));
         updateFilterClearButton($(prefix + "errors-filter-clear"));
       }
@@ -3313,6 +3341,7 @@
         const account = role === "account";
         const prefix = account ? "account-" : "";
         closeSharedTimePopover(account);
+        $(prefix + "privacy-mask").checked = false;
         $(prefix + "auth-search").value = "";
         if (!account) {
           $("key-filter").value = "";
@@ -3696,6 +3725,7 @@
         }
         authKey = "";
         currentRole = "";
+        document.body.classList.remove("privacy-masked");
         $("app").classList.add("hidden");
         $("account-app").classList.add("hidden");
         $("gate").classList.remove("hidden");
@@ -4195,7 +4225,9 @@
       }
       for (const row of PAGE_TAB_ROWS) {
         pageTabResizeObserver.observe(row, { box: "border-box" });
-        for (const control of row.querySelectorAll("button, select")) { pageTabResizeObserver.observe(control, { box: "border-box" }); }
+        for (const control of row.querySelectorAll("button, select, .toggle-filter")) {
+          pageTabResizeObserver.observe(control, { box: "border-box" });
+        }
       }
 
       function updateTabScrollHint(tabBar) {
@@ -4600,21 +4632,19 @@
 
       function renderAccountAccess(access) {
         const routingValid = access.routing_valid !== false;
-        const accountCredentialLabel = (item, state) => ({
-          text: item.provider_wide
-            ? credentialProviderLabel(item)
-            : item.status === "missing"
-              ? window.billingI18n.serverMessage(item.name_message, item.name) ||
-                m("ui.the_selected_upstream_credential_is_currently_unavailable")
-              : m("ui.join", {
-                  v0: item.provider,
-                  v1: DISPLAY_SEPARATOR,
-                  v2: window.billingI18n.serverMessage(item.name_message, item.name) || m("ui.credential_unavailable")
-                }),
-          tag: item.provider_wide ? m("ui.entire_category") : "",
-          iconName: credentialIcon(item),
-          state: item.denied ? "deny" : state
-        });
+        const accountCredentialLabel = (item, state) => {
+          const name = window.billingI18n.serverMessage(item.name_message, item.name);
+          return {
+            text: item.provider_wide
+              ? credentialProviderLabel(item)
+              : item.status === "missing"
+                ? name ? maskedLabelText(name) : m("ui.the_selected_upstream_credential_is_currently_unavailable")
+                : maskedTailText(item.provider, name || m("ui.credential_unavailable")),
+            tag: item.provider_wide ? m("ui.entire_category") : "",
+            iconName: credentialIcon(item),
+            state: item.denied ? "deny" : state
+          };
+        };
         const deniedModels = new Set((access.denied_models || []).map((model) => model.toLowerCase()));
         const modelItems = access.models.map((text) => ({
           text,
@@ -4627,15 +4657,13 @@
             modelItems.push({ text, state: "deny", iconName: "astroid" });
         const credentialItems = access.credentials.map((item) => accountCredentialLabel(item, "allow"));
         if (!credentialItems.length) credentialItems.push({ text: routingValid ? m("ui.all_credentials") : m("ui.unknown") });
+        const credentialKey = (item) => JSON.stringify([item.source, item.provider, !!item.provider_wide, item.name]);
+        const deniedCredentials = new Set(access.credentials.filter((item) => item.denied).map(credentialKey));
         for (const item of access.denied_credentials || []) {
-          const denied = accountCredentialLabel(item, "deny");
-          if (
-            !credentialItems.some(
-              (existing) =>
-                String(existing.text) === String(denied.text) && existing.iconName === denied.iconName && existing.state === "deny"
-            )
-          )
-            credentialItems.push(denied);
+          const key = credentialKey(item);
+          if (deniedCredentials.has(key)) continue;
+          deniedCredentials.add(key);
+          credentialItems.push(accountCredentialLabel(item, "deny"));
         }
         const nodes = [
           el(
@@ -4799,6 +4827,8 @@
         return visible;
       }
 
+      function namesIdentity(dimension, row) { return ["api_keys", "sources"].includes(dimension) && !!row?.key && row.key !== "other"; }
+
       function renderUsageDistributionChart(account, rows, dimension, dimensionLabel, metric, colors, animate) {
         const canvas = $(account ? "account-usage-chart" : "usage-chart");
         canvas.setAttribute(
@@ -4845,7 +4875,13 @@
                   titleColor: themeColor("--text-primary", "#f6f4f1"),
                   bodyColor: themeColor("--text-secondary", "#c9c3bb"),
                   callbacks: {
-                    title: (items) => (items.length ? dimensionLabel + DISPLAY_SEPARATOR + items[0].label : dimensionLabel),
+                    // Canvas text cannot be blurred, so a masked identity is left out of the tooltip entirely.
+                    title: (items) => {
+                      const row = items.length ? rows[items[0].dataIndex] : null;
+                      return row && !(privacyMasked() && namesIdentity(dimension, row))
+                        ? dimensionLabel + DISPLAY_SEPARATOR + items[0].label
+                        : dimensionLabel;
+                    },
                     label: (context) => {
                       const row = rows[context.dataIndex];
                       return [
@@ -5190,8 +5226,8 @@
               "div",
               { class: "usage-distribution-heading" },
               dimension === "api_keys" && row.key !== "other"
-                ? el("span", { text: apiKeyIdentity(row).text })
-                : el("b", {}, row.label || row.key || m("ui.unknown_2")),
+                ? el("span", { class: namesIdentity(dimension, row) ? "mask-blur" : "", text: apiKeyIdentity(row).text })
+                : el("b", {}, namesIdentity(dimension, row) ? maskedLabelText(row.label) : row.label || row.key || m("ui.unknown_2")),
               el("b", { class: "mono" }, row.percent.toFixed(2) + "%")
             ),
             el("div", { class: "usage-distribution-track" }, el("i", { style: "width:" + row.percent + "%" })),
@@ -5328,9 +5364,9 @@
                 el(
                   "div",
                   { class: "event-request-meta" },
-                  account ? null : errorEventField("API Key", apiKeyIdentity(entry).text, false),
+                  account ? null : errorEventField("API Key", maskedText(apiKeyIdentity(entry).text), false),
                   errorEventField(m("ui.model"), entry.billing_model || entry.upstream_model),
-                  errorEventField(m("ui.source"), displayLabel(entry.source))
+                  entry.source ? errorEventField(m("ui.source"), maskedLabelText(entry.source)) : null
                 ),
                 el("div", { class: "event-entry-tags" }, tags)
               ),
@@ -5710,7 +5746,7 @@
                     "div",
                     { class: "auth-file-identity" },
                     el("div", {
-                      class: "auth-file-email-title",
+                      class: "auth-file-email-title mask-blur",
                       title: file.email || m("ui.no_email_provided"),
                       text: file.email || m("ui.no_email_provided")
                     }),
@@ -5884,6 +5920,23 @@
         return fragment;
       }
 
+      function maskedTailText(provider, account) {
+        return [provider, el("span", { class: "text-separator", text: DISPLAY_SEPARATOR }), maskedText(account)];
+      }
+
+      function maskedText(value) { return el("span", { class: "mask-blur" }, displayText(value)); }
+
+      function splitCredentialLabel(value) {
+        const label = displayLabel(value);
+        const separator = typeof label === "string" ? label.indexOf(DISPLAY_SEPARATOR) : -1;
+        return separator <= 0 ? ["", value] : [label.slice(0, separator), label.slice(separator + DISPLAY_SEPARATOR.length)];
+      }
+
+      function maskedLabelText(value) {
+        const [provider, account] = splitCredentialLabel(value);
+        return provider ? maskedTailText(provider, account) : maskedText(account);
+      }
+
       function apiKeyIdentity(view) {
         if (currentRole === "admin") view = keyDirectory.resolve(view);
         const scope = String(view.scope || view.key || "");
@@ -5901,7 +5954,7 @@
         const identity = apiKeyIdentity(view);
         const trailing = options.trailing || [];
         const line = (text, className, children = []) =>
-          el("span", { class: "api-key-identity-line" + className }, el("span", {}, displayText(text)), children);
+          el("span", { class: "api-key-identity-line" + className }, maskedText(text), children);
         return el(
           "span",
           { class: "api-key-identity" + (options.stacked ? " api-key-identity-stacked" : ""), title: identity.text },
@@ -6158,21 +6211,14 @@
         });
       }
 
-      function credentialLabel(item) {
-        const name = window.billingI18n.serverMessage(
+      function credentialName(item) {
+        return window.billingI18n.serverMessage(
           item.display_name_message,
           item.display_name || (item.source === "auth-files" ? m("ui.no_email_provided") : m("ui.no_api_key_configured"))
         );
-        return m("ui.join", { v0: item.provider, v1: DISPLAY_SEPARATOR, v2: name });
       }
 
-      function boundCredentialLabel(ref, labels) {
-        const credential = (resources.admin.credentials.value || []).find((item) => item.ref === ref);
-        return displayLabel(
-          (credential && credentialLabel(credential)) || labels?.[ref] ||
-            m("ui.selected_upstream_credentialvaluevalue", { v0: DISPLAY_SEPARATOR, v1: ref.slice(-8) })
-        );
-      }
+      function credentialLabel(item) { return m("ui.join", { v0: item.provider, v1: DISPLAY_SEPARATOR, v2: credentialName(item) }); }
 
       function credentialSourceLabel(source) { return source === "auth-files" ? m("ui.auth_files") : m("ui.ai_providers"); }
 
@@ -6562,7 +6608,15 @@
             items.push(
               ...(rule[prefix + "credential_ids"] || []).map((ref) => {
                 const credential = (resources.admin.credentials.value || []).find((item) => item.ref === ref);
-                return { text: boundCredentialLabel(ref, labels), state, iconName: credential ? credentialIcon(credential) : "key" };
+                return {
+                  text: credential
+                    ? maskedTailText(credential.provider, credentialName(credential))
+                    : labels?.[ref]
+                      ? maskedLabelText(labels[ref])
+                      : maskedTailText(m("ui.selected_upstream_credentialvaluevalue", { v0: "", v1: "" }), ref.slice(-8)),
+                  state,
+                  iconName: credential ? credentialIcon(credential) : "key"
+                };
               })
             );
           }
@@ -6616,7 +6670,7 @@
       }
 
       function boundKeyField(keys) {
-        const chips = keys.map((key) => ({ text: apiKeyIdentity(key).text, tag: key.deleted_at ? m("ui.deleted") : "" }));
+        const chips = keys.map((key) => ({ text: maskedText(apiKeyIdentity(key).text), tag: key.deleted_at ? m("ui.deleted") : "" }));
         return settingsEntryField(m("ui.bound_keys"), settingsChipList(chips, "—"));
       }
 
@@ -6797,7 +6851,7 @@
       }
 
       function routeChoiceRow(selection, item, rerender) {
-        const { kind, value, label, iconName, badge, note } = item;
+        const { kind, value, label, text, iconName, badge, note } = item;
         const state = routeChoiceState(selection, kind, value);
         const next = { none: "allow", allow: "deny", deny: "none" }[state];
         const names = { none: m("ui.not_selected"), allow: m("ui.allowlist"), deny: m("ui.denylist") };
@@ -6828,7 +6882,7 @@
           },
           checkboxControl({ state }),
           iconName ? actionIcon(iconName) : null,
-          el("span", { class: "route-choice-name" + (kind === "model" ? " mono" : ""), text: label }),
+          el("span", { class: "route-choice-name" + (kind === "model" ? " mono" : "") }, text || displayText(label)),
           kind === "provider" ? el("span", { class: "tag warn", text: m("ui.entire_category") }) : null,
           badge ? el("span", { class: "tag plain", text: badge }) : null,
           note ? el("span", { class: "route-choice-note", text: note }) : null
@@ -6859,6 +6913,7 @@
             kind: "credential",
             value: item.ref,
             label: credentialLabel(item),
+            text: maskedTailText(item.provider, credentialName(item)),
             source: item.source,
             iconName: credentialIcon(item),
             badge: item.disabled ? m("ui.disabled") : item.unavailable ? m("ui.none_available") : ""
@@ -7860,7 +7915,7 @@
               el(
                 "div",
                 { class: "request-event-source muted", title: displayLabel(entry.source) || null },
-                displayLabel(entry.source) || m("ui.unknown_source")
+                entry.source ? maskedLabelText(entry.source) : m("ui.unknown_source")
               )
             ),
             el(
@@ -8023,6 +8078,31 @@
         });
       }
 
+      function routeLogDetails(row) {
+        const details = document.createDocumentFragment();
+        JSON.stringify(row, null, 2).split("\n").forEach((line, index) => {
+          if (index) details.append("\n");
+          const field = line.match(/^  "(key|selected_credential)": "/);
+          if (!field) {
+            details.append(line);
+            return;
+          }
+          const separator = field[1] === "selected_credential" ? line.indexOf("·", field[0].length) : -1;
+          const start = separator < 0 ? field[0].length : separator + 1;
+          const end = line.lastIndexOf('"');
+          // Preserve JSON whitespace and escapes; displayText would normalize middle-dot separators.
+          details.append(line.slice(0, start), el("span", { class: "mask-blur", text: line.slice(start, end) }), line.slice(end));
+        });
+        return details;
+      }
+
+      function upstreamCredentialText(value) {
+        const label = (name) => m("ui.upstream_credential_value", { v0: name });
+        if (!value) return label(m("ui.unknown_2"));
+        const [provider, account] = splitCredentialLabel(value);
+        return provider ? maskedTailText(label(provider), account) : [label(""), maskedText(account)];
+      }
+
       function renderPluginLogMessage(pluginLog) {
         const message = pluginLog.message || "";
         if (!message.startsWith("route ")) return el("div", { class: "plugin-log-message" }, message);
@@ -8034,7 +8114,7 @@
               : row.model_result === "configuration_error" ? m("ui.configuration_error") : m("ui.allowed");
           const credential =
             row.credential_result === "selected"
-              ? m("ui.upstream_credential_value", { v0: displayLabel(row.selected_credential) || m("ui.unknown_2") })
+              ? upstreamCredentialText(row.selected_credential)
               : row.credential_result === "no_match"
                 ? m("ui.upstream_credential_no_available_match")
                 : row.credential_result === "not_reached"
@@ -8066,13 +8146,13 @@
               el(
                 "span",
                 { class: "row" },
-                el("span", { text: m("ui.api_key_value", { v0: displayLabel(row.key || m("ui.unknown_2")) }) }),
+                el("span", {}, m("ui.api_key_value", { v0: "" }), row.key ? maskedText(row.key) : m("ui.unknown_2")),
                 el("span", { text: m("ui.model_value_value", { v0: row.model || m("ui.unknown_2"), v1: model }) }),
-                el("span", { text: credential }),
+                el("span", {}, credential),
                 el("span", { text: m("ui.request_result_value", { v0: outcome }) })
               )
             ),
-            el("pre", {}, JSON.stringify(row, null, 2))
+            el("pre", {}, routeLogDetails(row))
           );
         } catch (_) { return el("div", { class: "plugin-log-message" }, message); }
       }
@@ -8916,6 +8996,8 @@
           guard(async () => {
             const role = currentRole || loginMode;
             await deleteCredential(role);
+            const preference = viewPreferenceKey(role, (role === "account" ? "account-" : "") + "privacy-mask");
+            if (preference) { try { localStorage.removeItem(preference); } catch (_) {} }
             showGate(role, "");
           });
       });
@@ -9054,6 +9136,14 @@
         });
         ui.search.addEventListener("input", () => renderAuthFiles(account));
         ui.bulk.onclick = () => guard(() => refreshFilteredAuthQuotas(account));
+      }
+
+      for (const role of ["admin", "account"]) {
+        const toggle = $((role === "account" ? "account-" : "") + "privacy-mask");
+        toggle.addEventListener("change", () => {
+          saveChoice(role, toggle.id);
+          applyPrivacyMask(role);
+        });
       }
 
       const TABS = Array.from(document.querySelectorAll(".tabs button[data-tab]"));

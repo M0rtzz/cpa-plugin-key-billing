@@ -20,6 +20,8 @@
   "ui.all_api_keys": "All API keys",
   "ui.last_30_days": "Last 30 days",
   "ui.select_time_range": "Select time range",
+  "ui.blur_api_keys_labels_and_account_emails": "Blur API keys, labels, and account emails",
+  "ui.privacy_mask": "Privacy mask",
   "ui.export": "Export",
   "ui.search_api_keys_labels_or_plans": "Search API keys, labels, or plans",
   "ui.include_deleted": "Include deleted",
