@@ -73,6 +73,8 @@
         --shadow: 0 1px 2px 0 #00000014;
         --radius-md: 8px;
         --page-gap: 16px;
+        --filter-search-width: 280px;
+        --filter-select-max-width: 200px;
         --event-entry-bg: transparent;
         --event-entry-border: var(--border-color);
         --event-code-bg: var(--bg-secondary);
@@ -430,15 +432,13 @@
       }
       .page-tabs-row {
         display: grid;
-        grid-template-columns: minmax(0, max-content) auto;
+        grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
         align-items: center;
-        justify-content: space-between;
         gap: 16px;
         margin-bottom: 16px;
       }
-      .page-tabs-row.controls-inline { grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto; justify-content: normal; }
-      body:not(.embedded) .page-tabs-row { grid-template-columns: minmax(0, max-content); }
-      body:not(.embedded) .page-tabs-row.controls-inline { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); }
+      /* The mask and refresh buttons stay pinned to the tab row; only the filters wrap below it. */
+      .page-tab-tools { display: flex; grid-column: 3; grid-row: 1; align-items: center; justify-self: end; gap: 8px; }
       .page-tab-actions {
         display: flex;
         grid-column: 1 / -1;
@@ -449,13 +449,12 @@
         min-width: 0;
       }
       .page-tabs-row.controls-inline .page-tab-actions { grid-column: 2; grid-row: 1; }
-      .page-tabs-row.controls-inline .shared-time-filter, .page-tab-actions > button, .page-tab-actions > .toggle-filter { flex: none; }
+      .page-tabs-row.controls-inline .shared-time-filter, .page-tab-actions > button { flex: none; }
+      /* Wrapped filters keep to a single line, so the range trigger shrinks with the key select. */
+      .page-tabs-row:not(.controls-inline) .shared-time-filter > .time-range-control { flex: 0 1 auto; }
       .tab-refresh {
         display: none;
-        grid-column: 2;
-        grid-row: 1;
         place-items: center;
-        justify-self: end;
         width: 36px;
         height: 36px;
         min-width: 36px;
@@ -464,7 +463,6 @@
         border-radius: 50%;
         line-height: 0;
       }
-      .page-tabs-row.controls-inline .tab-refresh { grid-column: 3; }
       body.embedded .tab-refresh { display: grid; }
       .tabs-scroll {
         --tabs-fade-surface: var(--bg-secondary);
@@ -1004,7 +1002,7 @@
       .section-loading { min-height: 400px; }
       .auth-filter-bar { display: flex; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
       .auth-filter-bar .native-select, .auth-filter-bar select { min-width: 150px; }
-      .auth-filter-bar input[type="search"] { flex: 0 1 240px; width: 240px; min-width: 140px; }
+      .auth-filter-bar input[type="search"] { flex: 0 1 var(--filter-search-width); min-width: 140px; }
       .toggle-filter {
         display: inline-flex;
         align-items: center;
@@ -1362,19 +1360,22 @@
         color: var(--text-secondary);
         font-size: 12px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        white-space: normal;
-        overflow-wrap: anywhere;
+        white-space: nowrap;
+        overflow: hidden;
       }
-      .settings-chip.has-tag { align-items: stretch; flex-wrap: wrap; padding: 0 0 0 8px; overflow: hidden; }
-      .settings-chip.has-tag > .settings-chip-label { flex: 1 0 auto; max-width: 100%; align-self: center; padding-block: 2px; }
-      .settings-chip > .lucide-icon { align-self: center; margin: 0; width: 13px; height: 13px; }
-      .settings-chip-label { min-width: 0; overflow-wrap: anywhere; }
-      .settings-chip.has-tag > .tag { flex: none; margin-left: 3px; padding: 2px 8px; border-width: 0 0 0 1px; border-radius: 0; }
+      /* The tag is a full-height end segment; its extra end padding clears the rounded corner it is clipped to. */
+      .settings-chip.has-tag { align-items: stretch; padding: 0 0 0 8px; }
+      .settings-chip.has-tag > .settings-chip-label { flex: 0 1 auto; align-self: center; padding-block: 2px; }
+      .settings-chip.has-tag > .tag { flex: none; margin-left: 3px; padding: 2px 11px 2px 8px; border-width: 0 0 0 1px; border-radius: 0; }
+      .settings-chip > .lucide-icon, .settings-chip-tooltip > .lucide-icon { align-self: center; margin: 0; width: 13px; height: 13px; }
+      /* A chip stays on one line; the hover tooltip carries whatever the ellipsis cuts off. */
+      .settings-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .settings-chip-tooltip { display: flex; align-items: center; gap: 5px; }
       .key-route-cell { min-width: 125px; max-width: 190px; font-size: 12px; }
       .key-route-lines { display: grid; gap: 4px; }
       .key-route-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.65; }
-      .key-route-line .settings-chip { overflow: hidden; }
-      .key-route-line .settings-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* The cell describes every rule at once, so its chips stay out of the hover path. */
+      .key-route-line .settings-chip { pointer-events: none; }
       .key-route-lines:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; border-radius: 4px; }
       .hover-tooltip {
         position: fixed;
@@ -1521,10 +1522,13 @@
         .route-form-toolbar > .row { grid-column: 1 / -1; justify-content: flex-start; padding-bottom: 0; }
         .route-picker { width: calc(100vw - 32px); }
       }
-      .wide-search { width: 360px; max-width: 100%; }
+      /* Filters share one search width and one select cap so no single control dominates a wrapped toolbar. */
+      .wide-search, #price-filter, .auth-filter-bar input[type="search"] { width: var(--filter-search-width); max-width: 100%; }
+      .section-actions .native-select, .section-actions select, .shared-time-filter > .native-select {
+        max-width: var(--filter-select-max-width);
+      }
       .section-toolbar, .settings-section-header { margin-bottom: 12px; }
       .section-toolbar h2, .settings-section-header h2, .account-plan h2 { margin: 0; }
-      #price-filter { max-width: 220px; }
       .section-actions { min-width: 0; }
       .section-actions > button, .usage-distribution-tabs button { white-space: nowrap; }
       .key-toolbar-buttons { gap: 8px; }
@@ -1844,12 +1848,25 @@
           flex: 1 1 100%;
           width: 100%;
         }
-        .section-actions .wide-search, #price-filter { width: 100%; max-width: none; min-width: 0; }
-        #tab-keys .section-actions { grid-template-columns: minmax(0, 1fr); }
-        #tab-prices .section-actions { grid-template-columns: max-content minmax(0, 1fr); }
-        #price-filter { grid-column: 1 / -1; }
-        #tab-plugin-logs .section-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) auto; }
-        #tab-plugin-logs .section-actions > *, #tab-plugin-logs .section-actions select { width: 100%; min-width: 0; }
+        /* Cells size the controls here, so the shared search width and select cap step aside. */
+        .section-toolbar > .section-actions > *, .section-actions .native-select, .section-actions select { max-width: none; }
+        .section-actions .wide-search, #price-filter { width: 100%; min-width: 0; }
+        /* Flattening the button group lets the four controls share the two-column grid. */
+        #tab-keys .section-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #tab-keys .key-toolbar-buttons { display: contents; }
+        #tab-keys .key-toolbar-buttons > * { align-self: stretch; width: 100%; min-width: 0; white-space: normal; }
+        /* Only CPAMP shows the import button; without it search takes the whole line and the rest pair up below. */
+        #tab-keys .section-actions > .wide-search { grid-column: 1 / -1; }
+        :root[data-cpamp-plugin-host="true"] body.embedded #tab-keys .section-actions > .wide-search { grid-column: auto; }
+        /* Search takes the whole line; the remaining controls split the next one and wrap labels too long for half of it. */
+        #tab-prices .section-actions, #tab-plugin-logs .section-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #price-filter, #plugin-log-filter { grid-column: 1 / -1; }
+        #tab-prices .section-actions > *, #tab-plugin-logs .section-actions > *, #tab-plugin-logs .section-actions select {
+          align-self: stretch;
+          width: 100%;
+          min-width: 0;
+          white-space: normal;
+        }
         .section-actions.auth-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .auth-filter-bar input[type="search"], .auth-filter-bar .native-select, .auth-filter-bar select, .auth-filter-bar .toggle-filter {
           width: 100%;
@@ -1901,10 +1918,11 @@
         body:not(.embedded) .standalone-actions .icon-action { width: 34px; height: 34px; min-width: 34px; min-height: 34px; }
       }
       .shared-time-filter { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 1 auto; min-width: 0; }
-      .shared-time-filter > .native-select { flex: 0 1 auto; max-width: 320px; }
+      .shared-time-filter > .native-select { flex: 0 1 auto; }
       .shared-time-filter > .time-range-control { flex: none; }
       .labeled-icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
       .labeled-icon-button .lucide-icon { width: 15px; height: 15px; color: var(--text-tertiary); }
+      .privacy-mask-button[aria-pressed="true"], .privacy-mask-button[aria-pressed="true"] .lucide-icon { color: var(--primary-active); }
       .usage-distribution-card { min-height: 360px; }
       .analysis-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
       :root .card.analysis-summary-card {
@@ -2042,18 +2060,27 @@
         .usage-distribution-layout { grid-template-columns: 1fr; gap: 16px; }
         .usage-distribution-chart { width: min(240px, 75vw); height: min(240px, 75vw); }
       }
-      @media (max-width: 420px) {
-        .page-tabs-row:not(.controls-inline) .shared-time-filter:has(> .native-select) {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .page-tabs-row:not(.controls-inline) .shared-time-filter select { width: 100%; }
-      }
       @media (max-width: 640px) {
-        .page-tab-actions { flex-wrap: wrap; }
-        .page-tabs-row:not(.controls-inline) .shared-time-filter { flex: 1 0 100%; }
+        .page-tabs-row { gap: 12px; }
+        .page-tab-actions { gap: 6px; }
+        /* Splitting the line evenly stops a long key list from crowding out the range. */
+        .page-tabs-row:not(.controls-inline) .shared-time-filter { flex: 1 1 auto; gap: 6px; }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter > .native-select { flex: 1 1 0; max-width: none; }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter > .time-range-control { flex: 1 1 0; }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter > .native-select > select {
+          padding-left: 8px;
+          padding-right: 26px;
+          width: 100%;
+        }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter > .native-select::after { right: 6px; width: 16px; height: 16px; }
+        /* Wrapping chips need the full width; a short value still fits beside its label. */
+        .settings-entry-field:has(.settings-chip-list) { display: grid; gap: 4px; }
+        .settings-entry-field:has(.settings-chip-list) > .error-event-field-label { max-width: none; }
       }
       @media (max-width: 520px) {
+        /* The tab-row buttons go icon-only; their aria-label and title still name them. */
+        .page-tabs-row .labeled-icon-button > .labeled-icon-text { display: none; }
+        .page-tabs-row .labeled-icon-button { --button-padding-inline: 9px; }
         .usage-distribution-controls { gap: 6px; width: 100%; }
         .usage-distribution-tabs { gap: 4px; --button-padding-inline: 4px; }
         .usage-distribution-tabs button { font-size: 12px; }
@@ -2238,13 +2265,19 @@
                 <div id="shared-time-popover" class="time-range-popover hidden" role="dialog" aria-label="Select time range" data-i18n-aria-label="ui.select_time_range"></div>
               </div>
             </div>
-            <label class="toggle-filter" title="Blur API keys, labels, and account emails" data-i18n-title="ui.blur_api_keys_labels_and_account_emails">
-              <input id="privacy-mask" type="checkbox" role="switch" />
-              <span data-i18n="ui.privacy_mask">Privacy mask</span>
-            </label>
             <button id="events-export" class="labeled-icon-button hidden" type="button" data-i18n="ui.export">Export</button>
           </div>
-          <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
+          <div class="page-tab-tools">
+            <button
+              id="privacy-mask"
+              class="labeled-icon-button privacy-mask-button"
+              type="button"
+              aria-pressed="false"
+              title="Blur API keys, labels, and account emails"
+              data-i18n-title="ui.blur_api_keys_labels_and_account_emails"
+            ></button>
+            <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
+          </div>
         </div>
         <div id="shared-time-backdrop" class="time-range-backdrop hidden"></div>
 
@@ -2429,6 +2462,7 @@
             <div class="row spread section-toolbar">
               <h2 data-i18n="ui.plugin_logs">Plugin logs</h2>
               <div class="row section-actions">
+                <input id="plugin-log-filter" placeholder="Search loaded logs" class="wide-search"  data-i18n-placeholder="ui.search_loaded_logs"/>
                 <span class="native-select">
                   <select id="plugin-log-level" aria-label="Filter by level" data-i18n-aria-label="ui.filter_by_level">
                     <option value="all" data-i18n="ui.all_levels">All levels</option>
@@ -2437,7 +2471,6 @@
                     <option value="error" data-i18n="ui.error">Error</option>
                   </select>
                 </span>
-                <input id="plugin-log-filter" placeholder="Search loaded logs" class="wide-search"  data-i18n-placeholder="ui.search_loaded_logs"/>
                 <button id="plugin-logs-clear" class="danger" data-i18n="ui.clear_logs">Clear logs</button>
               </div>
             </div>
@@ -2489,13 +2522,19 @@
                   <div id="account-shared-time-popover" class="time-range-popover hidden" role="dialog" aria-label="Select time range" data-i18n-aria-label="ui.select_time_range"></div>
                 </div>
               </div>
-              <label class="toggle-filter" title="Blur API keys, labels, and account emails" data-i18n-title="ui.blur_api_keys_labels_and_account_emails">
-                <input id="account-privacy-mask" type="checkbox" role="switch" />
-                <span data-i18n="ui.privacy_mask">Privacy mask</span>
-              </label>
               <button id="account-events-export" class="labeled-icon-button hidden" type="button" data-i18n="ui.export">Export</button>
             </div>
-            <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
+            <div class="page-tab-tools">
+              <button
+                id="account-privacy-mask"
+                class="labeled-icon-button privacy-mask-button"
+                type="button"
+                aria-pressed="false"
+                title="Blur API keys, labels, and account emails"
+                data-i18n-title="ui.blur_api_keys_labels_and_account_emails"
+              ></button>
+              <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
+            </div>
           </div>
           <div id="account-shared-time-backdrop" class="time-range-backdrop hidden"></div>
           <section id="account-tab-subscription">
@@ -3285,8 +3324,13 @@
 
       function privacyMasked() { return document.body.classList.contains("privacy-masked"); }
 
-      function applyPrivacyMask(role) {
-        document.body.classList.toggle("privacy-masked", $((role === "account" ? "account-" : "") + "privacy-mask").checked);
+      function privacyMaskButton(role) { return $((role === "account" ? "account-" : "") + "privacy-mask"); }
+
+      function setPrivacyMask(role, masked) {
+        const button = privacyMaskButton(role);
+        button.setAttribute("aria-pressed", String(masked));
+        setLabeledActionIcon(button, masked ? "eye-off" : "eye", m("ui.mask"));
+        document.body.classList.toggle("privacy-masked", masked);
       }
 
       function storedTimeRange(role) {
@@ -3319,7 +3363,7 @@
         restoreChoice(role, prefix + "request-event-status", "");
         restoreChoice(role, prefix + "auth-enabled-only", true);
         restoreChoice(role, prefix + "auth-provider", "");
-        restoreChoice(role, prefix + "privacy-mask", false);
+        setPrivacyMask(role, viewPreference(role, prefix + "privacy-mask", false));
         if (!account) {
           restoreChoice(role, "analysis-key", "", true);
           restoreChoice(role, "keys-include-deleted", false);
@@ -3337,7 +3381,6 @@
         const metric = viewPreference(role, "analysis-metric", "total_tokens");
         analysisMetrics[role] = Object.hasOwn(DISTRIBUTION_METRICS, metric) ? metric : "total_tokens";
         updateSharedTimeControl(account);
-        applyPrivacyMask(role);
         updateFilterClearButton($(prefix + "request-events-filter-clear"));
         updateFilterClearButton($(prefix + "errors-filter-clear"));
       }
@@ -3346,7 +3389,7 @@
         const account = role === "account";
         const prefix = account ? "account-" : "";
         closeSharedTimePopover(account);
-        $(prefix + "privacy-mask").checked = false;
+        setPrivacyMask(role, false);
         $(prefix + "auth-search").value = "";
         if (!account) {
           $("key-filter").value = "";
@@ -6262,7 +6305,7 @@
             class: "hover-tooltip-heading",
             text: m("ui.full_routing_rulesvaluevalue_items", { v0: DISPLAY_SEPARATOR, v1: names.length })
           }),
-          ...names.map((entry) => settingsChipList([entry]))
+          ...names.map((entry) => settingsChipTooltip(entry))
         ];
         return el(
           "div",
@@ -6632,20 +6675,62 @@
         return items;
       }
 
+      // Nodes are cloned because a chip and its tooltip share one item, and messages are flattened
+      // because only the string path styles separators; chips rebuild on every language change anyway.
+      function chipText(value) {
+        if (Array.isArray(value)) return value.map(chipText);
+        if (value?.nodeType) return value.cloneNode(true);
+        return displayText(window.billingI18n.isMessage(value) ? String(value) : value);
+      }
+
+      function settingsChipTooltip(item) {
+        return el(
+          "p",
+          { class: "hover-tooltip-body settings-chip-tooltip mono" },
+          item.iconName ? actionIcon(item.iconName) : null,
+          el("span", { class: item.state === "deny" ? "routing-deny" : "" }, chipText(item.text)),
+          item.tag ? el("span", { class: "tag warn", text: item.tag }) : null
+        );
+      }
+
+      // A negative tabindex lets a tap focus the chip, so the next tap dismisses the tooltip, without adding a tab stop.
+      function chipTooltipProps(item, label) {
+        const show = (event) => {
+          if (label.scrollWidth > label.clientWidth + 1)
+            showHoverTooltip(event.currentTarget, [settingsChipTooltip(item)], { x: event.clientX, y: event.clientY });
+        };
+        return {
+          tabindex: "-1",
+          onpointerenter: (event) => { if (event.pointerType !== "touch") show(event); },
+          onpointerleave: (event) => scheduleHoverTooltipClose(event.relatedTarget),
+          onclick: show,
+          onblur: (event) => scheduleHoverTooltipClose(event.relatedTarget)
+        };
+      }
+
       function settingsChipList(items, fallback) {
         if (!items.length) return el("span", { class: fallback === "—" ? "muted" : "", text: fallback });
         return el(
           "div",
           { class: "settings-chip-list" },
-          items.map((item) =>
-            el(
+          items.map((item) => {
+            const label = el(
               "span",
-              { class: "settings-chip" + (item.tag ? " has-tag" : ""), title: item.title ? displayLabel(item.title) : null },
+              { class: "settings-chip-label" + (item.state === "deny" ? " routing-deny" : "") },
+              chipText(item.text)
+            );
+            return el(
+              "span",
+              {
+                class: "settings-chip" + (item.tag ? " has-tag" : ""),
+                title: item.title ? displayLabel(item.title) : null,
+                ...chipTooltipProps(item, label)
+              },
               item.iconName ? actionIcon(item.iconName) : null,
-              el("span", { class: "settings-chip-label" + (item.state === "deny" ? " routing-deny" : "") }, displayText(item.text)),
+              label,
               item.tag ? el("span", { class: "tag warn", text: item.tag }) : null
-            )
-          )
+            );
+          })
         );
       }
 
@@ -8960,6 +9045,8 @@
         "chevron-down": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>`,
         globe: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>`,
         clock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+        eye: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`,
+        "eye-off": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-off"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>`,
         key: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key-round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>`,
         "party-popper": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-party-popper"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg>`,
         "file-key": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-key-icon lucide-file-key"><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M4 12v6"/><path d="M4 14h2"/><path d="M9.65 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v4"/><circle cx="4" cy="20" r="2"/></svg>`,
@@ -8984,7 +9071,7 @@
       }
 
       function setLabeledActionIcon(button, name, label) {
-        button.replaceChildren(actionIcon(name), window.billingI18n.textNode(label));
+        button.replaceChildren(actionIcon(name), el("span", { class: "labeled-icon-text" }, label));
         setTextAttribute(button, "aria-label", label);
       }
 
@@ -9162,11 +9249,12 @@
       }
 
       for (const role of ["admin", "account"]) {
-        const toggle = $((role === "account" ? "account-" : "") + "privacy-mask");
-        toggle.addEventListener("change", () => {
-          saveChoice(role, toggle.id);
-          applyPrivacyMask(role);
-        });
+        const button = privacyMaskButton(role);
+        setPrivacyMask(role, false);
+        button.onclick = () => {
+          setPrivacyMask(role, !privacyMasked());
+          saveViewPreference(role, button.id, privacyMasked());
+        };
       }
 
       const TABS = Array.from(document.querySelectorAll(".tabs button[data-tab]"));

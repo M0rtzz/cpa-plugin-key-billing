@@ -21,7 +21,7 @@
   "ui.last_30_days": "最近 30 天",
   "ui.select_time_range": "选择时间范围",
   "ui.blur_api_keys_labels_and_account_emails": "模糊 API Key、标签与账号邮箱",
-  "ui.privacy_mask": "脱敏显示",
+  "ui.mask": "脱敏",
   "ui.export": "导出",
   "ui.search_api_keys_labels_or_plans": "搜索 API Key、备注或计划",
   "ui.include_deleted": "包含已删除",
