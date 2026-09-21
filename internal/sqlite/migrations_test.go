@@ -610,6 +610,66 @@ func TestResponseHeadersMigrationAndRollback(t *testing.T) {
 	}
 }
 
+func TestUpstreamResponseReportsMigration(t *testing.T) {
+	for _, version := range []int{15, 16} {
+		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "legacy.db")
+			raw, err := sql.Open("sqlite3", path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer raw.Close()
+			if _, err := raw.Exec(legacyPricingSchemaSQL); err != nil {
+				t.Fatal(err)
+			}
+			fixture := &DB{db: raw}
+			if err := fixture.transact(func(tx *sql.Tx) error {
+				steps := []func(*sql.Tx) error{migrateModelPricing, migrateQuotaWindows, migrateCredentials, migrateResponseHeaders}
+				if version >= 16 {
+					steps = append(steps, migrateRequestErrorReason)
+				}
+				for _, step := range steps {
+					if err := step(tx); err != nil {
+						return err
+					}
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			legacy := fmt.Sprintf("PRAGMA user_version=%d;", version) + `
+				INSERT INTO request_events(id,at,scope,service_tier,upstream_model,billing_model,failed,total_usd)
+					VALUES(1,1,'s','priority','gpt-5.5','gpt-5.5',0,2.5),(2,2,'s','','','',1,0);`
+			if version >= 16 {
+				legacy += `INSERT INTO request_errors(request_event_id,status_code,error_type,body)
+					VALUES(2,502,'upstream_error','preserved failure');`
+			} else {
+				legacy += `INSERT INTO request_errors(request_event_id,status_code,error_type,reason,body)
+					VALUES(2,502,'upstream_error','HTTP 502','preserved failure');`
+			}
+			if _, err := raw.Exec(legacy); err != nil {
+				t.Fatal(err)
+			}
+			database, err := Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer database.Close()
+			view, err := database.RequestEvents(billing.RequestEventQuery{}, time.Time{})
+			if err != nil || view.Total != 2 || view.Statuses.Failed != 1 {
+				t.Fatalf("migrated view = %+v, err = %v", view, err)
+			}
+			if entry := view.Entries[1]; entry.ServiceTier != "priority" || entry.ResponseServiceTier != "" ||
+				entry.UpstreamModel != "gpt-5.5" || entry.ResponseModel != "" || entry.Cost.TotalUSD != 2.5 {
+				t.Fatalf("migrated entry = %+v", entry)
+			}
+			if entry := view.Entries[0]; !entry.Failed || entry.ErrorBody != "preserved failure" {
+				t.Fatalf("migrated failure = %+v", entry)
+			}
+		})
+	}
+}
+
 func TestRequestErrorReasonMigration(t *testing.T) {
 	for _, version := range []int{14, 15} {
 		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {

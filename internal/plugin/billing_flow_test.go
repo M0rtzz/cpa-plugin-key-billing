@@ -101,8 +101,8 @@ func TestUsageHandleUsesClientKeyModelAliasAndCredential(t *testing.T) {
 	app := newAppWithPrice(t, true)
 	publishUsageRecord(t, app, UsageRecord{
 		Provider: "codex", ExecutorType: "CodexExecutor", Model: flowModel, Alias: "route/gpt-5.5",
-		APIKey: testAPIKey, AuthIndex: "auth-7", AuthType: "oauth", Source: "billing@example.com",
-		ReasoningEffort: "high", ServiceTier: "priority",
+		ResponseModel: "gpt-5.6-luna", APIKey: testAPIKey, AuthIndex: "auth-7", AuthType: "oauth",
+		Source: "billing@example.com", ReasoningEffort: "high", ServiceTier: "priority", ResponseServiceTier: "default",
 		Generate: true, RequestedAt: app.store.Now(), Latency: 1500 * time.Millisecond, TTFT: 250 * time.Millisecond,
 		Detail: UsageDetail{InputTokens: 1000, OutputTokens: 500, TotalTokens: 1500},
 	})
@@ -114,6 +114,7 @@ func TestUsageHandleUsesClientKeyModelAliasAndCredential(t *testing.T) {
 	entry := entries[0]
 	if entry.AuthIndex != "auth-7" || entry.ExecutorType != "CodexExecutor" ||
 		entry.ReasoningEffort != "high" || entry.ServiceTier != "priority" ||
+		entry.ResponseServiceTier != "default" || entry.ResponseModel != "gpt-5.6-luna" ||
 		entry.UpstreamModel != flowModel || entry.BillingModel != "route/gpt-5.5" || entry.Failed ||
 		entry.Source != "codex · billing@example.com" || entry.AccountingQuality != billing.TokenAccountingComplete ||
 		entry.LatencyMS != 1500 || entry.TTFTMS != 250 {

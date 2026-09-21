@@ -14,8 +14,8 @@ func requestEvent(scope string, at time.Time) billing.RequestEvent {
 	return billing.RequestEvent{
 		At: at, Scope: scope, AuthIndex: "auth-codex", ExecutorType: "CodexExecutor",
 		Provider: "codex", Account: "ops@example.com",
-		ReasoningEffort: "high", ServiceTier: "auto",
-		UpstreamModel: "gpt-5.5", BillingModel: "gpt-5.5",
+		ReasoningEffort: "high", ServiceTier: "auto", ResponseServiceTier: "priority",
+		UpstreamModel: "gpt-5.5", ResponseModel: "gpt-5.6-luna", BillingModel: "gpt-5.5",
 		LatencyMS: 1500, TTFTMS: 250,
 		AccountingQuality: billing.TokenAccountingComplete, PriceSource: billing.PriceSourceCustom,
 		Cost: billing.Cost{
@@ -234,6 +234,7 @@ func TestRequestEventRowsFollowTheKeyTheyName(t *testing.T) {
 	if entry := view.Entries[0]; entry.Label != "Alice Cooper" || entry.Preview != "sk-tes…0001" ||
 		entry.ExecutorType != "CodexExecutor" ||
 		entry.ReasoningEffort != "high" || entry.ServiceTier != "auto" ||
+		entry.ResponseServiceTier != "priority" || entry.ResponseModel != "gpt-5.6-luna" ||
 		entry.Source != "codex · ops@example.com" || entry.Provider != "codex" ||
 		entry.LatencyMS != 1500 || entry.TTFTMS != 250 {
 		t.Fatalf("entry = %+v", entry)

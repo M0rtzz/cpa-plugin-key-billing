@@ -11,7 +11,7 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
-func migrateToV16(tx *sql.Tx, version int) error {
+func migrateToV17(tx *sql.Tx, version int) error {
 	var steps []func(*sql.Tx) error
 	switch version {
 	case 10:
@@ -28,11 +28,24 @@ func migrateToV16(tx *sql.Tx, version int) error {
 	if version <= 14 {
 		steps = append(steps, migrateResponseHeaders)
 	}
-	steps = append(steps, migrateRequestErrorReason)
+	if version <= 15 {
+		steps = append(steps, migrateRequestErrorReason)
+	}
+	steps = append(steps, migrateUpstreamResponseReports)
 	for _, step := range steps {
 		if err := step(tx); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// Rows recorded before schema 17 carry no upstream response report.
+func migrateUpstreamResponseReports(tx *sql.Tx) error {
+	if _, err := tx.Exec(`
+		ALTER TABLE request_events ADD COLUMN response_service_tier TEXT NOT NULL DEFAULT '';
+		ALTER TABLE request_events ADD COLUMN response_model TEXT NOT NULL DEFAULT '';`); err != nil {
+		return fmt.Errorf("Add request event upstream response reports: %w", err)
 	}
 	return nil
 }
