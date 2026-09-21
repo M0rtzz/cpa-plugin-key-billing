@@ -136,6 +136,7 @@ func registration() Registration {
 			Version:          Version,
 			Author:           PluginName,
 			GitHubRepository: GitHubRepository,
+			Logo:             pluginLogo,
 			ConfigFields: []ConfigField{
 				{
 					Name:        "debug",

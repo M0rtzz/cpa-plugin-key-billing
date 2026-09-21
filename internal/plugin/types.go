@@ -84,6 +84,7 @@ type Metadata struct {
 	Version          string        `json:"Version"`
 	Author           string        `json:"Author"`
 	GitHubRepository string        `json:"GitHubRepository"`
+	Logo             string        `json:"Logo"`
 	ConfigFields     []ConfigField `json:"ConfigFields"`
 }
 
