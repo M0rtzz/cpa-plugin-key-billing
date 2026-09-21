@@ -3364,7 +3364,7 @@
 
       async function api(method, path, body, opts) {
         const generation = sessionGeneration;
-        const init = { method, cache: "no-store", headers: { Authorization: "Bearer " + (opts?.key ?? authKey) } };
+        const init = { method, cache: "no-store", headers: { ...opts?.headers, Authorization: "Bearer " + (opts?.key ?? authKey) } };
         const timeoutMS = Number(opts?.timeoutMS ?? 30000);
         const controller = new AbortController();
         if (!opts?.command) activeRequests.add(controller);
@@ -3396,7 +3396,7 @@
           // Proxy error pages and response dumps are not user-facing messages.
           const fallback = decoded && !/<[^>]+>/.test(decoded) ? decoded.slice(0, 200) + (decoded.length > 200 ? "…" : "") : "";
           const message = window.billingI18n.serverMessage(unescapeDeep(payload?.error), fallback);
-          if ((resp.status === 401 || resp.status === 403) && !opts?.auxiliaryCredential) {
+          if ((resp.status === 401 || (resp.status === 403 && !opts?.keepSessionOnForbidden)) && !opts?.auxiliaryCredential) {
             throw new AuthError(
               message ||
                 (currentRole === "account" ? m("ui.invalid_api_key_or_access_denied") : m("ui.invalid_management_key_or_access_denied"))
@@ -4377,6 +4377,7 @@
           if (account) page.sources.unshift(data.profile);
           page.task = null;
         }
+        if (account) result["auth-files"].sections[0].sources.push(data.profile);
         return result;
       }
       const pages = { admin: createPages("admin"), account: createPages("account") };
@@ -5626,14 +5627,14 @@
           Number.isFinite(Number(result.rate_limit_reset_credits_available_count))
         ) {
           summary.push(el("span", { text: m("ui.available_resets_value", { v0: int(result.rate_limit_reset_credits_available_count) }) }));
-          if (!account && file.category === "codex") {
+          if (file.category === "codex" && (!account || resources.account.profile.value?.can_reset_auth_quota === true)) {
             summary.push(
               el("button", {
                 type: "button",
                 class: "link small",
                 text: m("ui.reset_quota"),
-                disabled: !canResetAuthQuota(file),
-                onclick: () => guard(() => resetAuthQuota(file))
+                disabled: !canResetAuthQuota(file, account),
+                onclick: () => guard(() => resetAuthQuota(file, account))
               })
             );
           }
@@ -5722,83 +5723,67 @@
       const AUTH_QUOTA_TIMEOUT_MS = 65000;
       const AUTH_QUOTA_BATCH_CONCURRENCY = 3;
 
-      function canResetAuthQuota(file) {
+      function canResetAuthQuota(file, account) {
+        if (currentRole !== (account ? "account" : "admin") || (account && resources.account.profile.value?.can_reset_auth_quota !== true))
+          return false;
+        const owner = account ? accountUIState : adminUIState;
         return (
-          currentRole === "admin" && file.category === "codex" && file.quota_supported && !file.disabled &&
-          !adminUIState.authQuotaLoading.has(file.auth_index) &&
-          Number(adminUIState.authQuotas.get(file.auth_index)?.rate_limit_reset_credits_available_count) > 0
+          file.category === "codex" && file.quota_supported && !file.disabled && !owner.authQuotaLoading.has(file.auth_index) &&
+          Number(owner.authQuotas.get(file.auth_index)?.rate_limit_reset_credits_available_count) > 0
         );
       }
 
-      async function resetAuthQuota(file) {
-        if (!canResetAuthQuota(file)) return;
-        const owner = adminUIState, generation = authQuotaGeneration.admin, index = file.auth_index;
+      async function resetAuthQuota(file, account) {
+        if (!canResetAuthQuota(file, account)) return;
+        const owner = account ? accountUIState : adminUIState;
+        const generation = authQuotaGeneration[account ? "account" : "admin"], index = file.auth_index;
         await openActionDialog(
           m("ui.reset_codex_quota"),
           m("ui.available_resets_value_use_one_reset_now", {
-            v0: int(owner.authQuotas.get(index).rate_limit_reset_credits_available_count)
+            v0: int(owner.authQuotas.get(index).rate_limit_reset_credits_available_count),
+            v1: file.name
           }),
           undefined,
           async () => {
-            if (!authQuotaCacheCurrent(false, owner, generation, index) || !canResetAuthQuota(file)) {
+            if (!authQuotaCacheCurrent(account, owner, generation, index) || !canResetAuthQuota(file, account)) {
               throw new UIError(m("ui.the_auth_file_or_quota_changed_close_this_dialog_update_the_quota_and_try_again"));
             }
             owner.authQuotaLoading.add(index);
             owner.authQuotas.delete(index);
             owner.authQuotaErrors.delete(index);
-            persistAuthQuotaCache(false);
-            renderAuthFiles(false);
-            let reset = false;
+            persistAuthQuotaCache(account);
+            renderAuthFiles(account);
+            let resetConfirmed = false;
             try {
-              const files = await api("GET", "/v0/management/auth-files", null, { raw: true });
-              const auth = requireArray(files?.files, m("ui.auth_files")).find((item) => item.auth_index === index);
-              if (!auth || auth.type !== "codex" || auth.disabled || auth.name !== file.name) {
-                throw new UIError(m("ui.the_auth_file_changed_refresh_the_auth_file_list_and_try_again"));
-              }
-              if (!authQuotaCacheCurrent(false, owner, generation, index)) throw new StaleRequestError();
-              const header = {
-                Authorization: "Bearer $TOKEN$",
-                "Content-Type": "application/json",
-                "User-Agent": "codex-tui/0.149.1 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.149.1)"
-              };
-              const accountID = auth.id_token?.chatgpt_account_id;
-              if (typeof accountID === "string" && accountID.trim()) header["Chatgpt-Account-Id"] = accountID.trim();
-              const requestID =
-                crypto.randomUUID?.() ||
-                "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
-                  const value = Math.floor(Math.random() * 16);
-                  return (char === "x" ? value : (value & 3) | 8).toString(16);
-                });
-              const result = await api(
-                "POST",
-                "/v0/management/api-call",
-                {
-                  auth_index: index,
-                  method: "POST",
-                  url: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume",
-                  header,
-                  data: JSON.stringify({ redeem_request_id: requestID })
-                },
-                { timeoutMS: AUTH_QUOTA_TIMEOUT_MS, raw: true }
-              );
-              const status = Number(result?.status_code);
-              if (!(status >= 200 && status < 300))
-                throw new UIError(
-                  m("ui.failed_to_reset_quota_value", {
-                    v0: status ? m("ui.upstream_returned_http_value", { v0: status }) : m("ui.invalid_upstream_response")
-                  })
-                );
-              reset = true;
+              const params = new URLSearchParams({
+                auth_index: file.auth_index,
+                auth_name: file.name,
+                auth_revision: file.cache_revision || ""
+              });
+              const path = "/auth-files/quota/reset?" + params;
+              // getRandomValues also works on HTTP installations where randomUUID is unavailable.
+              const bytes = crypto.getRandomValues(new Uint8Array(16));
+              bytes[6] = (bytes[6] & 0x0f) | 0x40;
+              bytes[8] = (bytes[8] & 0x3f) | 0x80;
+              const resetID = Array.from(
+                bytes,
+                (byte, index) => ([4, 6, 8, 10].includes(index) ? "-" : "") + byte.toString(16).padStart(2, "0")
+              ).join("");
+              const opts = { timeoutMS: AUTH_QUOTA_TIMEOUT_MS, headers: { "X-Quota-Reset-ID": resetID }, keepSessionOnForbidden: account };
+              const result = account ? await accountAPI(path, opts) : await plugin("POST", path, null, opts);
+              if (result?.reset !== true) throw new UIError(m("ui.reset_was_not_confirmed_update_the_quota_to_check_its_current_status"));
+              resetConfirmed = true;
             } finally {
-              if (authQuotaCacheCurrent(false, owner, generation, index)) {
+              if (authQuotaCacheCurrent(account, owner, generation, index)) {
                 owner.authQuotaLoading.delete(index);
-                if (!reset) owner.authQuotaErrors.set(index, m("ui.reset_was_not_confirmed_update_the_quota_to_check_its_current_status"));
-                renderAuthFiles(false);
+                if (!resetConfirmed)
+                  owner.authQuotaErrors.set(index, m("ui.reset_was_not_confirmed_update_the_quota_to_check_its_current_status"));
+                renderAuthFiles(account);
               }
             }
-            if (!authQuotaCacheCurrent(false, owner, generation, index)) return;
-            await refreshAuthQuota(file, false);
-            if (authQuotaCacheCurrent(false, owner, generation, index)) {
+            if (!authQuotaCacheCurrent(account, owner, generation, index)) return;
+            await refreshAuthQuota(file, account);
+            if (authQuotaCacheCurrent(account, owner, generation, index)) {
               const failed = owner.authQuotaErrors.has(index);
               notify(
                 failed

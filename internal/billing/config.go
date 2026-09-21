@@ -12,11 +12,12 @@ import (
 const DefaultStateFile = "plugins/cpa-key-billing-state-v1.db"
 
 type Config struct {
-	Enabled              bool   `yaml:"enabled"`
-	Debug                bool   `yaml:"debug"`
-	StateFile            string `yaml:"state_file"`
-	CodexFastModeBilling bool   `yaml:"codex_fast_mode_billing"`
-	MaskAPIKeyViewEmails bool   `yaml:"mask_api_key_view_emails"`
+	Enabled               bool   `yaml:"enabled"`
+	Debug                 bool   `yaml:"debug"`
+	StateFile             string `yaml:"state_file"`
+	CodexFastModeBilling  bool   `yaml:"codex_fast_mode_billing"`
+	MaskAPIKeyViewEmails  bool   `yaml:"mask_api_key_view_emails"`
+	AllowAPIKeyQuotaReset bool   `yaml:"allow_api_key_quota_reset"`
 }
 
 func DefaultConfig() Config {

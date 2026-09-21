@@ -153,6 +153,11 @@ func registration() Registration {
 					Description: "Mask email addresses in API key account responses",
 				},
 				{
+					Name:        "allow_api_key_quota_reset",
+					Type:        "boolean",
+					Description: "Allow API key users to reset Codex auth file quotas using upstream reset credits",
+				},
+				{
 					Name:        "state_file",
 					Type:        "string",
 					Description: "Billing database file path",

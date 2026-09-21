@@ -43,6 +43,7 @@ const (
 	routePluginLogs             = "/plugin-logs"
 	routeAuthFiles              = "/auth-files"
 	routeAuthQuota              = "/auth-files/quota"
+	routeAuthQuotaReset         = "/auth-files/quota/reset"
 )
 
 type managementEndpoint struct {
@@ -93,6 +94,7 @@ var managementEndpoints = []managementEndpoint{
 	{http.MethodDelete, routePluginLogs, "Clear plugin logs", func(a *App, _ ManagementRequest) ManagementResponse { return a.clearPluginLogs() }},
 	{http.MethodGet, routeAuthFiles, "View auth files", func(a *App, _ ManagementRequest) ManagementResponse { return a.authFiles(viewAccess{}) }},
 	{http.MethodGet, routeAuthQuota, "Query auth file quotas", func(a *App, req ManagementRequest) ManagementResponse { return a.authQuota(req, viewAccess{}) }},
+	{http.MethodPost, routeAuthQuotaReset, "Reset auth file quotas", func(a *App, req ManagementRequest) ManagementResponse { return a.authQuotaReset(req, viewAccess{}) }},
 }
 
 type resourceEndpoint struct {
@@ -116,6 +118,7 @@ var resourceEndpoints = []resourceEndpoint{
 	{routeErrors, (*App).listRequestErrors},
 	{routeAuthFiles, func(a *App, _ ManagementRequest, access viewAccess) ManagementResponse { return a.authFiles(access) }},
 	{routeAuthQuota, (*App).authQuota},
+	{routeAuthQuotaReset, (*App).authQuotaReset},
 }
 
 func managementRegistration() ManagementRegistrationResponse {

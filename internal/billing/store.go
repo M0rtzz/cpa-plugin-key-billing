@@ -165,6 +165,12 @@ func (s *Store) MaskAPIKeyViewEmails() bool {
 	return s.cfg.MaskAPIKeyViewEmails
 }
 
+func (s *Store) AllowAPIKeyQuotaReset() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.cfg.AllowAPIKeyQuotaReset
+}
+
 func (s *Store) read(fn func(*State)) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

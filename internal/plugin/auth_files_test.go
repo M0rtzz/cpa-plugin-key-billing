@@ -2,8 +2,10 @@ package plugin
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -622,6 +624,156 @@ func TestXAIQuotaCombinesWeeklyMonthlyAndOnDemand(t *testing.T) {
 	monthly := result.Quota[1]
 	if monthly.Currency != "USD" || monthly.Used == nil || *monthly.Used != 10 || monthly.Limit == nil || *monthly.Limit != 10 || monthly.RemainingPercent == nil || *monthly.RemainingPercent != 0 {
 		t.Fatalf("monthly quota = %+v", monthly)
+	}
+}
+
+func TestAuthQuotaReset(t *testing.T) {
+	const resetID = "00112233-4455-4677-8899-aabbccddeeff"
+	for _, tc := range []struct {
+		name           string
+		upstreamStatus int
+		upstreamBody   string
+		want           int
+	}{
+		{"admin", 204, "", 200},
+		{"account", 204, "", 200},
+		{"masked name", 204, "", 200},
+		{"non-JSON success", 200, "accepted", 200},
+		{"no credits", 409, `{"error":{"message":"No reset credits available"}}`, 502},
+		{"expired credentials", 401, `{"error":{"message":"dummy-upstream-token expired"}}`, 502},
+		{"transport failure", 0, "", 502},
+		{"permission disabled", 0, "", 403},
+		{"unknown key", 0, "", 401},
+		{"invalid reset ID", 0, "", 400},
+		{"missing revision", 0, "", 409},
+		{"replaced file", 0, "", 409},
+		{"missing file", 0, "", 404},
+		{"unsupported provider", 0, "", 422},
+		{"disabled file", 0, "", 422},
+		{"denied credential", 0, "", 404},
+		{"outside allowlist", 0, "", 404},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := newTestApp(t)
+			t.Cleanup(app.Shutdown)
+			allowed := tc.name != "admin" && tc.name != "permission disabled"
+			config := string(testConfigYAML(t, true)) + "allow_api_key_quota_reset: " + strconv.FormatBool(allowed) +
+				"\nmask_api_key_view_emails: " + strconv.FormatBool(tc.name == "masked name") + "\n"
+			if err := app.configure(mustMarshal(t, LifecycleRequest{ConfigYAML: []byte(config)})); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := app.store.SyncKeys([]string{accountTestKeyA}, false); err != nil {
+				t.Fatal(err)
+			}
+			file := hostAuthFile{ID: "reset-file", AuthIndex: "codex-1", Name: "user@example.com.json", Type: "codex", Source: "file"}
+			req := ManagementRequest{
+				Method: http.MethodGet, Path: resourceBase + routeAuthQuotaReset, HostCallbackID: "reset-callback",
+				Headers: http.Header{"Authorization": {"Bearer " + accountTestKeyA}},
+				Query:   url.Values{"auth_index": {file.AuthIndex}, "auth_name": {file.Name}, "auth_revision": {""}},
+			}
+			req.Headers.Set("X-Quota-Reset-ID", resetID)
+			switch tc.name {
+			case "admin":
+				req.Method, req.Path = http.MethodPost, managementBase+routeAuthQuotaReset
+			case "unknown key":
+				req.Headers.Set("Authorization", "Bearer dummy-unknown-key")
+			case "invalid reset ID":
+				req.Headers.Set("X-Quota-Reset-ID", "invalid")
+			case "missing revision":
+				req.Query.Del("auth_revision")
+			case "replaced file":
+				file.ModTime = time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)
+			case "missing file":
+				req.Query.Set("auth_index", "missing")
+			case "unsupported provider":
+				file.Type = "claude"
+			case "disabled file":
+				file.Disabled = true
+			case "denied credential", "outside allowlist":
+				rule := billing.RouteRule{DeniedCredentialIDs: []string{billing.CredentialFingerprint(file.ID)}}
+				if tc.name == "outside allowlist" {
+					rule = billing.RouteRule{CredentialIDs: []string{billing.CredentialFingerprint("another-file")}}
+				}
+				if _, err := app.store.CreateRoute(billing.Route{Name: "reset access", Rule: rule}, []string{billing.CallerScope(accountTestKeyA)}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			hostCalls, reads, consumes := 0, 0, 0
+			app.SetHostCaller(func(method string, payload any) (json.RawMessage, error) {
+				hostCalls++
+				switch method {
+				case hostAuthList:
+					return mustJSONRaw(t, hostAuthListResponse{Files: []hostAuthFile{file}}), nil
+				case hostAuthGet:
+					reads++
+					return json.RawMessage(`{"json":{"access_token":"dummy-upstream-token","account_id":"account-7"}}`), nil
+				case hostHTTPDo:
+					consumes++
+					upstream := payload.(hostHTTPRequest)
+					if upstream.Method != http.MethodPost || upstream.URL != "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume" ||
+						upstream.HostCallbackID != req.HostCallbackID || upstream.Headers.Get("Chatgpt-Account-Id") != "account-7" {
+						t.Fatalf("unexpected reset request: %+v", upstream)
+					}
+					var body map[string]string
+					if err := json.Unmarshal(upstream.Body, &body); err != nil || body["redeem_request_id"] != resetID {
+						t.Fatalf("reset ID was not preserved: %s", upstream.Body)
+					}
+					if tc.name == "transport failure" {
+						return nil, fmt.Errorf("dummy-upstream-token: connection closed")
+					}
+					return mustJSONRaw(t, hostHTTPResponse{StatusCode: tc.upstreamStatus, Body: []byte(tc.upstreamBody)}), nil
+				default:
+					t.Fatalf("unexpected host method %q", method)
+					return nil, nil
+				}
+			})
+			access, _ := app.apiKeyViewAccess(req)
+			var profile accountProfileResponse
+			if err := json.Unmarshal(app.accountProfile(access).Body, &profile); err != nil {
+				t.Fatal(err)
+			}
+			if profile.CanResetAuthQuota != (allowed && access.Tracked) {
+				t.Fatalf("incorrect reset permission: %+v", profile)
+			}
+			if tc.name == "masked name" {
+				var files authFileListResponse
+				if err := json.Unmarshal(app.authFiles(access).Body, &files); err != nil {
+					t.Fatal(err)
+				}
+				if files.Files[0].Name == file.Name {
+					t.Fatal("file name was not masked")
+				}
+				req.Query.Set("auth_name", files.Files[0].Name)
+			}
+			raw, err := app.handleManagement(mustMarshal(t, req))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var response ManagementResponse
+			decodeResult(t, raw, &response)
+			if response.StatusCode != tc.want {
+				t.Fatalf("status = %d, want %d: %s", response.StatusCode, tc.want, response.Body)
+			}
+			wantCalls := 0
+			if tc.want == 200 || tc.want == 502 {
+				wantCalls = 1
+			}
+			if reads != wantCalls || consumes != wantCalls {
+				t.Fatalf("credential reads = %d, resets = %d; want %d", reads, consumes, wantCalls)
+			}
+			if (tc.want == 400 || tc.want == 401 || tc.want == 403) && hostCalls != 0 {
+				t.Fatalf("rejected request made %d host calls", hostCalls)
+			}
+			if tc.want == 200 && string(response.Body) != `{"reset":true}` {
+				t.Fatalf("unexpected reset result: %s", response.Body)
+			}
+			if strings.Contains(string(response.Body), "dummy-upstream-token") {
+				t.Fatal("response leaked credentials")
+			}
+			if tc.name != "admin" && !strings.Contains(response.Headers.Get("Cache-Control"), "no-store") {
+				t.Fatal("resource response is cacheable")
+			}
+		})
 	}
 }
 

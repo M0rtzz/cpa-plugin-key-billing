@@ -42,7 +42,7 @@ func TestRegisterDeclaresExpectedCapabilities(t *testing.T) {
 	}
 	if fields["state_file"].Type != "string" || fields["debug"].Type != "boolean" ||
 		fields["codex_fast_mode_billing"].Type != "boolean" || fields["mask_api_key_view_emails"].Type != "boolean" ||
-		fields["enabled"].Name != "" {
+		fields["allow_api_key_quota_reset"].Type != "boolean" || fields["enabled"].Name != "" {
 		t.Fatalf("ConfigFields = %+v", registration.Metadata.ConfigFields)
 	}
 }
@@ -103,6 +103,7 @@ func TestManagementRegistrationExposesOnlyCurrentEndpoints(t *testing.T) {
 		"POST /credentials/sync",
 		"GET /analysis", "GET /events", "GET /events/keys", "GET /errors",
 		"GET /plugin-logs", "DELETE /plugin-logs", "GET /auth-files", "GET /auth-files/quota",
+		"POST /auth-files/quota/reset",
 	} {
 		wantRoutes[value] = false
 	}
@@ -126,7 +127,7 @@ func TestManagementRegistrationExposesOnlyCurrentEndpoints(t *testing.T) {
 	wantResources := map[string]bool{
 		"/ui": false, "/profile": false, "/subscription": false, "/routing": false, "/prices": false,
 		"/analysis": false, "/events": false, "/errors": false,
-		"/auth-files": false, "/auth-files/quota": false,
+		"/auth-files": false, "/auth-files/quota": false, "/auth-files/quota/reset": false,
 	}
 	if len(registration.Resources) != len(wantResources) {
 		t.Fatalf("resources = %d, want %d: %+v", len(registration.Resources), len(wantResources), registration.Resources)

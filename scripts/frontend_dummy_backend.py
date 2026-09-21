@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import random
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -1311,8 +1312,6 @@ def payload_for(path, query):
                    and (not before or entry["id"] < before)]
         return {"entries": entries[:limit], "level_counts": counts,
                 "next_before_id": entries[limit - 1]["id"] if len(entries) > limit else 0}
-    if path == "/v0/management/auth-files":
-        return {"files": [{**item, "type": item["category"], "id_token": {"chatgpt_account_id": "dummy-" + item["auth_index"]}} for item in AUTH_FILES]}
     if path == f"{API_BASE}/auth-files":
         return {"files": AUTH_FILES}
     if path == f"{API_BASE}/auth-files/quota":
@@ -1350,6 +1349,7 @@ def payload_for(path, query):
 class Handler(BaseHTTPRequestHandler):
     host_mode = "standalone"
     initial_theme = "auto"
+    allow_api_key_quota_reset = False
 
     def send_response(self, code, message=None):
         time.sleep(random.uniform(0.4, 0.6))
@@ -1435,6 +1435,7 @@ class Handler(BaseHTTPRequestHandler):
             f"{RESOURCE_BASE}/analysis",
             f"{RESOURCE_BASE}/auth-files",
             f"{RESOURCE_BASE}/auth-files/quota",
+            f"{RESOURCE_BASE}/auth-files/quota/reset",
         }
         if parsed.path in resource_paths:
             if not authorization.startswith("Bearer ") or authorization[7:] not in api_keys:
@@ -1443,7 +1444,8 @@ class Handler(BaseHTTPRequestHandler):
             index = api_keys.index(authorization[7:])
             if parsed.path.endswith("/profile"):
                 key = LIVE_KEYS[index]
-                self.send_json(200, {"tracked": True, "identity": {"preview": key["preview"], "label": key["label"]}})
+                self.send_json(200, {"tracked": True, "identity": {"preview": key["preview"], "label": key["label"]},
+                                     "can_reset_auth_quota": self.allow_api_key_quota_reset})
             elif parsed.path.endswith("/subscription"):
                 key = LIVE_KEYS[index]
                 refresh_key_quota(key)
@@ -1469,6 +1471,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json(404, {"error": {"message": "认证文件不存在或不支持限额查询"}})
                 else:
                     self.send_json(200, payload)
+            elif parsed.path.endswith("/auth-files/quota/reset"):
+                if not self.allow_api_key_quota_reset:
+                    self.send_json(403, {"error": {"message": "Quota resets are disabled for API key users"}})
+                else:
+                    self.reset_auth_quota(parsed, account_auth_files(index))
             elif parsed.path.endswith("/events"):
                 self.send_json(200, request_event_view(parse_qs(parsed.query), LIVE_KEYS[index]["scope"]))
             return
@@ -1480,6 +1487,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.handle_mutation()
+
+    def reset_auth_quota(self, parsed, files):
+        query = parse_qs(parsed.query, keep_blank_values=True)
+        auth_index = query.get("auth_index", [""])[0]
+        auth_file = next((item for item in files if item["auth_index"] == auth_index), None)
+        quota = AUTH_FILE_QUOTAS.get(auth_index)
+        if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", self.headers.get("X-Quota-Reset-ID", "")):
+            self.send_json(400, {"error": {"message": "Invalid quota reset request ID"}})
+        elif auth_file is None or quota is None:
+            self.send_json(404, {"error": {"message": "Auth file does not exist"}})
+        elif auth_file["category"] != "codex" or auth_file.get("disabled"):
+            self.send_json(422, {"error": {"message": "This auth file cannot reset quotas"}})
+        elif query.get("auth_revision") != [auth_file["cache_revision"]] or query.get("auth_name") != [auth_file["name"]]:
+            self.send_json(409, {"error": {"message": "Auth file changed; refresh the auth file list and try again"}})
+        elif quota.get("rate_limit_reset_credits_available_count", 0) <= 0:
+            self.send_json(502, {"error": {"message": "No reset credits available"}})
+        else:
+            quota["rate_limit_reset_credits_available_count"] -= 1
+            if quota.get("rate_limit_reset_credits"):
+                quota["rate_limit_reset_credits"].pop(0)
+            for row in quota["quota"]:
+                row["remaining_percent"] = 100
+            self.send_json(200, {"reset": True})
 
     def do_PATCH(self):
         self.handle_mutation()
@@ -1501,24 +1531,8 @@ class Handler(BaseHTTPRequestHandler):
             self.mutation_view = json.loads(request_body or b"{}")
             request_body = json.dumps(self.mutation_view.get("data") or {}).encode()
         route = self.command, parsed.path
-        if route == ("POST", "/v0/management/api-call"):
-            body = json.loads(request_body or b"{}")
-            auth_index = body.get("auth_index", "")
-            auth_file = next((item for item in AUTH_FILES if item["auth_index"] == auth_index), None)
-            quota = AUTH_FILE_QUOTAS.get(auth_index)
-            if body.get("method") != "POST" or body.get("url") != "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume":
-                self.send_json(400, {"error": {"message": "dummy backend: unsupported api-call"}})
-            elif auth_file is None or quota is None or auth_file["category"] != "codex":
-                self.send_json(404, {"error": {"message": "Codex 认证文件不存在"}})
-            elif quota.get("rate_limit_reset_credits_available_count", 0) <= 0:
-                self.send_json(200, {"status_code": 409, "body": '{"error":{"message":"No reset credits available"}}'})
-            else:
-                quota["rate_limit_reset_credits_available_count"] -= 1
-                if quota.get("rate_limit_reset_credits"):
-                    quota["rate_limit_reset_credits"].pop(0)
-                for row in quota["quota"]:
-                    row["remaining_percent"] = 100
-                self.send_json(200, {"status_code": 204, "body": ""})
+        if route == ("POST", f"{API_BASE}/auth-files/quota/reset"):
+            self.reset_auth_quota(parsed, AUTH_FILES)
         elif route == ("DELETE", f"{API_BASE}/plugin-logs"):
             cleared = len(PLUGIN_LOGS)
             PLUGIN_LOGS.clear()
@@ -1721,10 +1735,16 @@ def main():
         default="auto",
         help="Initial host theme; the preview shell can switch themes after startup.",
     )
+    parser.add_argument(
+        "--allow-api-key-quota-reset",
+        action="store_true",
+        help="Allow API key users to reset Codex auth file quotas.",
+    )
     args = parser.parse_args()
     seed_paginated_history()
     Handler.host_mode = args.host
     Handler.initial_theme = args.theme
+    Handler.allow_api_key_quota_reset = args.allow_api_key_quota_reset
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     entry_path = "/ui" if args.host == "standalone" else "/"
     print(
