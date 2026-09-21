@@ -17,10 +17,10 @@ func requestErrorDatabase(t *testing.T) *DB {
 	events := []billing.RequestEvent{requestEvent("scope-a", eventStart)}
 	errors := []billing.RequestErrorEvent{
 		{Event: requestEvent("scope-a", eventStart.Add(time.Minute)), Error: billing.RequestError{
-			StatusCode: 429, ErrorType: "rate_limit", Reason: "HTTP 429", Body: `{"error":"limited"}`,
+			StatusCode: 429, ErrorType: "rate_limit", Body: `{"error":"limited"}`,
 		}},
 		{Event: requestEvent("scope-b", eventStart.Add(2*time.Minute)), Error: billing.RequestError{
-			StatusCode: 502, ErrorType: "upstream_error", Reason: "HTTP 502", Body: `{"error":"bad gateway"}`,
+			StatusCode: 502, ErrorType: "upstream_error", Body: `{"error":"bad gateway"}`,
 		}},
 	}
 	mustSave(t, database, state, billing.Changes{AllKeys: true, NormalRequestEvents: events, RequestErrorEvents: errors})
@@ -57,7 +57,7 @@ func TestEveryFailedRequestHasAnErrorEventEvenWithoutDetails(t *testing.T) {
 		t.Fatalf("errors = %+v, want one error event for each failed request", view)
 	}
 	for _, entry := range view.Entries {
-		if entry.StatusCode != 0 || entry.ErrorType != "" || entry.Reason != "" || entry.Body != "" {
+		if entry.StatusCode != 0 || entry.ErrorType != "" || entry.Body != "" {
 			t.Fatalf("empty failure details were invented: %+v", entry)
 		}
 	}

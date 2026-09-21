@@ -185,9 +185,7 @@ func (a *App) handleUsage(raw []byte) ([]byte, error) {
 	scope := billing.CallerScope(record.APIKey)
 	var recordError billing.RequestError
 	if record.Failed {
-		failure := usageFailureDetails(record.Failure)
-		recordError = billing.RequestError{StatusCode: failure.StatusCode, ErrorType: failure.ErrorType,
-			Reason: failure.Reason, Body: failure.Body}
+		recordError = usageFailureDetails(record.Failure)
 	}
 	event := billing.UsageEvent{
 		Scope:           scope,

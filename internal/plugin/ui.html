@@ -2846,7 +2846,7 @@
           "multiplier",
           "total_usd"
         ],
-        errors: ["at", "preview", "label", "billing_model", "upstream_model", "source", "status_code", "error_type", "reason", "body"]
+        errors: ["at", "preview", "label", "billing_model", "upstream_model", "source", "status_code", "error_type", "body"]
       };
       const SHARED_TIME_LABELS = {
         hour: m("ui.hours"),
@@ -5370,7 +5370,7 @@
                 ),
                 el("div", { class: "event-entry-tags" }, tags)
               ),
-              el("pre", { class: "event-error-body mono", text: entry.body || entry.reason || m("ui.no_error_details") })
+              el("pre", { class: "event-error-body mono", text: entry.body || m("ui.no_error_details") })
             );
           }
         });

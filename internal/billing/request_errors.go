@@ -5,7 +5,6 @@ import "time"
 type RequestError struct {
 	StatusCode int    `json:"status_code,omitempty"`
 	ErrorType  string `json:"error_type,omitempty"`
-	Reason     string `json:"reason,omitempty"`
 	Body       string `json:"body,omitempty"`
 }
 

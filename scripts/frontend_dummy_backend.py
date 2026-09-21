@@ -922,14 +922,12 @@ def refresh_route_counts():
         )
 
 
-# transport=True is a bare executor error: no upstream payload, so no body.
+# transport=True is a bare executor error: the body is the message itself
+# rather than an upstream payload.
 def request_error(event_index, message, status=0, error_type="", code="", transport=False):
     event = REQUEST_EVENTS[event_index]
     event["failed"] = True
-    reason = (f"HTTP {status}：" if status else "") + message
-    if error_type:
-        reason += f"（{error_type}）"
-    body = ""
+    body = message
     if not transport:
         error = {"message": message}
         if error_type:
@@ -954,7 +952,6 @@ def request_error(event_index, message, status=0, error_type="", code="", transp
         "ttft_ms": event["ttft_ms"],
         "status_code": status,
         "error_type": code or error_type,
-        "reason": reason,
         "body": body,
     }
 
@@ -980,6 +977,12 @@ ERRORS = [
         24,
         "websocket: close 1006 (abnormal closure): unexpected EOF",
         code="websocket_abnormal_closure",
+        transport=True,
+    ),
+    request_error(
+        23,
+        'Post "https://api.deepseek.com/anthropic/v1/messages?beta=true": context canceled',
+        code="context_canceled",
         transport=True,
     ),
 ]

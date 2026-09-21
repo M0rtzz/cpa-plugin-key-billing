@@ -82,7 +82,6 @@ func maskAPIKeyPayload(payload any) (any, bool) {
 	case billing.RequestErrorView:
 		for i := range value.Entries {
 			value.Entries[i].Source = maskEmails(value.Entries[i].Source)
-			value.Entries[i].Reason = maskEmails(value.Entries[i].Reason)
 			value.Entries[i].Body = maskEmails(value.Entries[i].Body)
 		}
 		if value.Filters != nil {

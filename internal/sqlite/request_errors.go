@@ -17,8 +17,8 @@ func appendRequestErrorEvent(tx *sql.Tx, entry billing.RequestErrorEvent) error 
 		return err
 	}
 	_, err = tx.Exec(`INSERT INTO request_errors
-		(request_event_id, status_code, error_type, reason, body) VALUES (?, ?, ?, ?, ?)`,
-		requestEventID, entry.Error.StatusCode, entry.Error.ErrorType, entry.Error.Reason, entry.Error.Body)
+		(request_event_id, status_code, error_type, body) VALUES (?, ?, ?, ?)`,
+		requestEventID, entry.Error.StatusCode, entry.Error.ErrorType, entry.Error.Body)
 	if err != nil {
 		return fmt.Errorf("Write error event: %w", err)
 	}
@@ -108,7 +108,7 @@ func (d *DB) RequestErrors(query billing.RequestErrorQuery, since time.Time) (bi
 		SELECT r.id, r.at, r.scope, coalesce(k.preview, ''), coalesce(k.label, ''),
 		r.auth_index, `+requestEventSourceName+`, r.provider,
 		r.executor_type, r.upstream_model, r.billing_model, r.latency_ms, r.ttft_ms,
-		e.status_code, e.error_type, e.reason, e.body
+		e.status_code, e.error_type, e.body
 		FROM page JOIN request_events r ON r.id = page.id
 		JOIN request_errors e ON e.request_event_id = r.id
 		LEFT JOIN api_keys k ON k.scope = r.scope
@@ -122,7 +122,7 @@ func (d *DB) RequestErrors(query billing.RequestErrorQuery, since time.Time) (bi
 		var at int64
 		if err := rows.Scan(&row.ID, &at, &row.Scope, &row.Preview, &row.Label, &row.AuthIndex, &row.Source,
 			&row.Provider, &row.ExecutorType, &row.UpstreamModel, &row.BillingModel, &row.LatencyMS,
-			&row.TTFTMS, &row.StatusCode, &row.ErrorType, &row.Reason, &row.Body); err != nil {
+			&row.TTFTMS, &row.StatusCode, &row.ErrorType, &row.Body); err != nil {
 			return billing.RequestErrorView{}, fmt.Errorf("Read error events: %w", err)
 		}
 		row.At = timeAt(at)

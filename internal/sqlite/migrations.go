@@ -11,7 +11,7 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
-func migrateToV15(tx *sql.Tx, version int) error {
+func migrateToV16(tx *sql.Tx, version int) error {
 	var steps []func(*sql.Tx) error
 	switch version {
 	case 10:
@@ -25,11 +25,21 @@ func migrateToV15(tx *sql.Tx, version int) error {
 	if version <= 13 {
 		steps = append(steps, migrateCredentials)
 	}
-	steps = append(steps, migrateResponseHeaders)
+	if version <= 14 {
+		steps = append(steps, migrateResponseHeaders)
+	}
+	steps = append(steps, migrateRequestErrorReason)
 	for _, step := range steps {
 		if err := step(tx); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func migrateRequestErrorReason(tx *sql.Tx) error {
+	if _, err := tx.Exec("ALTER TABLE request_errors DROP COLUMN reason"); err != nil {
+		return fmt.Errorf("Drop request error reason: %w", err)
 	}
 	return nil
 }

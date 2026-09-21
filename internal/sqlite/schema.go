@@ -137,7 +137,6 @@ CREATE TABLE request_errors (
 	request_event_id INTEGER PRIMARY KEY REFERENCES request_events(id) ON DELETE CASCADE,
 	status_code      INTEGER NOT NULL DEFAULT 0,
 	error_type       TEXT    NOT NULL DEFAULT '',
-	reason           TEXT    NOT NULL DEFAULT '',
 	body             TEXT    NOT NULL DEFAULT ''
 );
 

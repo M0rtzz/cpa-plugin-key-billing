@@ -1,142 +1,87 @@
 package plugin
 
 import (
+	"bytes"
 	"encoding/json"
-	"strconv"
 	"strings"
+
+	"cpa-key-billing/internal/billing"
 )
 
-const maxFailureReason = 300
-
-// Body stays empty when the failure was a bare transport error, not a response.
-type usageFailureView struct {
-	StatusCode int
-	ErrorType  string
-	Reason     string
-	Body       string
+func usageFailureDetails(failure UsageFailure) billing.RequestError {
+	body := normalizeFailureBody(failure.Body)
+	return billing.RequestError{
+		StatusCode: validFailureStatus(failure.StatusCode),
+		ErrorType:  failureErrorType(body),
+		Body:       body,
+	}
 }
 
-// Only feeds the reason and the category; the payload itself is stored verbatim.
-type upstreamFailure struct {
-	Message string
-	Type    string
-	Code    string
+// A body may arrive as a JSON-encoded string, possibly nested; unwrap it so
+// the stored text carries no transport escaping.
+func normalizeFailureBody(body string) string {
+	body = strings.TrimSpace(body)
+	for {
+		var unwrapped string
+		if json.Unmarshal([]byte(body), &unwrapped) != nil {
+			break
+		}
+		body = strings.TrimSpace(unwrapped)
+	}
+	var compact bytes.Buffer
+	if json.Compact(&compact, []byte(body)) == nil {
+		return compact.String()
+	}
+	return body
 }
 
-func usageFailureDetails(failure UsageFailure) usageFailureView {
-	statusCode := validFailureStatus(failure.StatusCode)
-	raw := strings.TrimSpace(failure.Body)
-	payload, qualifier, structured := parseUpstreamFailure(raw)
-	if !structured {
-		payload = upstreamFailure{Message: raw}
-	}
-	reason := formatFailureReason(statusCode, qualifyFailure(payload.Message, qualifier))
-	view := usageFailureView{StatusCode: statusCode, ErrorType: payload.errorType(reason), Reason: reason}
-	if structured {
-		view.Body = raw
-	}
-	return view
-}
-
-func (f upstreamFailure) errorType(reason string) string {
-	if f.Code != "" {
-		return f.Code
-	}
-	if f.Type != "" {
-		return f.Type
-	}
-	return inferredFailureType(reason)
-}
-
-// A reason may wrap the signature in an HTTP prefix and a qualifier.
-func inferredFailureType(reason string) string {
-	reason = strings.ToLower(reason)
+func failureErrorType(body string) string {
+	code, errorType := parseUpstreamFailure(body)
 	switch {
-	case strings.Contains(reason, "websocket: close 1006"):
+	case code != "":
+		return code
+	case errorType != "":
+		return errorType
+	default:
+		return inferredFailureType(body)
+	}
+}
+
+func inferredFailureType(body string) string {
+	body = strings.ToLower(body)
+	switch {
+	case strings.Contains(body, "websocket: close 1006"):
 		return "websocket_abnormal_closure"
-	case strings.Contains(reason, "context canceled"):
+	case strings.Contains(body, "context canceled"):
 		return "context_canceled"
 	default:
 		return ""
 	}
 }
 
-func parseUpstreamFailure(raw string) (payload upstreamFailure, qualifier string, structured bool) {
-	if raw == "" {
-		return upstreamFailure{}, "", false
+func parseUpstreamFailure(body string) (code, errorType string) {
+	if start := strings.IndexByte(body, '{'); start > 0 {
+		body = body[start:]
 	}
-	if start := strings.IndexByte(raw, '{'); start > 0 {
-		raw = raw[start:]
-	}
-	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder := json.NewDecoder(strings.NewReader(body))
 	decoder.UseNumber()
 	var root map[string]any
 	if decoder.Decode(&root) != nil || root == nil {
-		return upstreamFailure{}, "", false
+		return "", ""
 	}
-
-	var node map[string]any
+	node := root
 	for _, path := range [][]string{{"error"}, {"response", "error"}, {"body", "error"}} {
-		if node = failureObjectAt(root, path...); node != nil {
+		if found := failureObjectAt(root, path...); found != nil {
+			node = found
 			break
 		}
 	}
-	rootNode := false
-	message := ""
-	if node != nil {
-		message = failureString(node["message"])
-	} else if value := failureString(root["error"]); value != "" {
-		message = value
-		node = root
-		rootNode = true
-	} else if value := failureString(root["message"]); value != "" {
-		message = value
-		node = root
-		rootNode = true
-	}
-	if node == nil {
-		return upstreamFailure{}, "", false
-	}
-
-	errorType := failureString(node["type"])
-	qualifier = errorType
-	if rootNode && strings.EqualFold(errorType, "error") {
+	errorType = failureString(node["type"])
+	if strings.EqualFold(errorType, "error") {
+		// The generic wrapper around a nested error object, not a category.
 		errorType = ""
-		qualifier = failureString(node["code"])
-	} else if qualifier == "" {
-		qualifier = failureString(node["status"])
-		if qualifier == "" {
-			qualifier = failureString(node["code"])
-		}
 	}
-	payload = upstreamFailure{Message: message, Type: errorType, Code: failureString(node["code"])}
-	if payload == (upstreamFailure{}) {
-		// No scalars to read; no more usable than plain text.
-		return upstreamFailure{}, "", false
-	}
-	return payload, qualifier, true
-}
-
-func validFailureStatus(status int) int {
-	if status < 100 || status > 599 {
-		return 0
-	}
-	return status
-}
-
-func formatFailureReason(statusCode int, message string) string {
-	status := ""
-	if statusCode != 0 {
-		status = "HTTP " + strconv.Itoa(statusCode)
-	}
-	switch {
-	case message == "":
-		return status
-	case status == "" || strings.Contains(message, status):
-		return truncateFailureReason(message)
-	default:
-		return truncateFailureReason(status + "：" + message)
-	}
+	return failureString(node["code"]), errorType
 }
 
 func failureObjectAt(root map[string]any, path ...string) map[string]any {
@@ -163,18 +108,9 @@ func failureString(value any) string {
 	}
 }
 
-func qualifyFailure(message, code string) string {
-	if message == "" || code == "" || strings.Contains(message, code) {
-		return message
+func validFailureStatus(status int) int {
+	if status < 100 || status > 599 {
+		return 0
 	}
-	return message + "（" + code + "）"
-}
-
-func truncateFailureReason(reason string) string {
-	reason = strings.TrimSpace(reason)
-	runes := []rune(reason)
-	if len(runes) <= maxFailureReason {
-		return reason
-	}
-	return strings.TrimSpace(string(runes[:maxFailureReason])) + "…"
+	return status
 }
