@@ -129,7 +129,8 @@ CREATE TABLE request_events (
 	applied_input_per_1m        REAL    NOT NULL DEFAULT 0,
 	applied_output_per_1m       REAL    NOT NULL DEFAULT 0,
 	applied_cache_read_per_1m   REAL    NOT NULL DEFAULT 0,
-	applied_cache_write_per_1m  REAL    NOT NULL DEFAULT 0
+	applied_cache_write_per_1m  REAL    NOT NULL DEFAULT 0,
+	response_headers_json       TEXT    NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE request_errors (

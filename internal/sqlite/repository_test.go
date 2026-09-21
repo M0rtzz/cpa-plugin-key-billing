@@ -233,7 +233,7 @@ func TestQuotaConfigurationExtendsExistingJSON(t *testing.T) {
 	state.Keys["dummy-scope"].Cycles["w"] = cycle
 	mustSave(t, database, state, billing.Changes{Plans: true, AllKeys: true})
 	var version int
-	if err := database.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 14 {
+	if err := database.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != schemaVersion {
 		t.Fatalf("schema changed: %d, %v", version, err)
 	}
 	if err := database.Close(); err != nil {

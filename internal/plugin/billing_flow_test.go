@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -313,5 +314,31 @@ func TestUsageHandleSpendDrivesQuotaEnforcement(t *testing.T) {
 	decodeResult(t, raw, &response)
 	if !response.Terminate || response.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("response = %+v", response)
+	}
+}
+
+func TestUsageHandleRecordsTheUpstreamTurnState(t *testing.T) {
+	app := newAppWithPrice(t, true)
+	now := app.store.Now()
+	for i, headers := range []http.Header{
+		{billing.CodexTurnStateHeader: {strings.Repeat("s", billing.LobotomizedTurnStateLength)}},
+		{billing.CodexTurnStateHeader: {"reported-other-state"}},
+		nil, // Reused WebSockets report no handshake headers.
+	} {
+		publishUsageRecord(t, app, UsageRecord{
+			Provider: "codex", ExecutorType: "CodexWebsocketsExecutor", Model: flowModel, Alias: flowModel,
+			APIKey: testAPIKey, Generate: true, RequestedAt: now.Add(time.Duration(i) * time.Minute),
+			ResponseHeaders: headers,
+			Detail:          UsageDetail{InputTokens: 1000, OutputTokens: 500, TotalTokens: 1500},
+		})
+	}
+	entries := requestEventEntries(t, app)
+	if len(entries) != 3 {
+		t.Fatalf("entries = %+v", entries)
+	}
+	for i, entry := range entries {
+		if entry.Lobotomized != (i == 2) || entry.ResponseHeaders != nil {
+			t.Fatalf("entry %d = %+v", i, entry)
+		}
 	}
 }

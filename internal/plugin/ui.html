@@ -1752,6 +1752,7 @@
       }
       .request-event-cell-line { display: flex; align-items: center; gap: 4px; min-height: 20px; white-space: nowrap; }
       .request-event-source { min-height: 20px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .request-event-tags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
       .cost-value {
         display: inline-block;
         cursor: help;
@@ -2344,6 +2345,7 @@
                     <option value="" data-i18n="ui.all_results">All results</option>
                     <option value="false" data-i18n="ui.succeeded">Succeeded</option>
                     <option value="true" data-i18n="ui.failed">Failed</option>
+                    <option value="lobotomized" data-i18n="ui.lobotomized">Lobotomized</option>
                   </select>
                 </span>
                 <button id="request-events-filter-clear" class="link" type="button" disabled data-i18n="ui.clear_filters">Clear filters</button>
@@ -2504,6 +2506,7 @@
                       <option value="" data-i18n="ui.all_results">All results</option>
                       <option value="false" data-i18n="ui.succeeded">Succeeded</option>
                       <option value="true" data-i18n="ui.failed">Failed</option>
+                      <option value="lobotomized" data-i18n="ui.lobotomized">Lobotomized</option>
                     </select>
                   </span>
                   <button id="account-request-events-filter-clear" class="link" type="button" disabled data-i18n="ui.clear_filters">Clear filters</button>
@@ -2998,10 +3001,12 @@
         const filters = {};
         const key = account ? "" : $("analysis-key").value;
         if (key) filters.api_key = key;
-        for (const [field, control] of [["model", "model"], ["source", "source"], ["failed", "status"]]) {
-          const value = $(prefix + "-" + control).value;
+        for (const field of ["model", "source"]) {
+          const value = $(prefix + "-" + field).value;
           if (value) filters[field] = value;
         }
+        const status = $(prefix + "-status").value;
+        if (status === "lobotomized") filters.lobotomized = "true"; else if (status) filters.failed = status;
         return filters;
       }
 
@@ -7098,7 +7103,8 @@
       const REQUEST_EVENT_STATUS_OPTIONS = {
         "": { label: m("ui.all_results"), count: "all" },
         false: { label: m("ui.succeeded"), count: "normal" },
-        true: { label: m("ui.failed"), count: "failed" }
+        true: { label: m("ui.failed"), count: "failed" },
+        lobotomized: { label: m("ui.lobotomized"), count: "lobotomized" }
       };
 
       // Counts cover the whole field/time selection and ignore the status choice,
@@ -7866,7 +7872,14 @@
             el(
               "td",
               {},
-              el("span", { class: "tag " + (entry.failed ? "bad" : "ok"), text: entry.failed ? m("ui.failed") : m("ui.succeeded") })
+              el(
+                "div",
+                { class: "request-event-tags" },
+                el("span", { class: "tag " + (entry.failed ? "bad" : "ok"), text: entry.failed ? m("ui.failed") : m("ui.succeeded") }),
+                entry.lobotomized
+                  ? el("span", { class: "tag warn", text: m("ui.lobotomized"), title: m("ui.the_upstream_reported_a_degraded_turn_state") })
+                  : null
+              )
             ),
             el(
               "td",

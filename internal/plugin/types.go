@@ -161,6 +161,11 @@ type UsageRecord struct {
 	Failed          bool          `json:"Failed"`
 	Failure         UsageFailure  `json:"Failure"`
 	Detail          UsageDetail   `json:"Detail"`
+	// ResponseHeaders are the upstream response headers of the attempt that
+	// produced this record. The host reports HTTP response headers and upstream
+	// websocket handshake headers; a request served over a reused websocket
+	// carries none.
+	ResponseHeaders http.Header `json:"ResponseHeaders"`
 }
 
 type UsageFailure struct {

@@ -715,6 +715,7 @@ def event_sample(
     billing_model="",
     long_context=False,
     failed=False,
+    lobotomized=False,
     multiplier=1,
 ):
     uncached, cache_read, cache_write, output = tokens
@@ -730,6 +731,7 @@ def event_sample(
         "upstream_model": model,
         "billing_model": billing_model or model,
         "failed": failed,
+        "lobotomized": lobotomized,
         "latency_ms": latency_ms,
         "ttft_ms": ttft_ms,
         "accounting_quality": "" if failed else "complete",
@@ -753,7 +755,7 @@ def event_sample(
 SUCCESS_EVENT_SAMPLES = [
     event_sample(0, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "high", "priority", 11513, 8209, 266, (712, 91648, 4096, 425), (4, 0.4, 5, 20), multiplier=2.5),
     event_sample(5, "codex · dev-team@example.com", "codex", "gpt-5.6-luna", "CodexWebsocketsExecutor", "low", "auto", 2516, 1431, 10, (1030, 49920, 0, 75), (0.2, 0.02, 0.25, 1.2)),
-    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "medium", "auto", 2417, 1103, 0, (1194, 95616, 0, 73), (5, 0.5, 5, 30)),
+    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "medium", "auto", 2417, 1103, 0, (1194, 95616, 0, 73), (5, 0.5, 5, 30), lobotomized=True),
     event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "high", "auto", 5306, 2121, 21, (798, 169984, 0, 201), (4, 0.4, 5, 20)),
     event_sample(2, "claude · platform@example.com", "claude", "deepseek-v4-pro", "ClaudeExecutor", "high", "auto", 10061, 637, 0, (38049, 0, 0, 474), (0.435, 0.003625, 0.435, 0.87), billing_model="claude/deepseek-v4-pro"),
     event_sample(7, "codex · sk-proxy…7f3a", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "high", "auto", 7288, 4130, 188, (8502, 45440, 0, 309), (5, 0.5, 5, 30)),
@@ -768,7 +770,7 @@ SUCCESS_EVENT_SAMPLES = [
 ]
 
 FAILURE_EVENT_SAMPLES = [
-    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "high", "auto", 4338, 237, 0, (0, 0, 0, 0), (5, 0.5, 5, 30), failed=True),
+    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "high", "auto", 4338, 237, 0, (0, 0, 0, 0), (5, 0.5, 5, 30), failed=True, lobotomized=True),
 ]
 
 EVENT_SAMPLES = SUCCESS_EVENT_SAMPLES * 2 + FAILURE_EVENT_SAMPLES
@@ -808,7 +810,8 @@ def request_event_view(query, scope=""):
     selected_source = query.get("source", [""])[0]
     selected_provider = query.get("provider", [""])[0]
     selected_executor = query.get("executor", [""])[0]
-    selected_failed = query.get("failed", [""])[0]
+    selected_failed = query.get("failed", [""])[0].strip()
+    selected_lobotomized = query.get("lobotomized", [""])[0].strip() == "true"
     offset = max(0, int(query.get("offset", ["0"])[0] or 0))
     limit = max(0, int(query.get("limit", ["0"])[0] or 0))
     time_matched = filter_event_time([entry for entry in REQUEST_EVENTS
@@ -825,7 +828,7 @@ def request_event_view(query, scope=""):
     if selected_source:
         selected_source = next((source for source in source_values
                                 if source_filter_token(scope, source) == selected_source), "\0")
-    counts = {"all": 0, "normal": 0, "failed": 0}
+    counts = {"all": 0, "normal": 0, "failed": 0, "lobotomized": 0}
     matched = []
     for entry in time_matched:
         if selected_key and entry.get("scope") != selected_key:
@@ -841,7 +844,10 @@ def request_event_view(query, scope=""):
         failed = bool(entry.get("failed"))
         counts["all"] += 1
         counts["failed" if failed else "normal"] += 1
+        counts["lobotomized"] += bool(entry.get("lobotomized"))
         if selected_failed and failed != (selected_failed == "true"):
+            continue
+        if selected_lobotomized and not entry.get("lobotomized"):
             continue
         matched.append(entry)
     page = matched[offset:offset + limit] if limit else matched[offset:]
@@ -1419,6 +1425,15 @@ class Handler(BaseHTTPRequestHandler):
                 )
             self.send_html(body)
             return
+        if parsed.path in {f"{API_BASE}/events", f"{RESOURCE_BASE}/events"}:
+            query = parse_qs(parsed.query, keep_blank_values=True)
+            if "failed" in query and "lobotomized" in query:
+                self.send_json(400, {"error": {"message": "lobotomized cannot be combined with failed"}})
+                return
+            for field in ("failed", "lobotomized"):
+                if query.get(field, [""])[0].strip() not in ("", "true", "false"):
+                    self.send_json(400, {"error": {"message": f"{field} must be true or false"}})
+                    return
         authorization = self.headers.get("Authorization", "")
         api_keys = [f"sk-demo-{index:04d}" for index in range(1, len(LIVE_KEYS) + 1)]
         if parsed.path == "/v1/models":

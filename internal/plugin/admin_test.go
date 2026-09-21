@@ -339,8 +339,26 @@ func TestRequestEventQueryReachesTheStore(t *testing.T) {
 		t.Fatalf("field and time filtered events = %+v", events)
 	}
 
+	publishUsageRecord(t, app, UsageRecord{
+		Provider: "codex", ExecutorType: "CodexExecutor", Model: "gpt-5.5", Alias: "gpt-5.5",
+		APIKey: apiKey, Generate: true, RequestedAt: app.store.Now(),
+		ResponseHeaders: http.Header{billing.CodexTurnStateHeader: {
+			strings.Repeat("s", billing.LobotomizedTurnStateLength)}},
+		Detail: UsageDetail{InputTokens: 10, OutputTokens: 5, TotalTokens: 15},
+	})
+	callOK(t, app, http.MethodGet, routeEvents, url.Values{"lobotomized": {"true"}}, nil, http.StatusOK, &events)
+	if events.Total != 1 || len(events.Entries) != 1 || !events.Entries[0].Lobotomized ||
+		events.Statuses.Lobotomized != 1 || events.Statuses.All != 4 {
+		t.Fatalf("degraded turn events = %+v, statuses %+v", events.Entries, events.Statuses)
+	}
+
 	for _, query := range []url.Values{
-		{"failed": {"unknown"}}, {"offset": {"-1"}}, {"limit": {"0"}},
+		{"failed": {"unknown"}}, {"lobotomized": {"unknown"}},
+		{"failed": {"true"}, "lobotomized": {"true"}},
+		{"failed": {"false"}, "lobotomized": {"true"}},
+		{"failed": {"true"}, "lobotomized": {"false"}},
+		{"failed": {""}, "lobotomized": {"true"}},
+		{"offset": {"-1"}}, {"limit": {"0"}},
 		{"snapshot_id": {"-1"}}, {"snapshot_id": {"9223372036854775808"}},
 		{"limit": {"1001"}}, {"limit": {"one page"}}, {"from": {"yesterday"}},
 		{"from": {"2026-09-01T02:00:00Z"}, "to": {"2026-09-01T01:00:00Z"}},

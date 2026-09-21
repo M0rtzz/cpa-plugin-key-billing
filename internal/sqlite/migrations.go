@@ -11,7 +11,7 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
-func migrateToV14(tx *sql.Tx, version int) error {
+func migrateToV15(tx *sql.Tx, version int) error {
 	var steps []func(*sql.Tx) error
 	switch version {
 	case 10:
@@ -22,11 +22,22 @@ func migrateToV14(tx *sql.Tx, version int) error {
 	if version <= 12 {
 		steps = append(steps, migrateModelPricing, migrateQuotaWindows)
 	}
-	steps = append(steps, migrateCredentials)
+	if version <= 13 {
+		steps = append(steps, migrateCredentials)
+	}
+	steps = append(steps, migrateResponseHeaders)
 	for _, step := range steps {
 		if err := step(tx); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func migrateResponseHeaders(tx *sql.Tx) error {
+	if _, err := tx.Exec(
+		"ALTER TABLE request_events ADD COLUMN response_headers_json TEXT NOT NULL DEFAULT '{}'"); err != nil {
+		return fmt.Errorf("Add request event response headers: %w", err)
 	}
 	return nil
 }

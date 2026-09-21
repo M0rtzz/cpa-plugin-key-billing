@@ -1,6 +1,9 @@
 package billing
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
 
 // RequestEvent is one persisted request record and never stores a plaintext API key.
 // Account contains only an OAuth identity or masked API key.
@@ -26,9 +29,17 @@ type RequestEvent struct {
 	Cost        Cost        `json:"cost"`
 	// ReasoningTokens is already included in Cost.BilledOutputTokens.
 	ReasoningTokens int64 `json:"reasoning_tokens,omitempty"`
+	// ResponseHeaders is filtered on insert and never returned by list APIs.
+	ResponseHeaders http.Header `json:"-"`
 }
 
 const RequestEventRetention = 365 * 24 * time.Hour
+
+// PersistedResponseHeaders is the only allowlist for response header storage.
+var PersistedResponseHeaders = []string{CodexTurnStateHeader}
+
+const CodexTurnStateHeader = "X-Codex-Turn-State"
+const LobotomizedTurnStateLength = 312
 
 // Source uses the event's account snapshot; key labels use their current values.
 type RequestEventRow struct {
@@ -38,19 +49,23 @@ type RequestEventRow struct {
 	Preview string `json:"preview,omitempty"`
 	Label   string `json:"label,omitempty"`
 	Source  string `json:"source,omitempty"`
+	// False also covers unreported headers, including reused upstream WebSockets.
+	Lobotomized bool `json:"lobotomized"`
 }
 
 // RequestEventQuery selects one filtered page of request events.
 type RequestEventQuery struct {
 	// Scope is an internal authorization boundary. Callers never select it from
 	// a query parameter: account endpoints derive it from the presented API key.
-	Scope          string
-	KeyScope       string
-	Model          string
-	Source         string
-	Executor       string
-	Provider       string
-	Failed         *bool
+	Scope    string
+	KeyScope string
+	Model    string
+	Source   string
+	Executor string
+	Provider string
+	Failed   *bool
+	// Lobotomized and Failed are mutually exclusive result selections.
+	Lobotomized    bool
 	From           time.Time
 	To             time.Time
 	Timezone       *time.Location
@@ -83,10 +98,13 @@ type RequestSourceOption struct {
 	Label string `json:"label"`
 }
 
+// Lobotomized overlaps the other counts: a degraded turn is also either normal
+// or failed.
 type RequestEventStatusCounts struct {
-	All    int `json:"all"`
-	Normal int `json:"normal"`
-	Failed int `json:"failed"`
+	All         int `json:"all"`
+	Normal      int `json:"normal"`
+	Failed      int `json:"failed"`
+	Lobotomized int `json:"lobotomized"`
 }
 
 func (s *Store) RequestEvents(query RequestEventQuery) (RequestEventView, error) {

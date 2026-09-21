@@ -58,6 +58,8 @@
   "ui.all_results": "全部结果",
   "ui.succeeded": "成功",
   "ui.failed": "失败",
+  "ui.lobotomized": "降智",
+  "ui.the_upstream_reported_a_degraded_turn_state": "上游返回的会话状态标记为降智",
   "ui.clear_filters": "清除筛选",
   "ui.filter_by_error_type": "按错误类型筛选",
   "ui.all_error_types": "全部错误类型",
