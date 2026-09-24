@@ -25,16 +25,16 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 	result, errInsert := tx.Exec(`
 		INSERT INTO request_events (
 			at, scope, auth_index, provider, account, executor_type, reasoning_effort, service_tier,
-			upstream_model, billing_model, failed, latency_ms, ttft_ms,
+			response_service_tier, upstream_model, response_model, billing_model, failed, latency_ms, ttft_ms,
 			accounting_quality, price_source, reasoning_tokens, billing_multiplier, service_tier_multiplier,
 			total_usd, uncached_input_usd, cache_read_usd, cache_write_usd, output_usd,
 			uncached_input_tokens, cache_read_tokens, cache_write_tokens, billed_output_tokens,
 			tiered, long_context, threshold_input_tokens,
 			applied_input_per_1m, applied_output_per_1m,
 			applied_cache_read_per_1m, applied_cache_write_per_1m
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		nanos(entry.At), entry.Scope, entry.AuthIndex, entry.Provider, entry.Account, entry.ExecutorType, entry.ReasoningEffort, entry.ServiceTier,
-		entry.UpstreamModel, entry.BillingModel, entry.Failed,
+		entry.ResponseServiceTier, entry.UpstreamModel, entry.ResponseModel, entry.BillingModel, entry.Failed,
 		entry.LatencyMS, entry.TTFTMS,
 		string(entry.AccountingQuality), string(entry.PriceSource), entry.ReasoningTokens, global, service,
 		entry.Cost.TotalUSD, entry.Cost.UncachedInputUSD, entry.Cost.CacheReadUSD,
@@ -134,17 +134,19 @@ func (d *DB) RequestEvents(query billing.RequestEventQuery, since time.Time) (bi
 	// Apply pagination before loading metadata and usage details.
 	rows, errQuery := d.db.Query(`WITH page AS MATERIALIZED (SELECT r.id `+page+`)
 		SELECT r.id, r.at, r.scope, r.auth_index, r.provider, r.account,
-			r.executor_type, r.reasoning_effort, r.service_tier,
-			r.upstream_model, r.billing_model, r.failed, r.latency_ms, r.ttft_ms,
+			r.executor_type, r.reasoning_effort, r.service_tier, r.response_service_tier,
+			r.upstream_model, r.response_model, r.billing_model, r.failed, r.latency_ms, r.ttft_ms,
 			r.accounting_quality, r.price_source, r.reasoning_tokens, r.billing_multiplier, r.service_tier_multiplier,
 			r.total_usd, r.uncached_input_usd, r.cache_read_usd, r.cache_write_usd, r.output_usd,
 			r.uncached_input_tokens, r.cache_read_tokens, r.cache_write_tokens, r.billed_output_tokens,
 			r.tiered, r.long_context, r.threshold_input_tokens,
 			r.applied_input_per_1m, r.applied_output_per_1m,
 			r.applied_cache_read_per_1m, r.applied_cache_write_per_1m,
-			coalesce(k.preview, ''), coalesce(k.label, ''), `+requestEventSourceName+`
+			coalesce(k.preview, ''), coalesce(k.label, ''), `+requestEventSourceName+`,
+			coalesce(e.body, '')
 		FROM page JOIN request_events r ON r.id = page.id
 		LEFT JOIN api_keys k ON k.scope = r.scope
+		LEFT JOIN request_errors e ON e.request_event_id = r.id
 		ORDER BY r.at DESC, r.id DESC`, pageArgs...)
 	if errQuery != nil {
 		return billing.RequestEventView{}, fmt.Errorf("Read request events: %w", errQuery)
@@ -249,8 +251,8 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 		quality, priceSource string
 	)
 	if errScan := rows.Scan(&row.ID, &at, &row.Scope, &row.AuthIndex, &row.Provider, &row.Account,
-		&row.ExecutorType, &row.ReasoningEffort, &row.ServiceTier,
-		&row.UpstreamModel, &row.BillingModel, &failed,
+		&row.ExecutorType, &row.ReasoningEffort, &row.ServiceTier, &row.ResponseServiceTier,
+		&row.UpstreamModel, &row.ResponseModel, &row.BillingModel, &failed,
 		&row.LatencyMS, &row.TTFTMS,
 		&quality, &priceSource, &row.ReasoningTokens, &row.Cost.BillingMultiplier, &row.Cost.ServiceTierMultiplier,
 		&row.Cost.TotalUSD, &row.Cost.UncachedInputUSD, &row.Cost.CacheReadUSD,
@@ -260,7 +262,7 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 		&row.Cost.Tiered, &row.Cost.LongContext, &row.Cost.ThresholdInputTokens,
 		&row.Cost.AppliedInputPer1M, &row.Cost.AppliedOutputPer1M,
 		&row.Cost.AppliedCacheReadPer1M, &row.Cost.AppliedCacheWritePer1M,
-		&row.Preview, &row.Label, &row.Source); errScan != nil {
+		&row.Preview, &row.Label, &row.Source, &row.ErrorBody); errScan != nil {
 		return billing.RequestEventRow{}, fmt.Errorf("Read request events: %w", errScan)
 	}
 	row.At = timeAt(at)

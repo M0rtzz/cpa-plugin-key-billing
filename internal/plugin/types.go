@@ -18,7 +18,7 @@ const (
 const (
 	PluginID   = "cpa-key-billing"
 	PluginName = "cpa-key-billing"
-	Version    = "1.3.12"
+	Version    = "1.3.18"
 
 	MenuLabel       = "API Key Billing"
 	MenuDescription = "Manage downstream API key routing, billing, concurrency limits, subscription quotas, and usage"
@@ -84,6 +84,7 @@ type Metadata struct {
 	Version          string        `json:"Version"`
 	Author           string        `json:"Author"`
 	GitHubRepository string        `json:"GitHubRepository"`
+	Logo             string        `json:"Logo"`
 	ConfigFields     []ConfigField `json:"ConfigFields"`
 }
 
@@ -144,23 +145,25 @@ type RequestInterceptResponse struct {
 }
 
 type UsageRecord struct {
-	Provider        string        `json:"Provider"`
-	ExecutorType    string        `json:"ExecutorType"`
-	Model           string        `json:"Model"`
-	Alias           string        `json:"Alias"`
-	APIKey          string        `json:"APIKey"`
-	AuthIndex       string        `json:"AuthIndex"`
-	AuthType        string        `json:"AuthType"`
-	Source          string        `json:"Source"`
-	ReasoningEffort string        `json:"ReasoningEffort"`
-	ServiceTier     string        `json:"ServiceTier"`
-	Generate        bool          `json:"Generate"`
-	RequestedAt     time.Time     `json:"RequestedAt"`
-	Latency         time.Duration `json:"Latency"`
-	TTFT            time.Duration `json:"TTFT"`
-	Failed          bool          `json:"Failed"`
-	Failure         UsageFailure  `json:"Failure"`
-	Detail          UsageDetail   `json:"Detail"`
+	Provider            string        `json:"Provider"`
+	ExecutorType        string        `json:"ExecutorType"`
+	Model               string        `json:"Model"`
+	Alias               string        `json:"Alias"`
+	APIKey              string        `json:"APIKey"`
+	AuthIndex           string        `json:"AuthIndex"`
+	AuthType            string        `json:"AuthType"`
+	Source              string        `json:"Source"`
+	ReasoningEffort     string        `json:"ReasoningEffort"`
+	ServiceTier         string        `json:"ServiceTier"`
+	ResponseServiceTier string        `json:"ResponseServiceTier"`
+	ResponseModel       string        `json:"ResponseModel"`
+	Generate            bool          `json:"Generate"`
+	RequestedAt         time.Time     `json:"RequestedAt"`
+	Latency             time.Duration `json:"Latency"`
+	TTFT                time.Duration `json:"TTFT"`
+	Failed              bool          `json:"Failed"`
+	Failure             UsageFailure  `json:"Failure"`
+	Detail              UsageDetail   `json:"Detail"`
 }
 
 type UsageFailure struct {

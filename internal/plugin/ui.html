@@ -8,6 +8,13 @@
       if (window.parent === window) {
         document.documentElement.setAttribute("data-cpamp-plugin-host", "true");
         document.documentElement.setAttribute("data-cpamp-standalone", "true");
+        const favicon = document.createElement("link");
+        favicon.rel = "icon";
+        favicon.type = "image/svg+xml";
+        favicon.sizes = "any";
+        favicon.href =
+          "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjI0LjU3IDI1LjQ3IDQ2MS45NCA0NTkuNCIgZmlsbD0ibm9uZSI+CiAgPHN0eWxlPgogICAgQG1lZGlhIChwcmVmZXJzLWNvbG9yLXNjaGVtZTogZGFyaykgewogICAgICAja2V5LXN0YXJ0IHsgc3RvcC1jb2xvcjogI2YwZjZmZjsgfQogICAgICAja2V5LWVuZCB7IHN0b3AtY29sb3I6ICNjNGQ4ZWY7IH0KICAgICAgI2N5YW4tc3RhcnQgeyBzdG9wLWNvbG9yOiAjMjBiNGZmOyB9CiAgICAgICNjeWFuLW1pZCB7IHN0b3AtY29sb3I6ICMxNmQwZjI7IH0KICAgICAgI2N5YW4tZW5kIHsgc3RvcC1jb2xvcjogIzIwZWJlMDsgfQogICAgICAjZ3JlZW4tc3RhcnQgeyBzdG9wLWNvbG9yOiAjNDNlZmI5OyB9CiAgICAgICNncmVlbi1lbmQgeyBzdG9wLWNvbG9yOiAjMjBkYmExOyB9CiAgICAgICN5ZWxsb3ctc3RhcnQgeyBzdG9wLWNvbG9yOiAjZmZkYTU3OyB9CiAgICAgICN5ZWxsb3ctZW5kIHsgc3RvcC1jb2xvcjogI2ZmYzMzNTsgfQogICAgICAjc2xhdGUtc3RhcnQgeyBzdG9wLWNvbG9yOiAjNjk4YWFhOyB9CiAgICAgICNzbGF0ZS1lbmQgeyBzdG9wLWNvbG9yOiAjOTBhZWNiOyB9CiAgICB9CiAgPC9zdHlsZT4KICA8ZGVmcz4KICAgIDxyYWRpYWxHcmFkaWVudCBpZD0ia2V5IiBjeD0iNDUlIiBjeT0iMzklIiByPSI3NiUiPgogICAgICA8c3RvcCBpZD0ia2V5LXN0YXJ0IiBzdG9wLWNvbG9yPSIjMDQxYjM1Ii8+CiAgICAgIDxzdG9wIGlkPSJrZXktZW5kIiBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwMDEzMjkiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImN5YW4iIHgxPSIyOCIgeTE9IjI2OCIgeDI9IjM0NiIgeTI9IjI0MSIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBpZD0iY3lhbi1zdGFydCIgc3RvcC1jb2xvcj0iIzA3ODRkNiIvPgogICAgICA8c3RvcCBpZD0iY3lhbi1taWQiIG9mZnNldD0iLjUyIiBzdG9wLWNvbG9yPSIjMDA5Y2M1Ii8+CiAgICAgIDxzdG9wIGlkPSJjeWFuLWVuZCIgb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA5ZmE4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJncmVlbiIgeDE9IjMyNCIgeTE9IjQwIiB4Mj0iNDMzIiB5Mj0iMTc0IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIGlkPSJncmVlbi1zdGFydCIgc3RvcC1jb2xvcj0iIzExYTc3YyIvPgogICAgICA8c3RvcCBpZD0iZ3JlZW4tZW5kIiBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwNzg5NjIiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InllbGxvdyIgeDE9IjQyMiIgeTE9IjE3OCIgeDI9IjQ4NCIgeTI9IjI3NyIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBpZD0ieWVsbG93LXN0YXJ0IiBzdG9wLWNvbG9yPSIjZDY5YTA1Ii8+CiAgICAgIDxzdG9wIGlkPSJ5ZWxsb3ctZW5kIiBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNiYjc5MDAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InNsYXRlIiB4MT0iMzY3IiB5MT0iNDM3IiB4Mj0iNDgyIiB5Mj0iMjkxIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIGlkPSJzbGF0ZS1zdGFydCIgc3RvcC1jb2xvcj0iIzQ4NjU4MCIvPgogICAgICA8c3RvcCBpZD0ic2xhdGUtZW5kIiBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM2MTdmOWIiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxwYXRoIGZpbGw9InVybCgjY3lhbikiIGQ9Ik0gMzExLjk4IDMyLjM0IEMgMjI0Ljc4IDkuMTIgMTM0LjQ4IDQ2Ljc5IDc4Ljc1IDExNS40MiBDIDQzLjE0IDE1OC43NiAyNC41NyAyMDUuMiAyNC41NyAyNTYuOCBDIDI0LjU3IDM4MS42NyAxMjYuMjIgNDg0Ljg3IDI1NS43NCA0ODQuODcgQyAyODYuNyA0ODQuODcgMzE2LjYyIDQ3OS4yIDM0NSA0NjcuMzMgUSAzNTAuMTYgNDY1LjI2IDM0OC4xIDQ2MC42MiBMIDMzNi4wOSA0MjguODggUSAzMzMuOTQgNDI0LjAzIDMyOS4wOCA0MjUuNjUgQyAzMDUuODkgNDM0LjgyIDI4MC41NSA0MzkuMTMgMjU1Ljc1IDQzOS4xMyBDIDE1MS4xMyA0MzkuMTMgNjguNjMgMzU3LjE3IDY4LjYzIDI1Ni44NyBDIDY4LjYzIDE1Ni4wNCAxNTEuNjggNzMuNTQgMjU1Ljc1IDczLjU0IEMgMjcwLjg0IDczLjU0IDI4NS40MSA3NC42MSAyOTkuNDIgNzcuODUgUSAzMDUuMzYgNzkuNDcgMzA2Ljk3IDczLjU0IEwgMzE1LjU5IDM5LjA1IFEgMzE3LjE0IDMzLjg5IDMxMS45OCAzMi4zNCBaIi8+CiAgPHBhdGggZmlsbD0idXJsKCNncmVlbikiIGQ9Ik0gMzM1LjIgMzkuNTYgQyAzODYuOCA1OC4xNCA0MjkuMTEgOTQuNzggNDU2LjQ2IDE0Mi4yNSBRIDQ1OS4wNCAxNDYuODkgNDUzLjg4IDE0OS45OSBMIDQyNC41MiAxNjYuMjggUSA0MTkuNjcgMTY4Ljk4IDQxNi45NyAxNjMuNTkgQyAzOTUuOTUgMTI3LjQ2IDM2My4wNSA5OS45NiAzMjMuNjggODQuODcgUSAzMTguMjkgODMuMjUgMzE5LjkxIDc3Ljg1IEwgMzI5LjAxIDQzLjY5IFEgMzMwLjU2IDM4LjAyIDMzNS4yIDM5LjU2IFoiLz4KICA8cGF0aCBmaWxsPSJ1cmwoI3llbGxvdykiIGQ9Ik0gNDU5LjU2IDE2Mi44OSBRIDQ2NS4yMyAxNTkuNzkgNDY3LjMgMTY1LjQ3IEMgNDgyLjI2IDE5OS4wMSA0ODkuNDggMjM4Ljc0IDQ4NS4zNiAyNzQuMzQgUSA0ODUuMzYgMjgwLjAyIDQ4MC4yIDI3OC45OSBMIDQ0OC4yNSAyNzcuMzcgUSA0NDIuMzEgMjc3LjM3IDQ0Mi44NiAyNzEuOTcgQyA0NDUuMDEgMjQxLjc3IDQzOS4wOCAyMTIuMTIgNDI3Ljc2IDE4Ni43NyBRIDQyNS4wNiAxODEuMzggNDMwLjQ1IDE3OC42OSBMIDQ1OS41NiAxNjIuODkgWiIvPgogIDxwYXRoIGZpbGw9InVybCgjc2xhdGUpIiBkPSJNIDQ0Ni42MyAyOTAuODUgTCA0ODAuNzEgMjkyLjkyIFEgNDg1Ljg3IDI5My40NCA0ODQuODQgMjk5LjExIEMgNDcyLjk3IDM2Ni4xOSA0MzAuNjYgNDIzLjQ3IDM3MC4yOSA0NTUuNDYgUSAzNjYuMTYgNDU3LjUyIDM2NC4xIDQ1Mi44OCBMIDM0OS41NyA0MjQuNTcgUSAzNDYuODcgNDE5LjcyIDM1MS43MiA0MTYuNDkgQyAzOTguMSAzODguNDQgNDMxLjUzIDM0NS4zIDQ0MC4xNiAyOTYuMjQgUSA0NDEuMjQgMjkwLjMgNDQ2LjYzIDI5MC44NSBaIi8+CiAgPHBhdGggZmlsbD0idXJsKCNrZXkpIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0gMjQwLjE1IDIzMS44NSBDIDIzMi4zNCAxOTkuNTMgMjUxLjg1IDE2Ny4yIDI4MS4zOCAxNTEuMDUgQyAzMTQuODIgMTI5Ljg3IDM1NC45NCAxNDEuMDEgMzc4LjkxIDE2NS41NCBDIDM5OS41MyAxODcuMjcgNDA1LjY2IDIyMC4xNSAzOTIuMjkgMjUwLjggQyAzNzMuOSAyOTIuMDQgMzI0Ljg1IDMwOS4zMSAyODMuMDYgMjg4LjE0IFEgMjc5LjcxIDI4NS45MSAyNzcuNDkgMjg4LjE0IEwgMjUzLjUyIDMwNi41MiBRIDI1MS4zIDMwOC4yIDI1MS4zIDMxMS41NSBMIDI1MS4zIDMyNC4zNyBRIDI1MS4zIDMyOS45NCAyNDUuNzIgMzI5Ljk0IEwgMjIzLjk4IDMyOS45NCBRIDIyMC42NSAzMjkuOTQgMjIwLjY1IDMzMy4yOCBMIDIyMC42NSAzNDguMzIgUSAyMjAuNjUgMzUzLjM0IDIxNS42MiAzNTMuMzQgTCAxOTguOSAzNTMuMzQgUSAxOTUuNTcgMzUzLjM0IDE5NS41NyAzNTYuNjggTCAxOTUuNTcgMzc3LjMxIFEgMTk1LjU3IDM4Mi4zMiAxOTAuNTUgMzgyLjMyIEwgMTY1LjQ3IDM4Mi4zMiBRIDE2Mi4xMyAzODIuMzIgMTU5LjM0IDM3OS41MyBMIDE0Mi42MyAzNjIuODEgUSAxMzkuODQgMzYwLjU5IDEzOS44NCAzNTYuNjggTCAxMzkuODQgMzI2LjAzIFEgMTM5Ljg0IDMyMi42OSAxNDIuNjMgMzIwLjQ2IEwgMjM4LjQ4IDIzNy45OSBRIDI0Mi45NCAyMzUuMiAyNDAuMTUgMjMxLjg1IFogTSAzNjcuMjEgMjA4LjQ1IEMgMzY3LjIxIDIyNC42MSAzNTQuMzkgMjM3Ljk5IDMzNy42NyAyMzcuOTkgQyAzMjEuNTEgMjM3Ljk5IDMwOC43IDIyNS4xNyAzMDguNyAyMDguNDUgQyAzMDguNyAxOTIuMjggMzIxLjUxIDE3OC45MSAzMzcuNjcgMTc4LjkxIEMgMzUzLjgzIDE3OC45MSAzNjcuMjEgMTkyLjI4IDM2Ny4yMSAyMDguNDUgWiIvPgo8L3N2Zz4K";
+        document.head.append(favicon);
       }
     </script>
     <script>
@@ -66,6 +73,8 @@
         --shadow: 0 1px 2px 0 #00000014;
         --radius-md: 8px;
         --page-gap: 16px;
+        --filter-search-width: 280px;
+        --filter-select-max-width: 200px;
         --event-entry-bg: transparent;
         --event-entry-border: var(--border-color);
         --event-code-bg: var(--bg-secondary);
@@ -189,7 +198,7 @@
         --bg-tertiary: var(--app-surface-muted, #f6faff);
         --bg-hover: var(--app-accent-soft, var(--bg-tertiary));
         --floating-surface: var(--app-surface-strong, var(--bg-primary));
-        --floating-shadow: var(--glass-shadow, none);
+        --floating-shadow: 0 12px 28px rgb(15 23 42 / 0.16);
         --text-primary: var(--app-text-primary, #2c3e50);
         --text-secondary: var(--app-text-regular, #5f6c7b);
         --text-tertiary: var(--app-text-muted, #8b95a6);
@@ -236,6 +245,7 @@
         --analysis-color-6: var(--data-cyan-base, #23a6c7);
         --analysis-segment-border: var(--app-surface, var(--bg-primary));
       }
+      :root[data-cpamp-plugin-host="true"][data-theme="dark"] { --floating-shadow: 0 16px 34px rgb(0 0 0 / 0.55); }
       * { box-sizing: border-box; }
       body {
         margin: 0;
@@ -422,15 +432,13 @@
       }
       .page-tabs-row {
         display: grid;
-        grid-template-columns: minmax(0, max-content) auto;
+        grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
         align-items: center;
-        justify-content: space-between;
         gap: 16px;
         margin-bottom: 16px;
       }
-      .page-tabs-row.controls-inline { grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto; justify-content: normal; }
-      body:not(.embedded) .page-tabs-row { grid-template-columns: minmax(0, max-content); }
-      body:not(.embedded) .page-tabs-row.controls-inline { grid-template-columns: minmax(0, max-content) minmax(0, 1fr); }
+      /* The mask and refresh buttons stay pinned to the tab row; only the filters wrap below it. */
+      .page-tab-tools { display: flex; grid-column: 3; grid-row: 1; align-items: center; justify-self: end; gap: 8px; }
       .page-tab-actions {
         display: flex;
         grid-column: 1 / -1;
@@ -442,12 +450,11 @@
       }
       .page-tabs-row.controls-inline .page-tab-actions { grid-column: 2; grid-row: 1; }
       .page-tabs-row.controls-inline .shared-time-filter, .page-tab-actions > button { flex: none; }
+      /* Wrapped filters keep to a single line, so the range trigger shrinks with the key select. */
+      .page-tabs-row:not(.controls-inline) .shared-time-filter > .time-range-control { flex: 0 1 auto; }
       .tab-refresh {
         display: none;
-        grid-column: 2;
-        grid-row: 1;
         place-items: center;
-        justify-self: end;
         width: 36px;
         height: 36px;
         min-width: 36px;
@@ -456,7 +463,6 @@
         border-radius: 50%;
         line-height: 0;
       }
-      .page-tabs-row.controls-inline .tab-refresh { grid-column: 3; }
       body.embedded .tab-refresh { display: grid; }
       .tabs-scroll {
         --tabs-fade-surface: var(--bg-secondary);
@@ -512,6 +518,7 @@
       .tag.bad { background: var(--failure-badge-bg); color: var(--failure-badge-text); border-color: var(--failure-badge-border); }
       .tag.info { background: var(--info-badge-bg); color: var(--info-badge-text); border-color: var(--info-badge-border); }
       .tag.plain { background: var(--count-badge-bg); color: var(--count-badge-text); }
+      .tag.icon { padding: 2px 5px; }
       :root[data-cpamp-plugin-host="true"] body {
         background-color: var(--app-bg, #eff2f7);
         background-image: var(--app-bg-gradient, none);
@@ -801,7 +808,7 @@
         color: var(--text-secondary);
         line-height: 0;
       }
-      .standalone-actions .icon-action:hover:not(:disabled) {
+      .standalone-actions .icon-action:hover:not(:disabled), .standalone-actions .icon-action[aria-expanded="true"] {
         border-color: transparent;
         background: color-mix(in srgb, var(--text-primary) 8%, transparent);
         color: var(--text-primary);
@@ -827,15 +834,6 @@
       }
       .icon-action .lucide-icon { width: 16px; height: 16px; }
       body.embedded .standalone-actions { display: none; }
-      .standalone-actions .language-select {
-        width: auto;
-        min-width: 92px;
-        max-width: 112px;
-        min-height: 36px;
-        padding: 4px 8px;
-        border-color: transparent;
-        background: transparent;
-      }
       .account-subscription-stats { margin-bottom: 16px; }
       .account-plan { display: grid; align-content: start; gap: 10px; margin: 0; }
       .account-plan-value { font-size: 24px; }
@@ -1004,7 +1002,7 @@
       .section-loading { min-height: 400px; }
       .auth-filter-bar { display: flex; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
       .auth-filter-bar .native-select, .auth-filter-bar select { min-width: 150px; }
-      .auth-filter-bar input[type="search"] { flex: 0 1 240px; width: 240px; min-width: 140px; }
+      .auth-filter-bar input[type="search"] { flex: 0 1 var(--filter-search-width); min-width: 140px; }
       .toggle-filter {
         display: inline-flex;
         align-items: center;
@@ -1076,6 +1074,18 @@
         line-height: 1;
       }
       .toggle-filter.compact-toggle:focus-within { border-color: transparent; box-shadow: none; }
+      /* Keep the blur below a third of the font size so dense scripts retain separate glyphs. */
+      body.privacy-masked .mask-blur { filter: blur(0.28em); }
+      /* Blur selected identities without blurring the native control's border or arrow. */
+      body.privacy-masked .mask-select:not(:has(option[value=""]:checked))::before {
+        content: "";
+        position: absolute;
+        inset: 1px 30px 1px 1px;
+        border-radius: var(--radius-md);
+        backdrop-filter: blur(0.28em);
+        -webkit-backdrop-filter: blur(0.28em);
+        pointer-events: none;
+      }
       .auth-file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; align-items: stretch; }
       .auth-file-card {
         height: 100%;
@@ -1167,6 +1177,24 @@
       }
       .auth-file-quota { display: grid; gap: 11px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); }
       .auth-quota-summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--text-secondary); font-size: 12px; }
+      .auth-reset-credits {
+        display: grid;
+        gap: 6px;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        font-size: 12px;
+      }
+      .auth-reset-credits-title { color: var(--text-tertiary); font-weight: 600; }
+      .auth-reset-credit {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        color: var(--text-secondary);
+      }
+      .auth-reset-credit-time { margin-left: auto; color: var(--text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
       .auth-quota-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 11px; }
       .auth-quota-row { display: grid; gap: 4px; min-width: 0; }
       .auth-quota-line { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
@@ -1292,7 +1320,7 @@
         border-radius: 6px;
         cursor: pointer;
       }
-      .selection-list label span:not(.checkbox-control):not(.checkbox-box) {
+      .selection-list label > span:not(.checkbox-control):not(.api-key-identity) {
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1332,21 +1360,24 @@
         color: var(--text-secondary);
         font-size: 12px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        white-space: normal;
-        overflow-wrap: anywhere;
+        white-space: nowrap;
+        overflow: hidden;
       }
-      .settings-chip.has-tag { align-items: stretch; flex-wrap: wrap; padding: 0 0 0 8px; overflow: hidden; }
-      .settings-chip.has-tag > .settings-chip-label { flex: 1 0 auto; max-width: 100%; align-self: center; padding-block: 2px; }
-      .settings-chip > .lucide-icon { align-self: center; margin: 0; width: 13px; height: 13px; }
-      .settings-chip-label { min-width: 0; overflow-wrap: anywhere; }
-      .settings-chip.has-tag > .tag { flex: none; margin-left: 3px; padding: 2px 8px; border-width: 0 0 0 1px; border-radius: 0; }
+      /* The tag is a full-height end segment; its extra end padding clears the rounded corner it is clipped to. */
+      .settings-chip.has-tag { align-items: stretch; padding: 0 0 0 8px; }
+      .settings-chip.has-tag > .settings-chip-label { flex: 0 1 auto; align-self: center; padding-block: 2px; }
+      .settings-chip.has-tag > .tag { flex: none; margin-left: 3px; padding: 2px 11px 2px 8px; border-width: 0 0 0 1px; border-radius: 0; }
+      .settings-chip > .lucide-icon, .settings-chip-tooltip > .lucide-icon { align-self: center; margin: 0; width: 13px; height: 13px; }
+      /* A chip stays on one line; the hover tooltip carries whatever the ellipsis cuts off. */
+      .settings-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .settings-chip-tooltip { display: flex; align-items: center; gap: 5px; }
       .key-route-cell { min-width: 125px; max-width: 190px; font-size: 12px; }
       .key-route-lines { display: grid; gap: 4px; }
       .key-route-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.65; }
-      .key-route-line .settings-chip { overflow: hidden; }
-      .key-route-line .settings-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* The cell describes every rule at once, so its chips stay out of the hover path. */
+      .key-route-line .settings-chip { pointer-events: none; }
       .key-route-lines:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; border-radius: 4px; }
-      .key-route-tooltip {
+      .hover-tooltip {
         position: fixed;
         inset: auto;
         margin: 0;
@@ -1365,9 +1396,10 @@
         font-size: 12px;
       }
       /* Block flow avoids WebKit stretching auto-height popover grid rows. */
-      .key-route-tooltip:popover-open { display: block; }
-      .key-route-tooltip > * + * { margin-top: 6px; }
-      .key-route-tooltip-heading { font-size: 11px; color: var(--text-tertiary); }
+      .hover-tooltip:popover-open { display: block; }
+      .hover-tooltip > * + * { margin-top: 6px; }
+      .hover-tooltip-heading { font-size: 11px; color: var(--text-tertiary); }
+      .hover-tooltip-body { margin: 0; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
       .key-route-more { color: var(--text-tertiary); line-height: 1; }
       .key-route-actions { margin-top: 5px; }
       .key-route-actions > button.link { min-height: 22px; font-size: 12px; }
@@ -1490,10 +1522,13 @@
         .route-form-toolbar > .row { grid-column: 1 / -1; justify-content: flex-start; padding-bottom: 0; }
         .route-picker { width: calc(100vw - 32px); }
       }
-      .wide-search { width: 360px; max-width: 100%; }
+      /* Filters share one search width and one select cap so no single control dominates a wrapped toolbar. */
+      .wide-search, #price-filter, .auth-filter-bar input[type="search"] { width: var(--filter-search-width); max-width: 100%; }
+      .section-actions .native-select, .section-actions select, .shared-time-filter > .native-select {
+        max-width: var(--filter-select-max-width);
+      }
       .section-toolbar, .settings-section-header { margin-bottom: 12px; }
       .section-toolbar h2, .settings-section-header h2, .account-plan h2 { margin: 0; }
-      #price-filter { max-width: 220px; }
       .section-actions { min-width: 0; }
       .section-actions > button, .usage-distribution-tabs button { white-space: nowrap; }
       .key-toolbar-buttons { gap: 8px; }
@@ -1536,8 +1571,8 @@
       }
       .time-range-trigger[aria-expanded="true"] .time-range-chevron { transform: rotate(180deg); }
       .time-range-popover { position: absolute; top: calc(100% + 6px); right: 0; }
-      .date-time-popover { position: fixed; margin: 0; inset: auto; color: var(--text-primary); }
-      .time-range-popover, .date-time-popover {
+      .date-time-popover, .language-menu { position: fixed; margin: 0; inset: auto; color: var(--text-primary); }
+      .time-range-popover, .date-time-popover, .language-menu {
         z-index: 1200;
         width: min(360px, calc(100vw - 24px));
         overflow: auto;
@@ -1548,6 +1583,28 @@
         box-shadow: var(--floating-shadow);
         transform-origin: top right;
         animation: time-range-in 150ms ease-out both;
+      }
+      .language-menu { gap: 2px; width: max-content; min-width: 112px; max-width: calc(100vw - 24px); padding: 6px; }
+      .language-menu:popover-open { display: grid; }
+      :root .language-menu button.language-option {
+        width: 100%;
+        padding: 8px 12px;
+        border-color: transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-secondary);
+        text-align: left;
+      }
+      :root .language-menu button.language-option:hover:not(:disabled) {
+        border-color: transparent;
+        background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+        color: var(--text-primary);
+      }
+      :root .language-menu button.language-option[aria-checked="true"] {
+        border-color: transparent;
+        background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+        color: var(--primary-active);
+        font-weight: 600;
       }
       @media (max-width: 640px) {
         .date-time-popover { inset: auto 12px 12px; margin-inline: auto; max-height: calc(100dvh - 24px); }
@@ -1634,7 +1691,7 @@
         background: var(--app-input-bg-focus, var(--bg-primary));
         box-shadow: inset 0 0 0 1px var(--focus-inset);
       }
-      :root[data-cpamp-plugin-host="true"] .time-range-popover {
+      :root[data-cpamp-plugin-host="true"] .time-range-popover, :root[data-cpamp-plugin-host="true"] .language-menu {
         border-color: color-mix(
           in srgb,
           var(--app-input-border-focus, var(--primary-color)) 28%,
@@ -1791,21 +1848,30 @@
           flex: 1 1 100%;
           width: 100%;
         }
-        .section-actions .wide-search, #price-filter { width: 100%; max-width: none; min-width: 0; }
-        #tab-keys .section-actions { grid-template-columns: minmax(0, 1fr); }
-        #tab-prices .section-actions { grid-template-columns: max-content minmax(0, 1fr); }
-        #price-filter { grid-column: 1 / -1; }
-        #tab-plugin-logs .section-actions { grid-template-columns: repeat(2, minmax(0, 1fr)) auto; }
-        #tab-plugin-logs .section-actions > *, #tab-plugin-logs .section-actions select { width: 100%; min-width: 0; }
+        /* Cells size the controls here, so the shared search width and select cap step aside. */
+        .section-toolbar > .section-actions > *, .section-actions .native-select, .section-actions select { max-width: none; }
+        .section-actions .wide-search, #price-filter { width: 100%; min-width: 0; }
+        /* Flattening the button group lets the four controls share the two-column grid. */
+        #tab-keys .section-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #tab-keys .key-toolbar-buttons { display: contents; }
+        #tab-keys .key-toolbar-buttons > * { align-self: stretch; width: 100%; min-width: 0; white-space: normal; }
+        /* Only CPAMP shows the import button; without it search takes the whole line and the rest pair up below. */
+        #tab-keys .section-actions > .wide-search { grid-column: 1 / -1; }
+        :root[data-cpamp-plugin-host="true"] body.embedded #tab-keys .section-actions > .wide-search { grid-column: auto; }
+        /* Search takes the whole line; the remaining controls split the next one and wrap labels too long for half of it. */
+        #tab-prices .section-actions, #tab-plugin-logs .section-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #price-filter, #plugin-log-filter { grid-column: 1 / -1; }
+        #tab-prices .section-actions > *, #tab-plugin-logs .section-actions > *, #tab-plugin-logs .section-actions select {
+          align-self: stretch;
+          width: 100%;
+          min-width: 0;
+          white-space: normal;
+        }
         .section-actions.auth-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .auth-filter-bar input[type="search"],
-        .auth-filter-bar .native-select,
-        .auth-filter-bar select,
-        .toggle-filter:not(.compact-toggle) {
+        .auth-filter-bar input[type="search"], .auth-filter-bar .native-select, .auth-filter-bar select, .auth-filter-bar .toggle-filter {
           width: 100%;
           min-width: 0;
         }
-        .key-toolbar-buttons .toggle-filter { width: auto; }
         .auth-file-grid { grid-template-columns: 1fr; }
         .section-actions.event-card-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .section-actions.event-card-actions .native-select, .section-actions.event-card-actions select { width: 100%; min-width: 0; }
@@ -1852,9 +1918,11 @@
         body:not(.embedded) .standalone-actions .icon-action { width: 34px; height: 34px; min-width: 34px; min-height: 34px; }
       }
       .shared-time-filter { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex: 0 1 auto; min-width: 0; }
-      .shared-time-filter > .native-select { flex: 0 1 auto; max-width: 320px; }
+      .shared-time-filter > .native-select { flex: 0 1 auto; }
+      .shared-time-filter > .time-range-control { flex: none; }
       .labeled-icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
       .labeled-icon-button .lucide-icon { width: 15px; height: 15px; color: var(--text-tertiary); }
+      .privacy-mask-button[aria-pressed="true"], .privacy-mask-button[aria-pressed="true"] .lucide-icon { color: var(--primary-active); }
       .usage-distribution-card { min-height: 360px; }
       .analysis-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
       :root .card.analysis-summary-card {
@@ -1992,15 +2060,27 @@
         .usage-distribution-layout { grid-template-columns: 1fr; gap: 16px; }
         .usage-distribution-chart { width: min(240px, 75vw); height: min(240px, 75vw); }
       }
-      @media (max-width: 420px) {
-        .page-tabs-row:not(.controls-inline) .shared-time-filter:has(> .native-select) {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          flex: 1;
+      @media (max-width: 640px) {
+        .page-tabs-row { gap: 12px; }
+        .page-tab-actions { gap: 6px; }
+        /* Splitting the line evenly stops a long key list from crowding out the range. */
+        .page-tabs-row:not(.controls-inline) .shared-time-filter { flex: 1 1 auto; gap: 6px; }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter > .native-select { flex: 1 1 0; max-width: none; }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter > .time-range-control { flex: 1 1 0; }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter > .native-select > select {
+          padding-left: 8px;
+          padding-right: 26px;
+          width: 100%;
         }
-        .page-tabs-row:not(.controls-inline) .shared-time-filter select { width: 100%; }
+        .page-tabs-row:not(.controls-inline) .shared-time-filter > .native-select::after { right: 6px; width: 16px; height: 16px; }
+        /* Wrapping chips need the full width; a short value still fits beside its label. */
+        .settings-entry-field:has(.settings-chip-list) { display: grid; gap: 4px; }
+        .settings-entry-field:has(.settings-chip-list) > .error-event-field-label { max-width: none; }
       }
       @media (max-width: 520px) {
+        /* The tab-row buttons go icon-only; their aria-label and title still name them. */
+        .page-tabs-row .labeled-icon-button > .labeled-icon-text { display: none; }
+        .page-tabs-row .labeled-icon-button { --button-padding-inline: 9px; }
         .usage-distribution-controls { gap: 6px; width: 100%; }
         .usage-distribution-tabs { gap: 4px; --button-padding-inline: 4px; }
         .usage-distribution-tabs button { font-size: 12px; }
@@ -2111,12 +2191,15 @@
         if (window.matchMedia) { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", sync); }
         window.billingTheme = {
           current: () => appliedTheme,
-          toggle() {
-            const next = appliedTheme === "dark" ? "white" : "dark";
-            selectedTheme = next;
-            try { localStorage.setItem(PLUGIN_STORE_KEY, next); } catch (_) {}
-            apply(next);
-            return next;
+          preference: () => selectedTheme,
+          cycle() {
+            const order = ["", "white", "dark"];
+            selectedTheme = order[(order.indexOf(selectedTheme) + 1) % order.length];
+            try {
+              if (selectedTheme) localStorage.setItem(PLUGIN_STORE_KEY, selectedTheme); else localStorage.removeItem(PLUGIN_STORE_KEY);
+            } catch (_) {}
+            sync();
+            return selectedTheme;
           }
         };
       })();
@@ -2170,7 +2253,7 @@
           </div>
           <div class="page-tab-actions hidden">
             <div id="shared-time-filter" class="shared-time-filter hidden">
-              <span class="native-select">
+              <span class="native-select mask-select">
                 <select id="analysis-key" aria-label="Filter by API key" data-i18n-aria-label="ui.filter_by_api_key"> <option value="" data-i18n="ui.all_api_keys">All API keys</option> </select>
               </span>
               <div class="time-range-control">
@@ -2184,7 +2267,17 @@
             </div>
             <button id="events-export" class="labeled-icon-button hidden" type="button" data-i18n="ui.export">Export</button>
           </div>
-          <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
+          <div class="page-tab-tools">
+            <button
+              id="privacy-mask"
+              class="labeled-icon-button privacy-mask-button"
+              type="button"
+              aria-pressed="false"
+              title="Blur API keys, labels, and account emails"
+              data-i18n-title="ui.blur_api_keys_labels_and_account_emails"
+            ></button>
+            <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
+          </div>
         </div>
         <div id="shared-time-backdrop" class="time-range-backdrop hidden"></div>
 
@@ -2216,11 +2309,11 @@
 
         <section id="tab-plans" class="hidden">
           <div class="card">
-            <div class="row spread settings-section-header"> <h2 data-i18n="ui.subscription_plans">Subscription plans</h2> <button id="plan-new" type="button" data-i18n="ui.create_subscription_plan">Create subscription plan</button> </div>
+            <div class="row spread settings-section-header"> <h2 data-i18n="ui.subscription_plans">Subscription plans</h2> <button id="plan-new" type="button" data-i18n="ui.create_plan">Create plan</button> </div>
             <div id="plans-body"></div>
           </div>
           <dialog id="plan-dialog" class="settings-dialog plan-dialog">
-            <h2 id="plan-dialog-title" data-i18n="ui.create_subscription_plan">Create subscription plan</h2>
+            <h2 id="plan-dialog-title" data-i18n="ui.create_plan">Create plan</h2>
             <div class="editor-state notice hidden"></div>
             <input id="plan-id" type="hidden" />
             <div class="plan-details">
@@ -2250,11 +2343,11 @@
 
         <section id="tab-routes" class="hidden">
           <div class="card">
-            <div class="row spread settings-section-header"> <h2 data-i18n="ui.routing_rules">Routing rules</h2> <button id="route-new" type="button" data-i18n="ui.create_routing_rule">Create routing rule</button> </div>
+            <div class="row spread settings-section-header"> <h2 data-i18n="ui.routing_rules">Routing rules</h2> <button id="route-new" type="button" data-i18n="ui.create_rule">Create rule</button> </div>
             <div id="routes-body"></div>
           </div>
           <dialog id="route-dialog" class="settings-dialog route-dialog">
-            <h2 id="route-dialog-title" data-i18n="ui.create_routing_rule">Create routing rule</h2>
+            <h2 id="route-dialog-title" data-i18n="ui.create_rule">Create rule</h2>
             <div class="editor-state notice hidden"></div>
             <input id="route-id" type="hidden" />
             <div class="route-form-toolbar">
@@ -2284,7 +2377,7 @@
               <h2 data-i18n="ui.model_pricing">Model pricing</h2>
               <div class="row section-actions">
                 <input id="price-filter" placeholder="Search models"  data-i18n-placeholder="ui.search_models"/>
-                <button id="price-reference-refresh" data-i18n="ui.update_reference_prices">Update reference prices</button>
+                <button id="price-reference-refresh" data-i18n="ui.update_references">Update references</button>
                 <button id="price-new" data-i18n="ui.add_pricing">Add pricing</button>
               </div>
             </div>
@@ -2301,7 +2394,7 @@
                 <span class="native-select">
                   <select id="request-event-model" aria-label="Filter by model" data-i18n-aria-label="ui.filter_by_model"> <option value="" data-i18n="ui.all_models">All models</option> </select>
                 </span>
-                <span class="native-select">
+                <span class="native-select mask-select">
                   <select id="request-event-source" aria-label="Filter by source" data-i18n-aria-label="ui.filter_by_source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select>
                 </span>
                 <span class="native-select">
@@ -2325,7 +2418,7 @@
               <h2 data-i18n="ui.error_events">Error events</h2>
               <div class="row section-actions event-card-actions">
                 <span class="native-select"> <select id="error-model" aria-label="Filter by model" data-i18n-aria-label="ui.filter_by_model"> <option value="" data-i18n="ui.all_models">All models</option> </select> </span>
-                <span class="native-select"> <select id="error-source" aria-label="Filter by source" data-i18n-aria-label="ui.filter_by_source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select> </span>
+                <span class="native-select mask-select"> <select id="error-source" aria-label="Filter by source" data-i18n-aria-label="ui.filter_by_source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select> </span>
                 <span class="native-select">
                   <select id="error-type" aria-label="Filter by error type" data-i18n-aria-label="ui.filter_by_error_type"> <option value="" data-i18n="ui.all_error_types">All error types</option> </select>
                 </span>
@@ -2369,6 +2462,7 @@
             <div class="row spread section-toolbar">
               <h2 data-i18n="ui.plugin_logs">Plugin logs</h2>
               <div class="row section-actions">
+                <input id="plugin-log-filter" placeholder="Search loaded logs" class="wide-search"  data-i18n-placeholder="ui.search_loaded_logs"/>
                 <span class="native-select">
                   <select id="plugin-log-level" aria-label="Filter by level" data-i18n-aria-label="ui.filter_by_level">
                     <option value="all" data-i18n="ui.all_levels">All levels</option>
@@ -2377,7 +2471,6 @@
                     <option value="error" data-i18n="ui.error">Error</option>
                   </select>
                 </span>
-                <input id="plugin-log-filter" placeholder="Search loaded logs" class="wide-search"  data-i18n-placeholder="ui.search_loaded_logs"/>
                 <button id="plugin-logs-clear" class="danger" data-i18n="ui.clear_logs">Clear logs</button>
               </div>
             </div>
@@ -2389,7 +2482,7 @@
 
       <main id="account-app" class="hidden">
         <header class="head app-header">
-          <div class="app-title"> <h1 data-i18n="ui.api_key_usage">API Key Usage</h1> <span id="account-identity" class="muted mono"></span> </div>
+          <div class="app-title"> <h1 data-i18n="ui.api_key_usage">API Key Usage</h1> <span id="account-identity" class="muted mono mask-blur"></span> </div>
           <div class="standalone-actions" aria-label="Page actions" data-i18n-aria-label="ui.page_actions">
             <button type="button" class="icon-action" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
             <button type="button" class="icon-action" data-page-action="theme" aria-label="Switch theme" data-i18n-aria-label="ui.switch_theme"></button>
@@ -2431,7 +2524,17 @@
               </div>
               <button id="account-events-export" class="labeled-icon-button hidden" type="button" data-i18n="ui.export">Export</button>
             </div>
-            <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
+            <div class="page-tab-tools">
+              <button
+                id="account-privacy-mask"
+                class="labeled-icon-button privacy-mask-button"
+                type="button"
+                aria-pressed="false"
+                title="Blur API keys, labels, and account emails"
+                data-i18n-title="ui.blur_api_keys_labels_and_account_emails"
+              ></button>
+              <button type="button" class="icon-action tab-refresh" data-page-action="refresh" aria-label="Refresh" data-i18n-aria-label="ui.refresh"></button>
+            </div>
           </div>
           <div id="account-shared-time-backdrop" class="time-range-backdrop hidden"></div>
           <section id="account-tab-subscription">
@@ -2447,7 +2550,7 @@
               <div class="card account-plan">
                 <h2 data-i18n="ui.concurrency_limit">Concurrency limit</h2>
                 <b id="account-concurrency" class="account-plan-value">—</b>
-                <div class="muted small" data-i18n="ui.active_connections_concurrency_limit_for_this_api_key">In-flight requests / concurrency limit for this API key</div>
+                <div class="muted small" data-i18n="ui.active_connections_concurrency_limit_for_this_api_key">In-flight requests&thinsp;/&thinsp;concurrency limit for this API key</div>
               </div>
             </div>
             <div class="card" id="account-access-card"> <h2 data-i18n="ui.access_permissions">Access permissions</h2> <div id="account-access"></div> </div>
@@ -2462,7 +2565,7 @@
                   <span class="native-select">
                     <select id="account-request-event-model" aria-label="Filter by model" data-i18n-aria-label="ui.filter_by_model"> <option value="" data-i18n="ui.all_models">All models</option> </select>
                   </span>
-                  <span class="native-select">
+                  <span class="native-select mask-select">
                     <select id="account-request-event-source" aria-label="Filter by source" data-i18n-aria-label="ui.filter_by_source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select>
                   </span>
                   <span class="native-select">
@@ -2485,7 +2588,7 @@
                 <h2 data-i18n="ui.error_events">Error events</h2>
                 <div class="row section-actions event-card-actions">
                   <span class="native-select"> <select id="account-error-model"> <option value="" data-i18n="ui.all_models">All models</option> </select> </span>
-                  <span class="native-select"> <select id="account-error-source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select> </span>
+                  <span class="native-select mask-select"> <select id="account-error-source"> <option value="" data-i18n="ui.all_sources">All sources</option> </select> </span>
                   <span class="native-select">
                     <select id="account-error-type" aria-label="Filter by error type" data-i18n-aria-label="ui.filter_by_error_type"> <option value="" data-i18n="ui.all_error_types">All error types</option> </select>
                   </span>
@@ -2528,7 +2631,7 @@
     <footer class="page-footer">
       <span>© 2026 <a href="https://github.com/haowang02/cpa-plugin-key-billing" target="_blank" rel="noopener noreferrer">CPA Key Billing</a></span>
       <span>&thinsp;·&thinsp;<a href="https://github.com/haowang02/cpa-plugin-key-billing/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" data-i18n="ui.license">License</a></span>
-      <span>&thinsp;·&thinsp;<span data-i18n="ui.version">Version</span>: v1.3.12</span>
+      <span>&thinsp;·&thinsp;<span data-i18n="ui.version">Version</span>: v1.3.18</span>
     </footer>
 
     <div id="notice" class="notice" popover="manual"></div>
@@ -2542,19 +2645,19 @@
         <div id="price-reference-results" class="price-reference-results" aria-live="polite"></div>
       </div>
       <div class="price-fields">
-        <label class="field"> <span data-i18n="ui.input_1m_tokens">Input / 1M tokens</span> <input id="price-in" type="number" step="any" min="0" value="0" /> </label>
-        <label class="field"> <span data-i18n="ui.output_1m_tokens">Output / 1M tokens</span> <input id="price-out" type="number" step="any" min="0" value="0" /> </label>
-        <label class="field"> <span data-i18n="ui.cache_read_1m_tokens">Cache read / 1M tokens</span> <input id="price-cr" type="number" step="any" min="0" /> </label>
-        <label class="field"> <span data-i18n="ui.cache_write_1m_tokens">Cache write / 1M tokens</span> <input id="price-cw" type="number" step="any" min="0" /> </label>
+        <label class="field"> <span data-i18n="ui.input_1m_tokens">Input&thinsp;/&thinsp;1M tokens</span> <input id="price-in" type="number" step="any" min="0" value="0" /> </label>
+        <label class="field"> <span data-i18n="ui.output_1m_tokens">Output&thinsp;/&thinsp;1M tokens</span> <input id="price-out" type="number" step="any" min="0" value="0" /> </label>
+        <label class="field"> <span data-i18n="ui.cache_read_1m_tokens">Cache read&thinsp;/&thinsp;1M tokens</span> <input id="price-cr" type="number" step="any" min="0" /> </label>
+        <label class="field"> <span data-i18n="ui.cache_write_1m_tokens">Cache write&thinsp;/&thinsp;1M tokens</span> <input id="price-cw" type="number" step="any" min="0" /> </label>
       </div>
       <label class="switch-field"> <input id="price-tiered" type="checkbox" /> <span data-i18n="ui.enable_long_context_tiered_pricing">Enable long-context tiered pricing</span> </label>
       <div id="price-tier-fields" class="price-fields tier-fields hidden">
         <label class="field"> <span data-i18n="ui.long_context_threshold_input_tokens">Long-context threshold (input tokens)</span> <input id="price-tier-threshold" type="number" step="1" min="1" value="272000" /> </label>
         <span></span>
-        <label class="field"> <span data-i18n="ui.long_context_input_1m_tokens">Long-context input / 1M tokens</span> <input id="price-tier-in" type="number" step="any" min="0" value="0" /> </label>
-        <label class="field"> <span data-i18n="ui.long_context_output_1m_tokens">Long-context output / 1M tokens</span> <input id="price-tier-out" type="number" step="any" min="0" value="0" /> </label>
-        <label class="field"> <span data-i18n="ui.long_context_cache_read_1m_tokens">Long-context cache read / 1M tokens</span> <input id="price-tier-cr" type="number" step="any" min="0" /> </label>
-        <label class="field"> <span data-i18n="ui.long_context_cache_write_1m_tokens">Long-context cache write / 1M tokens</span> <input id="price-tier-cw" type="number" step="any" min="0" /> </label>
+        <label class="field"> <span data-i18n="ui.long_context_input_1m_tokens">Long-context input&thinsp;/&thinsp;1M tokens</span> <input id="price-tier-in" type="number" step="any" min="0" value="0" /> </label>
+        <label class="field"> <span data-i18n="ui.long_context_output_1m_tokens">Long-context output&thinsp;/&thinsp;1M tokens</span> <input id="price-tier-out" type="number" step="any" min="0" value="0" /> </label>
+        <label class="field"> <span data-i18n="ui.long_context_cache_read_1m_tokens">Long-context cache read&thinsp;/&thinsp;1M tokens</span> <input id="price-tier-cr" type="number" step="any" min="0" /> </label>
+        <label class="field"> <span data-i18n="ui.long_context_cache_write_1m_tokens">Long-context cache write&thinsp;/&thinsp;1M tokens</span> <input id="price-tier-cw" type="number" step="any" min="0" /> </label>
       </div>
       <div class="row dialog-actions"> <button id="price-cancel" data-i18n="ui.cancel">Cancel</button> <button id="price-save" class="primary" data-i18n="ui.save">Save</button> </div>
     </dialog>
@@ -2569,11 +2672,11 @@
 
     <div id="cost-tooltip" class="cost-tooltip" role="tooltip" aria-hidden="true"></div>
 
-    <div id="key-route-tooltip" class="key-route-tooltip" popover="manual" role="tooltip" tabindex="0"></div>
+    <div id="hover-tooltip" class="hover-tooltip" popover="manual" role="tooltip" tabindex="0"></div>
 
     <dialog id="route-picker" class="settings-dialog route-picker" aria-labelledby="route-picker-title" aria-describedby="route-picker-identity">
       <h2 id="route-picker-title" data-i18n="ui.edit_api_key_routing_rules">Edit API key routing rules</h2>
-      <p id="route-picker-identity" class="route-picker-identity"></p>
+      <p id="route-picker-identity" class="route-picker-identity mask-blur"></p>
       <div id="route-picker-notice" class="editor-state notice hidden"></div>
       <div class="route-form-toolbar">
         <input id="route-picker-search" type="search" placeholder="Search routing rules, upstream credentials, or models" aria-label="Search routing rules, upstream credentials, or models" autocomplete="off"  data-i18n-placeholder="ui.search_routing_rules_upstream_credentials_or_models" data-i18n-aria-label="ui.search_routing_rules_upstream_credentials_or_models"/>
@@ -2777,6 +2880,7 @@
           "source",
           "reasoning_effort",
           "service_tier",
+          "response_service_tier",
           "failed",
           "ttft_ms",
           "latency_ms",
@@ -2791,7 +2895,7 @@
           "multiplier",
           "total_usd"
         ],
-        errors: ["at", "preview", "label", "billing_model", "upstream_model", "source", "status_code", "error_type", "reason", "body"]
+        errors: ["at", "preview", "label", "billing_model", "upstream_model", "source", "status_code", "error_type", "body"]
       };
       const SHARED_TIME_LABELS = {
         hour: m("ui.hours"),
@@ -3221,6 +3325,17 @@
         saveViewPreference(role, id, control.type === "checkbox" ? control.checked : control.value);
       }
 
+      function privacyMasked() { return document.body.classList.contains("privacy-masked"); }
+
+      function privacyMaskButton(role) { return $((role === "account" ? "account-" : "") + "privacy-mask"); }
+
+      function setPrivacyMask(role, masked) {
+        const button = privacyMaskButton(role);
+        button.setAttribute("aria-pressed", String(masked));
+        setLabeledActionIcon(button, masked ? "eye-off" : "eye", m("ui.mask"));
+        document.body.classList.toggle("privacy-masked", masked);
+      }
+
       function storedTimeRange(role) {
         const range = viewPreference(role, "time-range", { mode: "30d" });
         if (
@@ -3251,6 +3366,7 @@
         restoreChoice(role, prefix + "request-event-status", "");
         restoreChoice(role, prefix + "auth-enabled-only", true);
         restoreChoice(role, prefix + "auth-provider", "");
+        setPrivacyMask(role, viewPreference(role, prefix + "privacy-mask", false));
         if (!account) {
           restoreChoice(role, "analysis-key", "", true);
           restoreChoice(role, "keys-include-deleted", false);
@@ -3276,6 +3392,7 @@
         const account = role === "account";
         const prefix = account ? "account-" : "";
         closeSharedTimePopover(account);
+        setPrivacyMask(role, false);
         $(prefix + "auth-search").value = "";
         if (!account) {
           $("key-filter").value = "";
@@ -3332,7 +3449,7 @@
 
       async function api(method, path, body, opts) {
         const generation = sessionGeneration;
-        const init = { method, cache: "no-store", headers: { Authorization: "Bearer " + (opts?.key ?? authKey) } };
+        const init = { method, cache: "no-store", headers: { ...opts?.headers, Authorization: "Bearer " + (opts?.key ?? authKey) } };
         const timeoutMS = Number(opts?.timeoutMS ?? 30000);
         const controller = new AbortController();
         if (!opts?.command) activeRequests.add(controller);
@@ -3364,7 +3481,7 @@
           // Proxy error pages and response dumps are not user-facing messages.
           const fallback = decoded && !/<[^>]+>/.test(decoded) ? decoded.slice(0, 200) + (decoded.length > 200 ? "…" : "") : "";
           const message = window.billingI18n.serverMessage(unescapeDeep(payload?.error), fallback);
-          if ((resp.status === 401 || resp.status === 403) && !opts?.auxiliaryCredential) {
+          if ((resp.status === 401 || (resp.status === 403 && !opts?.keepSessionOnForbidden)) && !opts?.auxiliaryCredential) {
             throw new AuthError(
               message ||
                 (currentRole === "account" ? m("ui.invalid_api_key_or_access_denied") : m("ui.invalid_management_key_or_access_denied"))
@@ -3659,6 +3776,7 @@
         }
         authKey = "";
         currentRole = "";
+        document.body.classList.remove("privacy-masked");
         $("app").classList.add("hidden");
         $("account-app").classList.add("hidden");
         $("gate").classList.remove("hidden");
@@ -4158,7 +4276,9 @@
       }
       for (const row of PAGE_TAB_ROWS) {
         pageTabResizeObserver.observe(row, { box: "border-box" });
-        for (const control of row.querySelectorAll("button, select")) { pageTabResizeObserver.observe(control, { box: "border-box" }); }
+        for (const control of row.querySelectorAll("button, select, .toggle-filter")) {
+          pageTabResizeObserver.observe(control, { box: "border-box" });
+        }
       }
 
       function updateTabScrollHint(tabBar) {
@@ -4345,6 +4465,7 @@
           if (account) page.sources.unshift(data.profile);
           page.task = null;
         }
+        if (account) result["auth-files"].sections[0].sources.push(data.profile);
         return result;
       }
       const pages = { admin: createPages("admin"), account: createPages("account") };
@@ -4563,21 +4684,19 @@
 
       function renderAccountAccess(access) {
         const routingValid = access.routing_valid !== false;
-        const accountCredentialLabel = (item, state) => ({
-          text: item.provider_wide
-            ? credentialProviderLabel(item)
-            : item.status === "missing"
-              ? window.billingI18n.serverMessage(item.name_message, item.name) ||
-                m("ui.the_selected_upstream_credential_is_currently_unavailable")
-              : m("ui.join", {
-                  v0: item.provider,
-                  v1: DISPLAY_SEPARATOR,
-                  v2: window.billingI18n.serverMessage(item.name_message, item.name) || m("ui.credential_unavailable")
-                }),
-          tag: item.provider_wide ? m("ui.entire_category") : "",
-          iconName: credentialIcon(item),
-          state: item.denied ? "deny" : state
-        });
+        const accountCredentialLabel = (item, state) => {
+          const name = window.billingI18n.serverMessage(item.name_message, item.name);
+          return {
+            text: item.provider_wide
+              ? credentialProviderLabel(item)
+              : item.status === "missing"
+                ? name ? maskedLabelText(name) : m("ui.the_selected_upstream_credential_is_currently_unavailable")
+                : maskedTailText(item.provider, name || m("ui.credential_unavailable")),
+            tag: item.provider_wide ? m("ui.entire_category") : "",
+            iconName: credentialIcon(item),
+            state: item.denied ? "deny" : state
+          };
+        };
         const deniedModels = new Set((access.denied_models || []).map((model) => model.toLowerCase()));
         const modelItems = access.models.map((text) => ({
           text,
@@ -4590,15 +4709,13 @@
             modelItems.push({ text, state: "deny", iconName: "astroid" });
         const credentialItems = access.credentials.map((item) => accountCredentialLabel(item, "allow"));
         if (!credentialItems.length) credentialItems.push({ text: routingValid ? m("ui.all_credentials") : m("ui.unknown") });
+        const credentialKey = (item) => JSON.stringify([item.source, item.provider, !!item.provider_wide, item.name]);
+        const deniedCredentials = new Set(access.credentials.filter((item) => item.denied).map(credentialKey));
         for (const item of access.denied_credentials || []) {
-          const denied = accountCredentialLabel(item, "deny");
-          if (
-            !credentialItems.some(
-              (existing) =>
-                String(existing.text) === String(denied.text) && existing.iconName === denied.iconName && existing.state === "deny"
-            )
-          )
-            credentialItems.push(denied);
+          const key = credentialKey(item);
+          if (deniedCredentials.has(key)) continue;
+          deniedCredentials.add(key);
+          credentialItems.push(accountCredentialLabel(item, "deny"));
         }
         const nodes = [
           el(
@@ -4762,6 +4879,8 @@
         return visible;
       }
 
+      function namesIdentity(dimension, row) { return ["api_keys", "sources"].includes(dimension) && !!row?.key && row.key !== "other"; }
+
       function renderUsageDistributionChart(account, rows, dimension, dimensionLabel, metric, colors, animate) {
         const canvas = $(account ? "account-usage-chart" : "usage-chart");
         canvas.setAttribute(
@@ -4808,7 +4927,13 @@
                   titleColor: themeColor("--text-primary", "#f6f4f1"),
                   bodyColor: themeColor("--text-secondary", "#c9c3bb"),
                   callbacks: {
-                    title: (items) => (items.length ? dimensionLabel + DISPLAY_SEPARATOR + items[0].label : dimensionLabel),
+                    // Canvas text cannot be blurred, so a masked identity is left out of the tooltip entirely.
+                    title: (items) => {
+                      const row = items.length ? rows[items[0].dataIndex] : null;
+                      return row && !(privacyMasked() && namesIdentity(dimension, row))
+                        ? dimensionLabel + DISPLAY_SEPARATOR + items[0].label
+                        : dimensionLabel;
+                    },
                     label: (context) => {
                       const row = rows[context.dataIndex];
                       return [
@@ -5153,8 +5278,8 @@
               "div",
               { class: "usage-distribution-heading" },
               dimension === "api_keys" && row.key !== "other"
-                ? el("span", { text: apiKeyIdentity(row).text })
-                : el("b", {}, row.label || row.key || m("ui.unknown_2")),
+                ? el("span", { class: namesIdentity(dimension, row) ? "mask-blur" : "", text: apiKeyIdentity(row).text })
+                : el("b", {}, namesIdentity(dimension, row) ? maskedLabelText(row.label) : row.label || row.key || m("ui.unknown_2")),
               el("b", { class: "mono" }, row.percent.toFixed(2) + "%")
             ),
             el("div", { class: "usage-distribution-track" }, el("i", { style: "width:" + row.percent + "%" })),
@@ -5264,7 +5389,7 @@
           (value) => (value || m("ui.uncategorized")) + DISPLAY_SEPARATOR + int(counts[value])
         );
         populateEventFilterSelect($(prefix + "error-model"), m("ui.all_models"), filters.models);
-        populateEventFilterSelect($(prefix + "error-source"), m("ui.all_sources"), filters.sources, undefined, displayLabel);
+        populateSourceFilterSelect($(prefix + "error-source"), filters);
       }
 
       function renderErrors(account) {
@@ -5293,13 +5418,13 @@
                 el(
                   "div",
                   { class: "event-request-meta" },
-                  account ? null : errorEventField("API Key", apiKeyIdentity(entry).text, false),
+                  account ? null : errorEventField("API Key", maskedText(apiKeyIdentity(entry).text), false),
                   errorEventField(m("ui.model"), entry.billing_model || entry.upstream_model),
-                  errorEventField(m("ui.source"), displayLabel(entry.source))
+                  entry.source ? errorEventField(m("ui.source"), maskedLabelText(entry.source)) : null
                 ),
                 el("div", { class: "event-entry-tags" }, tags)
               ),
-              el("pre", { class: "event-error-body mono", text: entry.body || entry.reason || m("ui.no_error_details") })
+              el("pre", { class: "event-error-body mono", text: entry.body || m("ui.no_error_details") })
             );
           }
         });
@@ -5422,8 +5547,8 @@
             category: item.provider,
             disabled: item.status === "disabled",
             unavailable: item.status === "unavailable" || item.status === "failed",
-            quota_supported: false,
-            cache_revision: item.fetched_at || "",
+            quota_supported: item.provider === "codex" && item.status === "ready",
+            cache_revision: item.cache_revision || "",
             cached_quota: item
           }));
         }
@@ -5576,6 +5701,37 @@
         );
       }
 
+      function renderAuthResetCredits(file, result) {
+        if (file.category !== "codex") return null;
+        const credits = result.rate_limit_reset_credits || [];
+        if (!credits.length) {
+          return result.rate_limit_reset_credits_unavailable
+            ? el("div", { class: "muted small", text: m("ui.reset_credits_expiry_unavailable") })
+            : null;
+        }
+        const timezone =
+          new Intl.DateTimeFormat("en", { timeZoneName: "shortOffset" }).formatToParts(new Date())
+            .find((part) => part.type === "timeZoneName")?.value || "";
+        return el(
+          "div",
+          { class: "auth-reset-credits" },
+          el("div", { class: "auth-reset-credits-title", text: m("ui.reset_credits_expiry", { v0: timezone }) }),
+          credits.map((credit, index) => {
+            const expiresAt = new Date(credit.expires_at);
+            const remaining = (expiresAt.getTime() - Date.now()) / 1000;
+            const time = Number.isFinite(remaining)
+              ? compactResetDate(expiresAt) + DISPLAY_SEPARATOR + (remaining <= 0 ? m("ui.expired") : compactResetAfter(remaining))
+              : credit.expires_at || "—";
+            return el(
+              "div",
+              { class: "auth-reset-credit" },
+              el("span", { text: m("ui.reset_credit_number", { v0: index + 1 }) }),
+              el("span", { class: "auth-reset-credit-time", text: time })
+            );
+          })
+        );
+      }
+
       function renderAuthFileQuota(file, account) {
         const owner = account ? accountUIState : adminUIState;
         const index = file.auth_index;
@@ -5587,27 +5743,29 @@
         const result = owner.authQuotas.get(index);
         if (!result) return null;
         const summary = [];
-        if (Number.isFinite(Number(result.rate_limit_reset_credits_available_count))) {
+        if (
+          result.rate_limit_reset_credits_available_count != null &&
+          Number.isFinite(Number(result.rate_limit_reset_credits_available_count))
+        ) {
           summary.push(el("span", { text: m("ui.available_resets_value", { v0: int(result.rate_limit_reset_credits_available_count) }) }));
-          if (!account && file.category === "codex") {
+          if (file.category === "codex" && (!account || resources.account.profile.value?.can_reset_auth_quota === true)) {
             summary.push(
               el("button", {
                 type: "button",
                 class: "link small",
                 text: m("ui.reset_quota"),
-                disabled: !canResetAuthQuota(file),
-                onclick: () => guard(() => resetAuthQuota(file))
+                disabled: !canResetAuthQuota(file, account),
+                onclick: () => guard(() => resetAuthQuota(file, account))
               })
             );
           }
         }
-        if (result.fetched_at)
-          summary.push(el("span", { class: "muted", text: m("ui.last_checked_value", { v0: when(result.fetched_at) }) }));
         const rows = result.quota;
         return el(
           "div",
           { class: "auth-file-quota" },
           summary.length ? el("div", { class: "auth-quota-summary" }, summary) : null,
+          renderAuthResetCredits(file, result),
           rows.length
             ? el("div", { class: "auth-quota-list" }, rows.map(renderQuotaRow))
             : el("div", { class: "muted small", text: m("ui.the_upstream_returned_no_displayable_quota") })
@@ -5671,7 +5829,7 @@
                     "div",
                     { class: "auth-file-identity" },
                     el("div", {
-                      class: "auth-file-email-title",
+                      class: "auth-file-email-title mask-blur",
                       title: (account ? file.name : file.email) || m("ui.no_email_provided"),
                       text: (account ? file.name : file.email) || m("ui.no_email_provided")
                     }),
@@ -5689,84 +5847,75 @@
       const AUTH_QUOTA_TIMEOUT_MS = 65000;
       const AUTH_QUOTA_BATCH_CONCURRENCY = 3;
 
-      function canResetAuthQuota(file) {
+      function canResetAuthQuota(file, account) {
+        if (currentRole !== (account ? "account" : "admin") || (account && resources.account.profile.value?.can_reset_auth_quota !== true))
+          return false;
+        const owner = account ? accountUIState : adminUIState;
+        const quota = owner.authQuotas.get(file.auth_index);
         return (
-          currentRole === "admin" && file.category === "codex" && file.quota_supported && !file.disabled &&
-          !adminUIState.authQuotaLoading.has(file.auth_index) &&
-          Number(adminUIState.authQuotas.get(file.auth_index)?.rate_limit_reset_credits_available_count) > 0
+          file.category === "codex" && file.quota_supported && !file.disabled && !owner.authQuotaLoading.has(file.auth_index) &&
+          (!account || (quota?.status === "ready" && quota.stale !== true)) &&
+          Number(quota?.rate_limit_reset_credits_available_count) > 0
         );
       }
 
-      async function resetAuthQuota(file) {
-        if (!canResetAuthQuota(file)) return;
-        const owner = adminUIState, generation = authQuotaGeneration.admin, index = file.auth_index;
+      async function resetAuthQuota(file, account) {
+        if (!canResetAuthQuota(file, account)) return;
+        const owner = account ? accountUIState : adminUIState;
+        const generation = authQuotaGeneration[account ? "account" : "admin"], index = file.auth_index;
         await openActionDialog(
           m("ui.reset_codex_quota"),
           m("ui.available_resets_value_use_one_reset_now", {
-            v0: int(owner.authQuotas.get(index).rate_limit_reset_credits_available_count)
+            v0: int(owner.authQuotas.get(index).rate_limit_reset_credits_available_count),
+            v1: file.name
           }),
           undefined,
           async () => {
-            if (!authQuotaCacheCurrent(false, owner, generation, index) || !canResetAuthQuota(file)) {
+            if (!authQuotaCacheCurrent(account, owner, generation, index) || !canResetAuthQuota(file, account)) {
               throw new UIError(m("ui.the_auth_file_or_quota_changed_close_this_dialog_update_the_quota_and_try_again"));
             }
             owner.authQuotaLoading.add(index);
             owner.authQuotas.delete(index);
             owner.authQuotaErrors.delete(index);
-            persistAuthQuotaCache(false);
-            renderAuthFiles(false);
-            let reset = false;
+            persistAuthQuotaCache(account);
+            renderAuthFiles(account);
+            let resetConfirmed = false;
+            let refreshFailed = false;
             try {
-              const files = await api("GET", "/v0/management/auth-files", null, { raw: true });
-              const auth = requireArray(files?.files, m("ui.auth_files")).find((item) => item.auth_index === index);
-              if (!auth || auth.type !== "codex" || auth.disabled || auth.name !== file.name) {
-                throw new UIError(m("ui.the_auth_file_changed_refresh_the_auth_file_list_and_try_again"));
-              }
-              if (!authQuotaCacheCurrent(false, owner, generation, index)) throw new StaleRequestError();
-              const header = {
-                Authorization: "Bearer $TOKEN$",
-                "Content-Type": "application/json",
-                "User-Agent": "codex-tui/0.149.1 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.149.1)"
-              };
-              const accountID = auth.id_token?.chatgpt_account_id;
-              if (typeof accountID === "string" && accountID.trim()) header["Chatgpt-Account-Id"] = accountID.trim();
-              const requestID =
-                crypto.randomUUID?.() ||
-                "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
-                  const value = Math.floor(Math.random() * 16);
-                  return (char === "x" ? value : (value & 3) | 8).toString(16);
-                });
-              const result = await api(
-                "POST",
-                "/v0/management/api-call",
-                {
-                  auth_index: index,
-                  method: "POST",
-                  url: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume",
-                  header,
-                  data: JSON.stringify({ redeem_request_id: requestID })
-                },
-                { timeoutMS: AUTH_QUOTA_TIMEOUT_MS, raw: true }
-              );
-              const status = Number(result?.status_code);
-              if (!(status >= 200 && status < 300))
-                throw new UIError(
-                  m("ui.failed_to_reset_quota_value", {
-                    v0: status ? m("ui.upstream_returned_http_value", { v0: status }) : m("ui.invalid_upstream_response")
-                  })
-                );
-              reset = true;
+              const params = new URLSearchParams({
+                auth_index: file.auth_index,
+                auth_name: file.name,
+                auth_revision: file.cache_revision || ""
+              });
+              const path = "/auth-files/quota/reset?" + params;
+              // getRandomValues also works on HTTP installations where randomUUID is unavailable.
+              const bytes = crypto.getRandomValues(new Uint8Array(16));
+              bytes[6] = (bytes[6] & 0x0f) | 0x40;
+              bytes[8] = (bytes[8] & 0x3f) | 0x80;
+              const resetID = Array.from(
+                bytes,
+                (byte, index) => ([4, 6, 8, 10].includes(index) ? "-" : "") + byte.toString(16).padStart(2, "0")
+              ).join("");
+              const opts = { timeoutMS: AUTH_QUOTA_TIMEOUT_MS, headers: { "X-Quota-Reset-ID": resetID }, keepSessionOnForbidden: account };
+              const result = account ? await accountAPI(path, opts) : await plugin("POST", path, null, opts);
+              if (result?.reset !== true) throw new UIError(m("ui.reset_was_not_confirmed_update_the_quota_to_check_its_current_status"));
+              resetConfirmed = true;
+              refreshFailed = result.refresh_failed === true;
             } finally {
-              if (authQuotaCacheCurrent(false, owner, generation, index)) {
+              if (authQuotaCacheCurrent(account, owner, generation, index)) {
                 owner.authQuotaLoading.delete(index);
-                if (!reset) owner.authQuotaErrors.set(index, m("ui.reset_was_not_confirmed_update_the_quota_to_check_its_current_status"));
-                renderAuthFiles(false);
+                if (!resetConfirmed)
+                  owner.authQuotaErrors.set(index, m("ui.reset_was_not_confirmed_update_the_quota_to_check_its_current_status"));
+                renderAuthFiles(account);
               }
             }
-            if (!authQuotaCacheCurrent(false, owner, generation, index)) return;
-            await refreshAuthQuota(file, false);
-            if (authQuotaCacheCurrent(false, owner, generation, index)) {
-              const failed = owner.authQuotaErrors.has(index);
+            if (!authQuotaCacheCurrent(account, owner, generation, index)) return;
+            await refreshAuthQuota(file, account);
+            if (authQuotaCacheCurrent(account, owner, generation, index)) {
+              const refreshed = owner.authQuotas.get(index);
+              const failed =
+                refreshFailed || owner.authQuotaErrors.has(index) ||
+                (account && (!refreshed || refreshed.status !== "ready" || refreshed.stale === true));
               notify(
                 failed
                   ? m("ui.quota_reset_but_refresh_failed_please_update_the_quota_manually")
@@ -5781,7 +5930,6 @@
       // Fetching quota updates memory only. Single and batch actions own their
       // display and persistence, so a batch never redraws the list per response.
       async function loadAuthQuota(file, account) {
-        if (account) return;
         const owner = account ? accountUIState : adminUIState;
         const role = account ? "account" : "admin";
         const generation = authQuotaGeneration[role];
@@ -5805,7 +5953,6 @@
       }
 
       async function refreshAuthQuota(file, account) {
-        if (account) return;
         const role = account ? "account" : "admin";
         const generation = authQuotaGeneration[role];
         const task = loadAuthQuota(file, account);
@@ -5864,13 +6011,32 @@
         return fragment;
       }
 
+      function maskedTailText(provider, account) {
+        return [provider, el("span", { class: "text-separator", text: DISPLAY_SEPARATOR }), maskedText(account)];
+      }
+
+      function maskedText(value) { return el("span", { class: "mask-blur" }, displayText(value)); }
+
+      function splitCredentialLabel(value) {
+        const label = displayLabel(value);
+        const separator = typeof label === "string" ? label.indexOf(DISPLAY_SEPARATOR) : -1;
+        return separator <= 0 ? ["", value] : [label.slice(0, separator), label.slice(separator + DISPLAY_SEPARATOR.length)];
+      }
+
+      function maskedLabelText(value) {
+        const [provider, account] = splitCredentialLabel(value);
+        return provider ? maskedTailText(provider, account) : maskedText(account);
+      }
+
       function apiKeyIdentity(view) {
         if (currentRole === "admin") view = keyDirectory.resolve(view);
         const scope = String(view.scope || view.key || "");
         const preview = String(view.preview || "");
-        const candidate = String(view.label || "");
-        const label = candidate && candidate !== preview && candidate !== scope ? candidate : "";
-        const primary = !scope ? m("ui.unassigned") : label || preview || "unknown";
+        const candidate = view.label || "";
+        const name = String(candidate);
+        // Account views identify the caller by label and preview alone, without a scope.
+        const label = name && name !== preview && name !== scope ? candidate : "";
+        const primary = label || preview || (scope ? "unknown" : m("ui.unassigned"));
         const secondary = label ? preview : "";
         return { primary, secondary, text: displayLabel(secondary ? primary + DISPLAY_SEPARATOR + secondary : primary) };
       }
@@ -5879,7 +6045,7 @@
         const identity = apiKeyIdentity(view);
         const trailing = options.trailing || [];
         const line = (text, className, children = []) =>
-          el("span", { class: "api-key-identity-line" + className }, el("span", {}, displayText(text)), children);
+          el("span", { class: "api-key-identity-line" + className }, maskedText(text), children);
         return el(
           "span",
           { class: "api-key-identity" + (options.stacked ? " api-key-identity-stacked" : ""), title: identity.text },
@@ -5963,7 +6129,7 @@
 
       function renderKeys() {
         if (currentRole !== "admin" || activeTab(false) !== "keys") return false;
-        closeKeyRouteTooltip();
+        closeHoverTooltip();
         if (renderDataPending($("keys-body"), [resources.admin.keys], m("ui.loading"), "empty section-loading")) return;
         const plans = resources.admin.plans.value;
         const filter = $("key-filter").value.trim().toLowerCase();
@@ -6136,21 +6302,14 @@
         });
       }
 
-      function credentialLabel(item) {
-        const name = window.billingI18n.serverMessage(
+      function credentialName(item) {
+        return window.billingI18n.serverMessage(
           item.display_name_message,
           item.display_name || (item.source === "auth-files" ? m("ui.no_email_provided") : m("ui.no_api_key_configured"))
         );
-        return m("ui.join", { v0: item.provider, v1: DISPLAY_SEPARATOR, v2: name });
       }
 
-      function boundCredentialLabel(ref, labels) {
-        const credential = (resources.admin.credentials.value || []).find((item) => item.ref === ref);
-        return displayLabel(
-          (credential && credentialLabel(credential)) || labels?.[ref] ||
-            m("ui.selected_upstream_credentialvaluevalue", { v0: DISPLAY_SEPARATOR, v1: ref.slice(-8) })
-        );
-      }
+      function credentialLabel(item) { return m("ui.join", { v0: item.provider, v1: DISPLAY_SEPARATOR, v2: credentialName(item) }); }
 
       function credentialSourceLabel(source) { return source === "auth-files" ? m("ui.auth_files") : m("ui.ai_providers"); }
 
@@ -6184,30 +6343,19 @@
           .concat(routingDimensionChips(bindings, "credential", view.credential_labels))
           .concat(routingDimensionChips(bindings, "model", view.credential_labels));
         const disabled = !!view.deleted_at || adminUIState.keySubmissions.has(view.scope);
+        const tooltip = () => [
+          el("div", {
+            class: "hover-tooltip-heading",
+            text: m("ui.full_routing_rulesvaluevalue_items", { v0: DISPLAY_SEPARATOR, v1: names.length })
+          }),
+          ...names.map((entry) => settingsChipTooltip(entry))
+        ];
         return el(
           "div",
           { class: "key-route-cell" },
           el(
             "div",
-            {
-              class: "key-route-lines",
-              tabindex: names.length ? "0" : null,
-              onpointerenter: (event) => {
-                if (event.pointerType !== "touch" && names.length)
-                  showKeyRouteTooltip(event.currentTarget, names, { x: event.clientX, y: event.clientY });
-              },
-              onpointerleave: (event) => scheduleKeyRouteTooltipClose(event.relatedTarget),
-              onfocus: (event) => { if (names.length) showKeyRouteTooltip(event.currentTarget, names); },
-              onblur: (event) => scheduleKeyRouteTooltipClose(event.relatedTarget),
-              onkeydown: (event) => {
-                if (event.key === "Escape") closeKeyRouteTooltip();
-                else if (event.key === "ArrowDown" && names.length) {
-                  event.preventDefault();
-                  showKeyRouteTooltip(event.currentTarget, names);
-                  $("key-route-tooltip").focus({ preventScroll: true });
-                }
-              }
-            },
+            { class: "key-route-lines", ...hoverTooltipProps(tooltip, names.length) },
             ...(names.length
               ? names.slice(0, 3).map((entry) => el("div", { class: "key-route-line" }, settingsChipList([entry])))
               : [el("div", { class: "key-route-line muted", text: m("ui.all_routes") })]),
@@ -6226,7 +6374,7 @@
               "aria-label": m("ui.clear_routing_rules_for_value", { v0: apiKeyIdentity(view).primary }),
               onclick: () =>
                 guard(() => {
-                  closeKeyRouteTooltip();
+                  closeHoverTooltip();
                   return openActionDialog(
                     m("ui.clear_routing_rules_for_value_2", { v0: apiKeyIdentity(view).primary }),
                     m("ui.remove_all_routing_rule_bindings_and_direct_model_and_credential_allowlists_and_denyl"),
@@ -6251,40 +6399,54 @@
         );
       }
 
-      let keyRouteTooltipAnchor = null;
-      let keyRouteTooltipTimer = 0;
+      let hoverTooltipAnchor = null;
+      let hoverTooltipTimer = 0;
 
-      function closeKeyRouteTooltip() {
-        clearTimeout(keyRouteTooltipTimer);
-        keyRouteTooltipTimer = 0;
-        keyRouteTooltipAnchor?.removeAttribute("aria-describedby");
-        keyRouteTooltipAnchor = null;
-        const tooltip = $("key-route-tooltip");
+      function closeHoverTooltip() {
+        clearTimeout(hoverTooltipTimer);
+        hoverTooltipTimer = 0;
+        hoverTooltipAnchor?.removeAttribute("aria-describedby");
+        hoverTooltipAnchor = null;
+        const tooltip = $("hover-tooltip");
         if (tooltip.matches(":popover-open")) tooltip.hidePopover();
       }
 
-      function scheduleKeyRouteTooltipClose(next) {
-        const tooltip = $("key-route-tooltip");
-        if (next && (tooltip.contains(next) || keyRouteTooltipAnchor?.contains(next))) return;
-        clearTimeout(keyRouteTooltipTimer);
-        if (next?.closest?.(".key-route-actions")) closeKeyRouteTooltip();
-        else keyRouteTooltipTimer = setTimeout(closeKeyRouteTooltip, 150);
+      function scheduleHoverTooltipClose(next) {
+        const tooltip = $("hover-tooltip");
+        if (next && (tooltip.contains(next) || hoverTooltipAnchor?.contains(next))) return;
+        clearTimeout(hoverTooltipTimer);
+        if (next?.closest?.(".key-route-actions")) closeHoverTooltip(); else hoverTooltipTimer = setTimeout(closeHoverTooltip, 150);
       }
 
-      function showKeyRouteTooltip(anchor, entries, pointer) {
-        clearTimeout(keyRouteTooltipTimer);
-        if (keyRouteTooltipAnchor === anchor && $("key-route-tooltip").matches(":popover-open")) return;
-        closeKeyRouteTooltip();
-        const tooltip = $("key-route-tooltip");
-        keyRouteTooltipAnchor = anchor;
+      function hoverTooltipProps(content, enabled) {
+        return {
+          tabindex: enabled ? "0" : null,
+          onpointerenter: (event) => {
+            if (event.pointerType !== "touch" && enabled)
+              showHoverTooltip(event.currentTarget, content(), { x: event.clientX, y: event.clientY });
+          },
+          onpointerleave: (event) => scheduleHoverTooltipClose(event.relatedTarget),
+          onfocus: (event) => { if (enabled) showHoverTooltip(event.currentTarget, content()); },
+          onblur: (event) => scheduleHoverTooltipClose(event.relatedTarget),
+          onkeydown: (event) => {
+            if (event.key === "Escape") closeHoverTooltip();
+            else if (event.key === "ArrowDown" && enabled) {
+              event.preventDefault();
+              showHoverTooltip(event.currentTarget, content());
+              $("hover-tooltip").focus({ preventScroll: true });
+            }
+          }
+        };
+      }
+
+      function showHoverTooltip(anchor, content, pointer) {
+        clearTimeout(hoverTooltipTimer);
+        if (hoverTooltipAnchor === anchor && $("hover-tooltip").matches(":popover-open")) return;
+        closeHoverTooltip();
+        const tooltip = $("hover-tooltip");
+        hoverTooltipAnchor = anchor;
         anchor.setAttribute("aria-describedby", tooltip.id);
-        tooltip.replaceChildren(
-          el("div", {
-            class: "key-route-tooltip-heading",
-            text: m("ui.full_routing_rulesvaluevalue_items", { v0: DISPLAY_SEPARATOR, v1: entries.length })
-          }),
-          ...entries.map((entry) => settingsChipList([entry]))
-        );
+        tooltip.replaceChildren(...content);
         tooltip.style.maxHeight = "";
         tooltip.showPopover();
         tooltip.scrollTop = 0;
@@ -6300,8 +6462,8 @@
         if (top + height > innerHeight - margin) top = point.y - gap - height;
         left = Math.max(margin, Math.min(left, viewportWidth - width - margin));
         top = Math.max(margin, Math.min(top, innerHeight - height - margin));
-        const actions = anchor.closest(".key-route-cell").querySelector(".key-route-actions").getBoundingClientRect();
-        if (left < actions.right && left + width > actions.left && top < actions.bottom && top + height > actions.top) {
+        const actions = anchor.closest(".key-route-cell")?.querySelector(".key-route-actions")?.getBoundingClientRect();
+        if (actions && left < actions.right && left + width > actions.left && top < actions.bottom && top + height > actions.top) {
           // Keep the cursor as the anchor; flip above it when its own action
           // links would otherwise be covered. Only the links need clearance.
           const above = point.y - gap - margin;
@@ -6321,7 +6483,7 @@
       let keyRouteSelection = { scope: "" };
 
       function editKeyRoutes(view) {
-        closeKeyRouteTooltip();
+        closeHoverTooltip();
         openEditor("route-picker", "route", (data) => {
           const key = data.keys.find((entry) => entry.scope === view.scope);
           if (!key || key.deleted_at) throw new UIError(m("ui.this_api_key_no_longer_exists_refresh_the_list"));
@@ -6540,7 +6702,15 @@
             items.push(
               ...(rule[prefix + "credential_ids"] || []).map((ref) => {
                 const credential = (resources.admin.credentials.value || []).find((item) => item.ref === ref);
-                return { text: boundCredentialLabel(ref, labels), state, iconName: credential ? credentialIcon(credential) : "key" };
+                return {
+                  text: credential
+                    ? maskedTailText(credential.provider, credentialName(credential))
+                    : labels?.[ref]
+                      ? maskedLabelText(labels[ref])
+                      : maskedTailText(m("ui.selected_upstream_credentialvaluevalue", { v0: "", v1: "" }), ref.slice(-8)),
+                  state,
+                  iconName: credential ? credentialIcon(credential) : "key"
+                };
               })
             );
           }
@@ -6548,20 +6718,62 @@
         return items;
       }
 
+      // Nodes are cloned because a chip and its tooltip share one item, and messages are flattened
+      // because only the string path styles separators; chips rebuild on every language change anyway.
+      function chipText(value) {
+        if (Array.isArray(value)) return value.map(chipText);
+        if (value?.nodeType) return value.cloneNode(true);
+        return displayText(window.billingI18n.isMessage(value) ? String(value) : value);
+      }
+
+      function settingsChipTooltip(item) {
+        return el(
+          "p",
+          { class: "hover-tooltip-body settings-chip-tooltip mono" },
+          item.iconName ? actionIcon(item.iconName) : null,
+          el("span", { class: item.state === "deny" ? "routing-deny" : "" }, chipText(item.text)),
+          item.tag ? el("span", { class: "tag warn", text: item.tag }) : null
+        );
+      }
+
+      // A negative tabindex lets a tap focus the chip, so the next tap dismisses the tooltip, without adding a tab stop.
+      function chipTooltipProps(item, label) {
+        const show = (event) => {
+          if (label.scrollWidth > label.clientWidth + 1)
+            showHoverTooltip(event.currentTarget, [settingsChipTooltip(item)], { x: event.clientX, y: event.clientY });
+        };
+        return {
+          tabindex: "-1",
+          onpointerenter: (event) => { if (event.pointerType !== "touch") show(event); },
+          onpointerleave: (event) => scheduleHoverTooltipClose(event.relatedTarget),
+          onclick: show,
+          onblur: (event) => scheduleHoverTooltipClose(event.relatedTarget)
+        };
+      }
+
       function settingsChipList(items, fallback) {
         if (!items.length) return el("span", { class: fallback === "—" ? "muted" : "", text: fallback });
         return el(
           "div",
           { class: "settings-chip-list" },
-          items.map((item) =>
-            el(
+          items.map((item) => {
+            const label = el(
               "span",
-              { class: "settings-chip" + (item.tag ? " has-tag" : ""), title: item.title ? displayLabel(item.title) : null },
+              { class: "settings-chip-label" + (item.state === "deny" ? " routing-deny" : "") },
+              chipText(item.text)
+            );
+            return el(
+              "span",
+              {
+                class: "settings-chip" + (item.tag ? " has-tag" : ""),
+                title: item.title ? displayLabel(item.title) : null,
+                ...chipTooltipProps(item, label)
+              },
               item.iconName ? actionIcon(item.iconName) : null,
-              el("span", { class: "settings-chip-label" + (item.state === "deny" ? " routing-deny" : "") }, displayText(item.text)),
+              label,
               item.tag ? el("span", { class: "tag warn", text: item.tag }) : null
-            )
-          )
+            );
+          })
         );
       }
 
@@ -6594,7 +6806,7 @@
       }
 
       function boundKeyField(keys) {
-        const chips = keys.map((key) => ({ text: apiKeyIdentity(key).text, tag: key.deleted_at ? m("ui.deleted") : "" }));
+        const chips = keys.map((key) => ({ text: maskedText(apiKeyIdentity(key).text), tag: key.deleted_at ? m("ui.deleted") : "" }));
         return settingsEntryField(m("ui.bound_keys"), settingsChipList(chips, "—"));
       }
 
@@ -6775,7 +6987,7 @@
       }
 
       function routeChoiceRow(selection, item, rerender) {
-        const { kind, value, label, iconName, badge, note } = item;
+        const { kind, value, label, text, iconName, badge, note } = item;
         const state = routeChoiceState(selection, kind, value);
         const next = { none: "allow", allow: "deny", deny: "none" }[state];
         const names = { none: m("ui.not_selected"), allow: m("ui.allowlist"), deny: m("ui.denylist") };
@@ -6806,7 +7018,7 @@
           },
           checkboxControl({ state }),
           iconName ? actionIcon(iconName) : null,
-          el("span", { class: "route-choice-name" + (kind === "model" ? " mono" : ""), text: label }),
+          el("span", { class: "route-choice-name" + (kind === "model" ? " mono" : "") }, text || displayText(label)),
           kind === "provider" ? el("span", { class: "tag warn", text: m("ui.entire_category") }) : null,
           badge ? el("span", { class: "tag plain", text: badge }) : null,
           note ? el("span", { class: "route-choice-note", text: note }) : null
@@ -6837,6 +7049,7 @@
             kind: "credential",
             value: item.ref,
             label: credentialLabel(item),
+            text: maskedTailText(item.provider, credentialName(item)),
             source: item.source,
             iconName: credentialIcon(item),
             badge: item.disabled ? m("ui.disabled") : item.unavailable ? m("ui.none_available") : ""
@@ -6900,10 +7113,7 @@
         openEditor("route-dialog", "route", (data) => {
           const current = id ? data.routes.find((entry) => entry.id === id) : null;
           if (id && !current) throw new UIError(m("ui.this_routing_rule_no_longer_exists_close_the_dialog_and_refresh_the_list"));
-          setText(
-            $("route-dialog-title"),
-            current ? m("ui.edit_routing_rule_value", { v0: current.name || id }) : m("ui.create_routing_rule")
-          );
+          setText($("route-dialog-title"), current ? m("ui.edit_rule_value", { v0: current.name || id }) : m("ui.create_rule"));
           $("route-id").value = id || "";
           setText($("route-save"), current ? m("ui.save") : m("ui.create"));
           $("route-name").value = current?.name || "";
@@ -7166,11 +7376,39 @@
         renderSelectOptions(select, options);
       }
 
+      function populateSourceFilterSelect(select, filters) {
+        const values = disambiguateSourceFilterOptions(filters.source_options || []);
+        populateEventFilterSelect(select, m("ui.all_sources"), values, (option) => option.value, (option) => option.label);
+      }
+
+      function disambiguateSourceFilterOptions(options) {
+        const prepared = options.map((option) => ({
+          option,
+          label: String(displayLabel(option.label)),
+          digest: String(option.value || "")
+        }));
+        const groups = new Map();
+        for (const item of prepared) {
+          if (!groups.has(item.label)) groups.set(item.label, []);
+          groups.get(item.label).push(item);
+        }
+        return prepared.map((item) => {
+          const group = groups.get(item.label);
+          if (group.length < 2) return item.option;
+          let length = Math.min(6, item.digest.length);
+          while (
+            length < item.digest.length && group.some((other) => other !== item && other.digest.startsWith(item.digest.slice(0, length)))
+          )
+            length++;
+          return { ...item.option, label: item.label + " · #" + item.digest.slice(0, length).toUpperCase() };
+        });
+      }
+
       function populateRequestEventFilters(filters, account) {
         if (!filters) return;
         const prefix = account ? "account-request-event" : "request-event";
         populateEventFilterSelect($(prefix + "-model"), m("ui.all_models"), filters.models);
-        populateEventFilterSelect($(prefix + "-source"), m("ui.all_sources"), filters.sources, undefined, displayLabel);
+        populateSourceFilterSelect($(prefix + "-source"), filters);
       }
 
       function readEventKeys(reload) {
@@ -7796,6 +8034,16 @@
         return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= EVENT_LOAD_MORE_THRESHOLD_PX;
       }
 
+      function failureTag(entry) {
+        const body = entry.failed ? entry.error_body : "";
+        const content = () => [el("pre", { class: "hover-tooltip-body mono", text: body })];
+        return el("span", {
+          class: "tag " + (entry.failed ? "bad" : "ok"),
+          text: entry.failed ? m("ui.failed") : m("ui.succeeded"),
+          ...hoverTooltipProps(content, body)
+        });
+      }
+
       function renderRequestEvents(account = false) {
         hideCostTooltip();
         const list = pagedList("events", account);
@@ -7831,20 +8079,34 @@
           const billingModel = entry.billing_model || entry.upstream_model || "—";
           const upstreamModel = entry.upstream_model || "—";
           const showUpstreamModel = entry.upstream_model && entry.upstream_model !== billingModel;
+          const mismatchedModel = entry.response_model && entry.response_model !== entry.upstream_model ? entry.response_model : "";
+          const mismatchLabel = m("ui.upstream_served_a_model_other_than_the_one_requested");
+          const serviceTiers = [entry.service_tier, entry.response_service_tier].filter(Boolean).join("\u2009/\u2009") || "—";
+          const modelNote = mismatchedModel
+            ? el(
+                "div",
+                { class: "request-event-cell-line muted" },
+                actionIcon("corner-down-right"),
+                mismatchedModel,
+                el(
+                  "span",
+                  {
+                    class: "tag warn icon",
+                    role: "img",
+                    "aria-label": mismatchLabel,
+                    ...hoverTooltipProps(() => [el("div", { class: "hover-tooltip-body", text: mismatchLabel })], true)
+                  },
+                  actionIcon("equal-not")
+                )
+              )
+            : showUpstreamModel ? el("div", { class: "request-event-cell-line muted" }, actionIcon("move-right"), upstreamModel) : null;
 
           return el(
             "tr",
             {},
             el("td", {}, dateTimeLines(entry.at)),
             account ? null : el("td", {}, renderAPIKeyIdentity(entry, { stacked: true })),
-            el(
-              "td",
-              { class: "small" },
-              el("div", { class: "request-event-cell-line mono" }, billingModel),
-              showUpstreamModel
-                ? el("div", { class: "request-event-cell-line muted" }, m("ui.upstream_value", { v0: upstreamModel }))
-                : null
-            ),
+            el("td", { class: "small" }, el("div", { class: "request-event-cell-line mono" }, billingModel), modelNote),
             el(
               "td",
               { class: "small" },
@@ -7852,20 +8114,16 @@
               el(
                 "div",
                 { class: "request-event-source muted", title: displayLabel(entry.source) || null },
-                displayLabel(entry.source) || m("ui.unknown_source")
+                entry.source ? maskedLabelText(entry.source) : m("ui.unknown_source")
               )
             ),
             el(
               "td",
               { class: "small" },
               el("div", { class: "request-event-cell-line mono" }, entry.reasoning_effort || "—"),
-              el("div", { class: "request-event-cell-line muted" }, entry.service_tier || "—")
+              el("div", { class: "request-event-cell-line muted" }, serviceTiers)
             ),
-            el(
-              "td",
-              {},
-              el("span", { class: "tag " + (entry.failed ? "bad" : "ok"), text: entry.failed ? m("ui.failed") : m("ui.succeeded") })
-            ),
+            el("td", {}, failureTag(entry)),
             el(
               "td",
               { class: "num" },
@@ -8008,6 +8266,31 @@
         });
       }
 
+      function routeLogDetails(row) {
+        const details = document.createDocumentFragment();
+        JSON.stringify(row, null, 2).split("\n").forEach((line, index) => {
+          if (index) details.append("\n");
+          const field = line.match(/^  "(key|selected_credential)": "/);
+          if (!field) {
+            details.append(line);
+            return;
+          }
+          const separator = field[1] === "selected_credential" ? line.indexOf("·", field[0].length) : -1;
+          const start = separator < 0 ? field[0].length : separator + 1;
+          const end = line.lastIndexOf('"');
+          // Preserve JSON whitespace and escapes; displayText would normalize middle-dot separators.
+          details.append(line.slice(0, start), el("span", { class: "mask-blur", text: line.slice(start, end) }), line.slice(end));
+        });
+        return details;
+      }
+
+      function upstreamCredentialText(value) {
+        const label = (name) => m("ui.upstream_credential_value", { v0: name });
+        if (!value) return label(m("ui.unknown_2"));
+        const [provider, account] = splitCredentialLabel(value);
+        return provider ? maskedTailText(label(provider), account) : [label(""), maskedText(account)];
+      }
+
       function renderPluginLogMessage(pluginLog) {
         const message = pluginLog.message || "";
         if (!message.startsWith("route ")) return el("div", { class: "plugin-log-message" }, message);
@@ -8019,7 +8302,7 @@
               : row.model_result === "configuration_error" ? m("ui.configuration_error") : m("ui.allowed");
           const credential =
             row.credential_result === "selected"
-              ? m("ui.upstream_credential_value", { v0: displayLabel(row.selected_credential) || m("ui.unknown_2") })
+              ? upstreamCredentialText(row.selected_credential)
               : row.credential_result === "no_match"
                 ? m("ui.upstream_credential_no_available_match")
                 : row.credential_result === "not_reached"
@@ -8051,13 +8334,13 @@
               el(
                 "span",
                 { class: "row" },
-                el("span", { text: m("ui.api_key_value", { v0: displayLabel(row.key || m("ui.unknown_2")) }) }),
+                el("span", {}, m("ui.api_key_value", { v0: "" }), row.key ? maskedText(row.key) : m("ui.unknown_2")),
                 el("span", { text: m("ui.model_value_value", { v0: row.model || m("ui.unknown_2"), v1: model }) }),
-                el("span", { text: credential }),
+                el("span", {}, credential),
                 el("span", { text: m("ui.request_result_value", { v0: outcome }) })
               )
             ),
-            el("pre", {}, JSON.stringify(row, null, 2))
+            el("pre", {}, routeLogDetails(row))
           );
         } catch (_) { return el("div", { class: "plugin-log-message" }, message); }
       }
@@ -8554,10 +8837,7 @@
         openEditor("plan-dialog", "plan", (data) => {
           const current = id ? data.plans.find((entry) => entry.id === id) : null;
           if (id && !current) throw new UIError(m("ui.this_subscription_plan_no_longer_exists_close_the_dialog_and_refresh_the_list"));
-          setText(
-            $("plan-dialog-title"),
-            current ? m("ui.edit_subscription_plan_value", { v0: current.name || id }) : m("ui.create_subscription_plan")
-          );
+          setText($("plan-dialog-title"), current ? m("ui.edit_plan_value", { v0: current.name || id }) : m("ui.create_plan"));
           $("plan-id").value = id || "";
           setText($("plan-save"), current ? m("ui.save") : m("ui.create"));
           $("plan-name").value = current?.name || "";
@@ -8835,6 +9115,7 @@
         x: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18M6 6l12 12"/></svg>`,
         refresh: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rotate-cw"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`,
         sun: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`,
+        "sun-moon": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-sun-moon"><path d="M12 2v2"/><path d="M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715"/><path d="M16 12a4 4 0 0 0-4-4"/><path d="m19 5-1.256 1.256"/><path d="M20 12h2"/></svg>`,
         moon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-moon"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>`,
         logout: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-log-out"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>`,
         download: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>`,
@@ -8842,10 +9123,16 @@
         check: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check"><path d="M20 6 9 17l-5-5"/></svg>`,
         chevron: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>`,
         "chevron-down": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down"><path d="m6 9 6 6 6-6"/></svg>`,
+        globe: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-globe"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>`,
         clock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+        eye: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>`,
+        "eye-off": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-off"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>`,
         key: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key-round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>`,
         "party-popper": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-party-popper"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></svg>`,
-        "file-key": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-key-icon lucide-file-key"><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M4 12v6"/><path d="M4 14h2"/><path d="M9.65 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v4"/><circle cx="4" cy="20" r="2"/></svg>`
+        "file-key": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-key-icon lucide-file-key"><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M4 12v6"/><path d="M4 14h2"/><path d="M9.65 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v4"/><circle cx="4" cy="20" r="2"/></svg>`,
+        "move-right": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-move-right"><path d="M18 8L22 12L18 16"/><path d="M2 12H22"/></svg>`,
+        "corner-down-right": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-corner-down-right"><path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></svg>`,
+        "equal-not": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-equal-not"><line x1="5" x2="19" y1="9" y2="9"/><line x1="5" x2="19" y1="15" y2="15"/><line x1="19" x2="5" y1="5" y2="19"/></svg>`
       };
 
       function actionIcon(name, className = "") {
@@ -8864,15 +9151,18 @@
       }
 
       function setLabeledActionIcon(button, name, label) {
-        button.replaceChildren(actionIcon(name), window.billingI18n.textNode(label));
+        button.replaceChildren(actionIcon(name), el("span", { class: "labeled-icon-text" }, label));
         setTextAttribute(button, "aria-label", label);
       }
 
+      const THEME_MODES = {
+        "": { icon: "sun-moon", label: () => m("ui.theme_follows_system") },
+        white: { icon: "sun", label: () => m("ui.theme_light") },
+        dark: { icon: "moon", label: () => m("ui.theme_dark") }
+      };
       function updateThemeButtons() {
-        const dark = window.billingTheme?.current() === "dark";
-        document.querySelectorAll('[data-page-action="theme"]').forEach((button) => {
-          setActionIcon(button, dark ? "sun" : "moon", dark ? m("ui.switch_to_light_theme") : m("ui.switch_to_dark_theme"));
-        });
+        const mode = THEME_MODES[window.billingTheme?.preference()] || THEME_MODES[""];
+        document.querySelectorAll('[data-page-action="theme"]').forEach((button) => setActionIcon(button, mode.icon, mode.label()));
       }
 
       function updateThemedVisuals() {
@@ -8885,7 +9175,10 @@
         button.onclick = () => refreshPage();
       }
       document.querySelectorAll('[data-page-action="theme"]').forEach((button) => {
-        button.onclick = () => { window.billingTheme?.toggle(); };
+        button.onclick = () => {
+          window.billingTheme?.cycle();
+          updateThemeButtons();
+        };
       });
       document.querySelectorAll('[data-page-action="logout"]').forEach((button) => {
         setActionIcon(button, "logout", m("ui.sign_out"));
@@ -8893,9 +9186,68 @@
           guard(async () => {
             const role = currentRole || loginMode;
             await deleteCredential(role);
+            const preference = viewPreferenceKey(role, (role === "account" ? "account-" : "") + "privacy-mask");
+            if (preference) { try { localStorage.removeItem(preference); } catch (_) {} }
             showGate(role, "");
           });
       });
+      function addLanguageControl(group) {
+        const menu = el("div", { class: "language-menu", popover: "auto", role: "menu", "aria-label": m("language.select") });
+        const button = el(
+          "button",
+          {
+            type: "button",
+            class: "icon-action",
+            "data-page-action": "language",
+            "aria-haspopup": "menu",
+            "aria-expanded": "false",
+            "aria-label": m("language.select"),
+            title: m("language.select"),
+            onclick: () => {
+              if (menu.matches(":popover-open")) return menu.hidePopover();
+              const current = window.billingI18n.current();
+              menu.replaceChildren(
+                ...window.billingI18n.languages().map((item) =>
+                  el("button", {
+                    type: "button",
+                    class: "language-option",
+                    role: "menuitemradio",
+                    "aria-checked": String(item.value === current),
+                    text: item.label,
+                    onclick: () => {
+                      menu.hidePopover();
+                      button.focus();
+                      window.billingI18n.select(item.value);
+                    }
+                  })
+                )
+              );
+              menu.showPopover();
+              positionAnchoredPopover(menu, button, true);
+              menu.querySelector('[aria-checked="true"]')?.focus({ preventScroll: true });
+            }
+          },
+          actionIcon("globe")
+        );
+        menu.addEventListener("toggle", (event) => button.setAttribute("aria-expanded", String(event.newState === "open")));
+        menu.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            menu.hidePopover();
+            button.focus();
+            return;
+          }
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          const items = Array.from(menu.querySelectorAll("button"));
+          const index = items.indexOf(document.activeElement);
+          items[(index + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+        });
+        group.prepend(button, menu);
+      }
+      document.querySelectorAll(".standalone-actions").forEach(addLanguageControl);
+
       window.addEventListener("billing-theme-change", updateThemedVisuals);
       window.addEventListener("billing-language-change", () => {
         dateFormatter = new Intl.DateTimeFormat(locale());
@@ -8977,6 +9329,15 @@
         if (!account) ui.bulk.onclick = () => guard(() => refreshFilteredAuthQuotas(false));
       }
 
+      for (const role of ["admin", "account"]) {
+        const button = privacyMaskButton(role);
+        setPrivacyMask(role, false);
+        button.onclick = () => {
+          setPrivacyMask(role, !privacyMasked());
+          saveViewPreference(role, button.id, privacyMasked());
+        };
+      }
+
       const TABS = Array.from(document.querySelectorAll(".tabs button[data-tab]"));
       function setAdminTab(name) {
         if (editors.get($("route-picker"))?.saving) return;
@@ -9044,22 +9405,22 @@
           notify(id ? m("ui.subscription_plan_saved") : m("ui.subscription_plan_created"));
         });
 
-      $("key-route-tooltip").addEventListener("pointerenter", () => clearTimeout(keyRouteTooltipTimer));
-      $("key-route-tooltip").addEventListener("focus", () => clearTimeout(keyRouteTooltipTimer));
-      $("key-route-tooltip").addEventListener("pointerleave", (event) => scheduleKeyRouteTooltipClose(event.relatedTarget));
-      $("key-route-tooltip").addEventListener("blur", (event) => scheduleKeyRouteTooltipClose(event.relatedTarget));
-      $("key-route-tooltip").addEventListener("keydown", (event) => {
+      $("hover-tooltip").addEventListener("pointerenter", () => clearTimeout(hoverTooltipTimer));
+      $("hover-tooltip").addEventListener("focus", () => clearTimeout(hoverTooltipTimer));
+      $("hover-tooltip").addEventListener("pointerleave", (event) => scheduleHoverTooltipClose(event.relatedTarget));
+      $("hover-tooltip").addEventListener("blur", (event) => scheduleHoverTooltipClose(event.relatedTarget));
+      $("hover-tooltip").addEventListener("keydown", (event) => {
         if (event.key === "Escape") {
-          const anchor = keyRouteTooltipAnchor;
+          const anchor = hoverTooltipAnchor;
           anchor?.focus();
-          closeKeyRouteTooltip();
+          closeHoverTooltip();
         }
       });
       document.addEventListener("pointerdown", (event) => {
-        if (!$("key-route-tooltip").contains(event.target) && !keyRouteTooltipAnchor?.contains(event.target)) closeKeyRouteTooltip();
+        if (!$("hover-tooltip").contains(event.target) && !hoverTooltipAnchor?.contains(event.target)) closeHoverTooltip();
       });
-      window.addEventListener("resize", closeKeyRouteTooltip);
-      document.addEventListener("scroll", (event) => { if (event.target !== $("key-route-tooltip")) closeKeyRouteTooltip(); }, true);
+      window.addEventListener("resize", closeHoverTooltip);
+      document.addEventListener("scroll", (event) => { if (event.target !== $("hover-tooltip")) closeHoverTooltip(); }, true);
 
       $("route-picker-search").addEventListener("input", renderKeyRouteList);
       $("route-picker-all").onclick = () => setVisibleRouteChoices("route-picker", keyRouteSelection, "allow", renderKeyRouteList);

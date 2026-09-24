@@ -139,6 +139,7 @@ func registration() Registration {
 			Version:          Version,
 			Author:           PluginName,
 			GitHubRepository: GitHubRepository,
+			Logo:             pluginLogo,
 			ConfigFields: []ConfigField{
 				{
 					Name: "billing_multiplier", Type: "number",
@@ -157,6 +158,16 @@ func registration() Registration {
 					Name:        "codex_fast_mode_billing",
 					Type:        "boolean",
 					Description: "Bill Codex OAuth priority requests at 2.5 times the global-adjusted cost (default true)",
+				},
+				{
+					Name:        "mask_api_key_view_emails",
+					Type:        "boolean",
+					Description: "Mask email addresses in API key account responses",
+				},
+				{
+					Name:        "allow_api_key_quota_reset",
+					Type:        "boolean",
+					Description: "Allow API key users to reset Codex auth file quotas using upstream reset credits",
 				},
 				{
 					Name:        "state_file",

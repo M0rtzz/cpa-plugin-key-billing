@@ -1,19 +1,22 @@
 package billing
 
+import "strings"
+
 // Builtin prices are shipped with the plugin and are intentionally not persisted.
 var builtinPrices = map[string]CustomPrice{
 	NormalizeModelID("codex-auto-review"): {
 		ModelID: "codex-auto-review",
-		// Matches models.dev openai/gpt-5.4.
 		PriceRates: PriceRates{
-			InputPer1M:     2.5,
-			OutputPer1M:    15,
-			CacheReadPer1M: float64Ptr(0.25),
+			InputPer1M:      0.2,
+			OutputPer1M:     1.2,
+			CacheReadPer1M:  float64Ptr(0.02),
+			CacheWritePer1M: float64Ptr(0.25),
 			LongContext: &LongContextPrice{
 				ThresholdInputTokens: 272000,
-				InputPer1M:           5,
-				OutputPer1M:          22.5,
-				CacheReadPer1M:       float64Ptr(0.5),
+				InputPer1M:           0.4,
+				OutputPer1M:          1.8,
+				CacheReadPer1M:       float64Ptr(0.04),
+				CacheWritePer1M:      float64Ptr(0.5),
 			},
 		},
 	},
@@ -25,6 +28,22 @@ var builtinPrices = map[string]CustomPrice{
 			CacheReadPer1M: float64Ptr(1.25),
 		},
 	},
+	NormalizeModelID("gpt-image-2.5"): {
+		ModelID: "gpt-image-2.5",
+		PriceRates: PriceRates{
+			InputPer1M:     5,
+			OutputPer1M:    30,
+			CacheReadPer1M: float64Ptr(1.25),
+		},
+	},
+	NormalizeModelID("deepseek-flash"): {
+		ModelID: "deepseek-flash",
+		PriceRates: PriceRates{
+			InputPer1M:     0.15,
+			OutputPer1M:    0.6,
+			CacheReadPer1M: float64Ptr(0.003),
+		},
+	},
 }
 
 func float64Ptr(value float64) *float64 {
@@ -32,7 +51,11 @@ func float64Ptr(value float64) *float64 {
 }
 
 func resolveBuiltinRates(modelID string) (PriceRates, bool) {
-	price, found := builtinPrices[NormalizeModelID(modelID)]
+	key := NormalizeModelID(modelID)
+	if slash := strings.LastIndexByte(key, '/'); slash >= 0 {
+		key = key[slash+1:]
+	}
+	price, found := builtinPrices[key]
 	return price.PriceRates, found
 }
 

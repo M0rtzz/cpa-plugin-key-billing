@@ -328,11 +328,14 @@ func TestRequestEventQueryReachesTheStore(t *testing.T) {
 	}
 	from := events.Entries[0].At.Add(-time.Second).Format(time.RFC3339Nano)
 	to := app.store.Now().Add(time.Second).Format(time.RFC3339Nano)
+	sourceToken := sourceFilterToken("", events.Entries[0].Source)
 	callOK(t, app, http.MethodGet, routeEvents, url.Values{
-		"api_key": {billing.CallerScope(apiKey)}, "model": {"gpt-5.5"}, "source": {events.Entries[0].Source},
+		"api_key": {billing.CallerScope(apiKey)}, "model": {"gpt-5.5"},
+		"source": {sourceToken},
 		"failed": {"false"}, "from": {from}, "to": {to},
 	}, nil, http.StatusOK, &events)
-	if events.Total != 3 || events.Filters == nil {
+	if events.Total != 3 || events.Filters == nil || len(events.Filters.SourceOptions) != 1 ||
+		events.Filters.SourceOptions[0].Value != sourceToken {
 		t.Fatalf("field and time filtered events = %+v", events)
 	}
 

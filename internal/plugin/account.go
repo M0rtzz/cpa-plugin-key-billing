@@ -37,8 +37,9 @@ func (a *App) billingSettings() billingSettingsResponse {
 
 type accountProfileResponse struct {
 	billingSettingsResponse
-	Tracked  bool            `json:"tracked"`
-	Identity accountIdentity `json:"identity"`
+	Tracked           bool            `json:"tracked"`
+	Identity          accountIdentity `json:"identity"`
+	CanResetAuthQuota bool            `json:"can_reset_auth_quota"`
 }
 
 type accountSubscriptionResponse struct {
@@ -71,13 +72,14 @@ func (a *App) accountProfile(access viewAccess) ManagementResponse {
 	response := accountProfileResponse{billingSettingsResponse: a.billingSettings(), Tracked: access.Tracked}
 	if access.Tracked {
 		response.Identity = accountIdentity{Preview: access.Key.Preview, Label: access.Key.Label}
+		response.CanResetAuthQuota = a.store.AllowAPIKeyQuotaReset()
 	}
-	return apiKeyJSON(http.StatusOK, response)
+	return viewJSON(access, http.StatusOK, response)
 }
 
 func (a *App) accountSubscription(access viewAccess) ManagementResponse {
 	view := access.Key
-	return apiKeyJSON(http.StatusOK, accountSubscriptionResponse{
+	return viewJSON(access, http.StatusOK, accountSubscriptionResponse{
 		billingSettingsResponse: a.billingSettings(),
 		Subscription:            accountSubscription{Name: view.PlanName, QuotaView: view.QuotaView},
 		Concurrency:             accountConcurrency{Limit: view.ConcurrencyLimit, Current: view.CurrentConcurrency},
@@ -96,7 +98,7 @@ func (a *App) accountRouting(access viewAccess) ManagementResponse {
 		response.WarningMessages = append(response.WarningMessages, messages.New("The routing rule no longer exists; contact your administrator"))
 	}
 	if !decision.RestrictsCredentials() {
-		return apiKeyJSON(http.StatusOK, response)
+		return viewJSON(access, http.StatusOK, response)
 	}
 	if err := a.refreshCredentialInventory(); err != nil {
 		response.Warnings = append(response.Warnings, "Failed to load upstream credentials")
@@ -121,7 +123,7 @@ func (a *App) accountRouting(access viewAccess) ManagementResponse {
 	}
 	denied, _ := accountRoutingCredentials(inventory, decision.DeniedCredentialIDs, nil, decision)
 	response.DeniedCredentials = append(response.DeniedCredentials, denied...)
-	return apiKeyJSON(http.StatusOK, response)
+	return viewJSON(access, http.StatusOK, response)
 }
 
 func accountRoutingCredentials(inventory []credentialView, refs []string, providers []billing.CredentialProviderSelector, decision billing.RoutingDecision) ([]accountRouteCredential, []messages.Message) {

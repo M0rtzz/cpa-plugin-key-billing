@@ -185,27 +185,27 @@ func (a *App) handleUsage(raw []byte) ([]byte, error) {
 	scope := billing.CallerScope(record.APIKey)
 	var recordError billing.RequestError
 	if record.Failed {
-		failure := usageFailureDetails(record.Failure)
-		recordError = billing.RequestError{StatusCode: failure.StatusCode, ErrorType: failure.ErrorType,
-			Reason: failure.Reason, Body: failure.Body}
+		recordError = usageFailureDetails(record.Failure)
 	}
 	event := billing.UsageEvent{
-		Scope:           scope,
-		KeyPreview:      billing.PreviewKey(record.APIKey),
-		AuthIndex:       record.AuthIndex,
-		Provider:        record.Provider,
-		ExecutorType:    record.ExecutorType,
-		AuthType:        record.AuthType,
-		Account:         record.Source,
-		ReasoningEffort: record.ReasoningEffort,
-		ServiceTier:     record.ServiceTier,
-		UpstreamModel:   record.Model,
-		RouteModel:      record.Alias,
-		RequestedAt:     record.RequestedAt,
-		Latency:         record.Latency,
-		TTFT:            record.TTFT,
-		Breakdown:       usageBreakdown(record),
-		At:              a.store.Now(),
+		Scope:               scope,
+		KeyPreview:          billing.PreviewKey(record.APIKey),
+		AuthIndex:           record.AuthIndex,
+		Provider:            record.Provider,
+		ExecutorType:        record.ExecutorType,
+		AuthType:            record.AuthType,
+		Account:             record.Source,
+		ReasoningEffort:     record.ReasoningEffort,
+		ServiceTier:         record.ServiceTier,
+		ResponseServiceTier: record.ResponseServiceTier,
+		UpstreamModel:       record.Model,
+		ResponseModel:       record.ResponseModel,
+		RouteModel:          record.Alias,
+		RequestedAt:         record.RequestedAt,
+		Latency:             record.Latency,
+		TTFT:                record.TTFT,
+		Breakdown:           usageBreakdown(record),
+		At:                  a.store.Now(),
 	}
 	if record.Failed {
 		a.store.RecordUsageError(event, recordError)

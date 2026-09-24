@@ -71,6 +71,7 @@ func authQuotaCacheKey(file hostAuthFile) string {
 
 func cloneAuthQuota(result authQuotaResponse) authQuotaResponse {
 	result.Quota = append([]quotaRow{}, result.Quota...)
+	result.RateLimitResetCredits = append([]resetCreditExpiry{}, result.RateLimitResetCredits...)
 	for i := range result.Quota {
 		row := &result.Quota[i]
 		if row.RemainingPercent != nil {
@@ -145,12 +146,15 @@ func (a *App) cachedAuthQuota(file hostAuthFile) (authQuotaResponse, bool, bool,
 }
 
 type accountQuotaObservation struct {
-	Plan      string     `json:"plan,omitempty"`
-	Status    string     `json:"status"`
-	Reason    string     `json:"reason,omitempty"`
-	FetchedAt *time.Time `json:"fetched_at,omitempty"`
-	Stale     bool       `json:"stale"`
-	Quota     []quotaRow `json:"quota"`
+	Plan                                string              `json:"plan,omitempty"`
+	Status                              string              `json:"status"`
+	Reason                              string              `json:"reason,omitempty"`
+	FetchedAt                           *time.Time          `json:"fetched_at,omitempty"`
+	Stale                               bool                `json:"stale"`
+	Quota                               []quotaRow          `json:"quota"`
+	RateLimitResetCreditsAvailableCount *int                `json:"rate_limit_reset_credits_available_count,omitempty"`
+	RateLimitResetCredits               []resetCreditExpiry `json:"rate_limit_reset_credits,omitempty"`
+	RateLimitResetCreditsUnavailable    bool                `json:"rate_limit_reset_credits_unavailable,omitempty"`
 }
 
 func safeQuotaText(value string) string {
@@ -175,6 +179,11 @@ func (a *App) accountCachedQuota(file hostAuthFile) accountQuotaObservation {
 			out.FetchedAt = &result.FetchedAt
 		}
 		out.Quota = result.Quota
+		if a.store.AllowAPIKeyQuotaReset() && authCategory(file.Type) == "codex" {
+			out.RateLimitResetCreditsAvailableCount = result.RateLimitResetCreditsAvailableCount
+			out.RateLimitResetCredits = result.RateLimitResetCredits
+			out.RateLimitResetCreditsUnavailable = result.RateLimitResetCreditsUnavailable
+		}
 	}
 	supported, _ := authQuotaAvailability(file, authFileProvider(file))
 	switch {
@@ -206,9 +215,10 @@ func (a *App) accountCachedQuota(file hostAuthFile) accountQuotaObservation {
 }
 
 type accountQuotaAccount struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Provider string `json:"provider"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Provider      string `json:"provider"`
+	CacheRevision string `json:"cache_revision,omitempty"`
 	accountQuotaObservation
 }
 
@@ -287,7 +297,10 @@ func (a *App) accountQuotaSummary(_ ManagementRequest, access viewAccess) Manage
 		if decision.RestrictsModels() {
 			observation = restrictAccountQuotaScope(observation)
 		}
-		out.Accounts = append(out.Accounts, accountQuotaAccount{ID: id, Name: name, Provider: safeQuotaText(authFileProvider(file)), accountQuotaObservation: observation})
+		out.Accounts = append(out.Accounts, accountQuotaAccount{
+			ID: id, Name: name, Provider: safeQuotaText(authFileProvider(file)), CacheRevision: authFileRevision(file),
+			accountQuotaObservation: observation,
+		})
 		out.Counts.Total++
 		switch observation.Status {
 		case "disabled":

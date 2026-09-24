@@ -106,7 +106,9 @@ CREATE TABLE request_events (
 	executor_type               TEXT    NOT NULL DEFAULT '',
 	reasoning_effort            TEXT    NOT NULL DEFAULT '',
 	service_tier                TEXT    NOT NULL DEFAULT '',
+	response_service_tier       TEXT    NOT NULL DEFAULT '',
 	upstream_model              TEXT    NOT NULL DEFAULT '',
+	response_model              TEXT    NOT NULL DEFAULT '',
 	billing_model               TEXT    NOT NULL DEFAULT '',
 	failed                      INTEGER NOT NULL DEFAULT 0,
 	latency_ms                  INTEGER NOT NULL DEFAULT 0,
@@ -131,14 +133,14 @@ CREATE TABLE request_events (
 	applied_input_per_1m        REAL    NOT NULL DEFAULT 0,
 	applied_output_per_1m       REAL    NOT NULL DEFAULT 0,
 	applied_cache_read_per_1m   REAL    NOT NULL DEFAULT 0,
-	applied_cache_write_per_1m  REAL    NOT NULL DEFAULT 0
+	applied_cache_write_per_1m  REAL    NOT NULL DEFAULT 0,
+	response_headers_json       TEXT    NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE request_errors (
 	request_event_id INTEGER PRIMARY KEY REFERENCES request_events(id) ON DELETE CASCADE,
 	status_code      INTEGER NOT NULL DEFAULT 0,
 	error_type       TEXT    NOT NULL DEFAULT '',
-	reason           TEXT    NOT NULL DEFAULT '',
 	body             TEXT    NOT NULL DEFAULT ''
 );
 

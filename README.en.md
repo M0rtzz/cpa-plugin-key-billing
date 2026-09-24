@@ -90,6 +90,8 @@ plugins:
       debug: false # Include routing and reference-price matching in debug logs
       billing_multiplier: 1 # Global factor; 0.2 bills 20% of the base cost
       codex_fast_mode_billing: true # Enabled by default; qualifying Codex OAuth priority usage adds 2.5×
+      mask_api_key_view_emails: false # Mask email addresses in API key account views
+      allow_api_key_quota_reset: false # Allow API key users to reset accessible Codex auth file quotas using upstream reset credits
       state_file: "plugins/cpa-key-billing-state-v1.db"
       account_api_base_url: "http://127.0.0.1:18316" # Use this CPA instance's actual loopback port
 ```
@@ -110,7 +112,7 @@ Restart CLIProxyAPI and open **API Key Billing** in the management panel. Review
 
 ## Access
 
-Standalone user pages are available at `/v0/resource/plugins/cpa-key-billing/usage.html` (usage and costs) and `/v0/resource/plugins/cpa-key-billing/quota.html` (read-only quotas). Users enter their own API key; no management password is needed. Accounts are anonymous but retain their plan types, including Plus and Pro 20x. Only quota queries from the billing plugin's administrator interface update the upstream quota cache.
+Standalone user pages are available at `/v0/resource/plugins/cpa-key-billing/usage.html` (usage and costs) and `/v0/resource/plugins/cpa-key-billing/quota.html` (quota lookup). Users enter their own API key; no management password is needed. Accounts are anonymous but retain their plan types, including Plus and Pro 20x. Quota lookups read only the cache. When `allow_api_key_quota_reset` is enabled, users can also reset accessible Codex auth file quotas using upstream reset credits; a successful reset refreshes the cache.
 
 Set `account_api_base_url` to this CPA instance's numeric loopback origin. All user JSON endpoints, including the existing account UI endpoints, return `503` without it. Administrators and public HTML remain available. User quota endpoints are cache-only; emails, file names, raw upstream error details, and account source filters are no longer exposed. See the [deployment and rollback guide](docs/self-service-deployment.md) for building the two HTML files and the plugin, configuration, and compatibility details.
 

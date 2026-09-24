@@ -65,7 +65,7 @@ test("all literal UI message references exist and scripts parse", () => {
   for (const [, key] of ui.matchAll(/data-i18n(?:-[\w-]+)?="([^"]+)"/g)) assert.ok(Object.hasOwn(en, key), key);
 });
 
-function environment(stored, hostLanguage, { crossOrigin = false, search = "" } = {}) {
+function environment(stored, hostLanguage, { crossOrigin = false, search = "", catalogs = { en, "zh-CN": zh } } = {}) {
   const listeners = {}, root = { lang: "" };
   const document = { documentElement: root, createTreeWalker: () => ({ currentNode: root, nextNode: () => false }), querySelectorAll: () => [] };
   const storage = new Map(stored ? [["cpa-key-billing:language", stored]] : []);
@@ -79,7 +79,7 @@ function environment(stored, hostLanguage, { crossOrigin = false, search = "" } 
   const context = vm.createContext({ window, document, URL, URLSearchParams, NodeFilter: { SHOW_ELEMENT: 1, SHOW_TEXT: 4 },
     location: { search }, MutationObserver: class { observe() {} }, CustomEvent: class {},
     localStorage: { getItem: (key) => storage.get(key), setItem: (key, value) => storage.set(key, value) },
-    BILLING_MESSAGES: { en, "zh-CN": zh } });
+    BILLING_MESSAGES: catalogs });
   vm.runInContext(runtime, context);
   return { i18n: window.billingI18n, window, listeners, posted, storage, evaluate: source => vm.runInContext(source, context), change: (language) => {
     storage.set("cpa-key-billing:language", language); listeners.storage({ key: "cpa-key-billing:language" });
@@ -116,14 +116,18 @@ test("backend catalog and formatting metadata match the UI catalog", () => {
 });
 
 test("invalid server translation metadata falls back to the original message", () => {
-  const { i18n } = environment();
-  const key = "ui.upstream_value", fallback = "Original server diagnostic";
+  const key = "test.server_message_value", fallback = "Original server diagnostic";
+  const catalogs = {
+    en: { ...en, [key]: "Translated server diagnostic: {v0}" },
+    "zh-CN": { ...zh, [key]: "已翻译服务端诊断：{v0}" }
+  };
+  const { i18n } = environment(undefined, undefined, { catalogs });
   for (const params of [null, [], "invalid", {}, { v0: null }, { v0: {} }, { v0: Infinity }]) {
     assert.equal(i18n.serverMessage({ message_key: key, message_params: params }, fallback), fallback);
   }
   const params = Object.create({ v0: "inherited value" });
   assert.equal(i18n.serverMessage({ message_key: key, message_params: params }, fallback), fallback);
-  assert.equal(String(i18n.serverMessage({ message_key: key, message_params: { v0: "custom 模型" } }, fallback)), "Upstream: custom 模型");
+  assert.equal(String(i18n.serverMessage({ message_key: key, message_params: { v0: "custom 模型" } }, fallback)), "Translated server diagnostic: custom 模型");
   assert.equal(String(i18n.serverMessage({ message_key: "ui.no_email_provided", message_params: null }, fallback)), "No email provided");
 });
 

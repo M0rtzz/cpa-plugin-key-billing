@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,6 +20,8 @@ const (
 	hostAuthGet  = "host.auth.get"
 	hostHTTPDo   = "host.http.do"
 )
+
+var quotaResetIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 type HostCaller func(method string, payload any) (json.RawMessage, error)
 
@@ -98,11 +101,17 @@ type quotaRow struct {
 }
 
 type authQuotaResponse struct {
-	AuthRevision                        string     `json:"auth_revision,omitempty"`
-	FetchedAt                           time.Time  `json:"fetched_at"`
-	Plan                                string     `json:"plan,omitempty"`
-	RateLimitResetCreditsAvailableCount *int       `json:"rate_limit_reset_credits_available_count,omitempty"`
-	Quota                               []quotaRow `json:"quota"`
+	AuthRevision                        string              `json:"auth_revision,omitempty"`
+	FetchedAt                           time.Time           `json:"fetched_at"`
+	Plan                                string              `json:"plan,omitempty"`
+	RateLimitResetCreditsAvailableCount *int                `json:"rate_limit_reset_credits_available_count,omitempty"`
+	RateLimitResetCredits               []resetCreditExpiry `json:"rate_limit_reset_credits,omitempty"`
+	RateLimitResetCreditsUnavailable    bool                `json:"rate_limit_reset_credits_unavailable,omitempty"`
+	Quota                               []quotaRow          `json:"quota"`
+}
+
+type resetCreditExpiry struct {
+	ExpiresAt string `json:"expires_at"`
 }
 
 func (a *App) authFiles(access viewAccess) ManagementResponse {
@@ -117,16 +126,78 @@ func (a *App) authFiles(access viewAccess) ManagementResponse {
 }
 
 func (a *App) authQuota(req ManagementRequest, access viewAccess) ManagementResponse {
+	selected, failure := a.resolveQuotaAuthFile(req, access)
+	if selected == nil {
+		return failure
+	}
+	if access.APIKey {
+		observation := a.accountCachedQuota(*selected)
+		if a.store.ResolveRouting(access.Scope, "", "").RestrictsModels() {
+			observation = restrictAccountQuotaScope(observation)
+		}
+		return viewJSON(access, http.StatusOK, observation)
+	}
+	result, errQuota := a.fetchAuthQuota(req.HostCallbackID, *selected, authCategory(selected.Type))
+	if errQuota != nil {
+		a.markAuthQuotaFailure(*selected)
+		return viewDetailedError(access, http.StatusBadGateway, "quota_failed", errQuota)
+	}
+	a.storeAuthQuota(*selected, result)
+	return viewJSON(access, http.StatusOK, result)
+}
+
+// Resource routes are GET-only. Require a reset ID header and preserve it on retries.
+func (a *App) authQuotaReset(req ManagementRequest, access viewAccess) ManagementResponse {
+	if access.APIKey && !access.Tracked {
+		return apiKeyUnauthorized()
+	}
+	if access.APIKey && !a.store.AllowAPIKeyQuotaReset() {
+		return viewJSONError(access, http.StatusForbidden, "forbidden", "Quota resets are disabled for API key users")
+	}
+	resetID := req.Headers.Get("X-Quota-Reset-ID")
+	if !quotaResetIDPattern.MatchString(resetID) {
+		return viewJSONError(access, http.StatusBadRequest, "invalid", "Invalid quota reset request ID")
+	}
+	selected, failure := a.resolveQuotaAuthFile(req, access)
+	if selected == nil {
+		return failure
+	}
+	if authCategory(selected.Type) != "codex" {
+		return viewJSONError(access, http.StatusUnprocessableEntity, "unsupported", "Quota resets are not supported for this auth file type")
+	}
+	name := selected.Name
+	if access.APIKey {
+		_, name = a.accountAuthIdentity(*selected, access.Scope)
+	}
+	if !req.Query.Has("auth_revision") || req.Query.Get("auth_revision") != authFileRevision(*selected) || req.Query.Get("auth_name") != name {
+		return viewJSONError(access, http.StatusConflict, "auth_file_changed", "Auth file changed; refresh the auth file list and try again")
+	}
+	if errReset := a.resetCodexQuota(req.HostCallbackID, *selected, resetID); errReset != nil {
+		return viewDetailedError(access, http.StatusBadGateway, "reset_failed", errReset)
+	}
+	response := map[string]bool{"reset": true}
+	if access.APIKey {
+		// Account quota reads use the administrator-populated cache. Refresh it
+		// after a successful reset so the account never sees pre-reset values.
+		result, errQuota := a.fetchAuthQuota(req.HostCallbackID, *selected, authCategory(selected.Type))
+		if errQuota != nil {
+			a.markAuthQuotaFailure(*selected)
+			response["refresh_failed"] = true
+		} else {
+			a.storeAuthQuota(*selected, result)
+		}
+	}
+	return viewJSON(access, http.StatusOK, response)
+}
+
+func (a *App) resolveQuotaAuthFile(req ManagementRequest, access viewAccess) (*hostAuthFile, ManagementResponse) {
 	authIndex := strings.TrimSpace(req.Query.Get("auth_index"))
 	if authIndex == "" || len(authIndex) > 512 {
-		return viewJSONError(access, http.StatusBadRequest, "invalid", "Invalid auth file identifier")
+		return nil, viewJSONError(access, http.StatusBadRequest, "invalid", "Invalid auth file identifier")
 	}
 	files, errList := a.listHostAuthFiles()
 	if errList != nil {
-		if access.APIKey {
-			return apiKeyJSONError(http.StatusBadGateway, "host_unavailable", "Upstream account information is temporarily unavailable")
-		}
-		return viewDetailedError(access, http.StatusBadGateway, "host_unavailable", errList)
+		return nil, viewDetailedError(access, http.StatusBadGateway, "host_unavailable", errList)
 	}
 	var selected *hostAuthFile
 	for i := range files {
@@ -140,39 +211,27 @@ func (a *App) authQuota(req ManagementRequest, access viewAccess) ManagementResp
 		}
 	}
 	if selected == nil {
-		return viewJSONError(access, http.StatusNotFound, "not_found", "Auth file does not exist")
+		return nil, viewJSONError(access, http.StatusNotFound, "not_found", "Auth file does not exist")
 	}
 	if strings.EqualFold(strings.TrimSpace(selected.AccountType), "api_key") {
-		return viewJSONError(access, http.StatusNotFound, "not_found", "Auth file does not exist")
+		return nil, viewJSONError(access, http.StatusNotFound, "not_found", "Auth file does not exist")
 	}
 	if access.APIKey {
 		decision := a.store.ResolveRouting(access.Scope, "", "")
 		if decision.ConfigurationError != "" || (decision.RestrictsCredentials() && !routingAllowsAuthFile(*selected, decision)) {
-			return viewJSONError(access, http.StatusNotFound, "not_found", "Auth file does not exist")
+			return nil, viewJSONError(access, http.StatusNotFound, "not_found", "Auth file does not exist")
 		}
-		observation := a.accountCachedQuota(*selected)
-		if decision.RestrictsModels() {
-			observation = restrictAccountQuotaScope(observation)
-		}
-		return apiKeyJSON(http.StatusOK, observation)
 	}
 	if selected.Disabled {
-		return viewJSONError(access, http.StatusUnprocessableEntity, "disabled", "Auth file is disabled")
+		return nil, viewJSONError(access, http.StatusUnprocessableEntity, "disabled", "Auth file is disabled")
 	}
-	provider := authCategory(selected.Type)
-	if authCategoryOrder(provider) == 5 {
-		return viewJSONError(access, http.StatusUnprocessableEntity, "unsupported", "Quota queries are not supported for this auth file type")
+	if authCategoryOrder(authCategory(selected.Type)) == 5 {
+		return nil, viewJSONError(access, http.StatusUnprocessableEntity, "unsupported", "Quota queries are not supported for this auth file type")
 	}
 	if selected.RuntimeOnly {
-		return viewJSONError(access, http.StatusUnprocessableEntity, "unsupported", "Runtime-only auth files have no readable credentials")
+		return nil, viewJSONError(access, http.StatusUnprocessableEntity, "unsupported", "Runtime-only auth files have no readable credentials")
 	}
-	result, errQuota := a.fetchAuthQuota(req.HostCallbackID, *selected, provider)
-	if errQuota != nil {
-		a.markAuthQuotaFailure(*selected)
-		return viewDetailedError(access, http.StatusBadGateway, "quota_failed", errQuota)
-	}
-	a.storeAuthQuota(*selected, result)
-	return viewJSON(access, http.StatusOK, result)
+	return selected, ManagementResponse{}
 }
 
 func (a *App) listAuthFiles(access viewAccess) ([]authFileView, error) {
@@ -308,24 +367,32 @@ func authCategoryOrder(category string) int {
 	}
 }
 
-func (a *App) fetchAuthQuota(callbackID string, file hostAuthFile, provider string) (authQuotaResponse, error) {
+func (a *App) readAuthCredential(file hostAuthFile) (map[string]any, error) {
 	raw, errGet := a.hostCaller(hostAuthGet, map[string]string{"auth_index": file.AuthIndex})
 	if errGet != nil {
-		return authQuotaResponse{}, messages.Errorf("Read auth file: %w", errGet)
+		return nil, messages.Errorf("Read auth file: %w", errGet)
 	}
 	var auth hostAuthGetResponse
 	if errDecode := json.Unmarshal(raw, &auth); errDecode != nil {
-		return authQuotaResponse{}, messages.Errorf("Parse auth file: %w", errDecode)
+		return nil, messages.Errorf("Parse auth file: %w", errDecode)
 	}
 	var credential map[string]any
 	if errDecode := json.Unmarshal(auth.JSON, &credential); errDecode != nil {
-		return authQuotaResponse{}, messages.Errorf("Invalid auth file contents")
+		return nil, messages.Errorf("Invalid auth file contents")
 	}
 	if credentialUsesAPIKey(credential) {
-		return authQuotaResponse{}, messages.Errorf("API key credentials do not support this quota query")
+		return nil, messages.Errorf("API key credentials do not support this quota query")
 	}
 	if credentialString(credential, "proxy_url", "proxyUrl") != "" {
-		return authQuotaResponse{}, messages.Errorf("Quota queries do not support a separate proxy for an auth file")
+		return nil, messages.Errorf("Quota queries do not support a separate proxy for an auth file")
+	}
+	return credential, nil
+}
+
+func (a *App) fetchAuthQuota(callbackID string, file hostAuthFile, provider string) (authQuotaResponse, error) {
+	credential, errCredential := a.readAuthCredential(file)
+	if errCredential != nil {
+		return authQuotaResponse{}, errCredential
 	}
 	result := authQuotaResponse{AuthRevision: authFileRevision(file), FetchedAt: time.Now().UTC(), Quota: []quotaRow{}}
 	if provider == "xai" && paidXAICredential(credential) {
@@ -362,7 +429,39 @@ func (a *App) fetchAuthQuota(callbackID string, file hostAuthFile, provider stri
 	return result, nil
 }
 
+func (a *App) resetCodexQuota(callbackID string, file hostAuthFile, resetID string) error {
+	credential, errCredential := a.readAuthCredential(file)
+	if errCredential != nil {
+		return errCredential
+	}
+	token := credentialToken(credential)
+	if token == "" {
+		return messages.Errorf("Auth file has no usable credentials")
+	}
+	headers := http.Header{"User-Agent": {"codex_cli_rs/0.76.0"}}
+	if accountID := credentialString(credential, "account_id", "accountId", "chatgpt_account_id", "chatgptAccountId"); accountID != "" {
+		headers.Set("Chatgpt-Account-Id", accountID)
+	}
+	_, errCall := a.upstreamCall(
+		callbackID, http.MethodPost, "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume",
+		token, headers, map[string]string{"redeem_request_id": resetID},
+	)
+	return errCall
+}
+
 func (a *App) upstream(callbackID, method, endpoint, token string, headers http.Header, body any) (map[string]any, error) {
+	object, errCall := a.upstreamCall(callbackID, method, endpoint, token, headers, body)
+	if errCall != nil {
+		return nil, errCall
+	}
+	if object == nil {
+		return nil, messages.Errorf("Invalid upstream response")
+	}
+	return object, nil
+}
+
+// Reset responses may be empty even when successful.
+func (a *App) upstreamCall(callbackID, method, endpoint, token string, headers http.Header, body any) (map[string]any, error) {
 	if headers == nil {
 		headers = make(http.Header)
 	}
@@ -402,9 +501,6 @@ func (a *App) upstream(callbackID, method, endpoint, token string, headers http.
 			message = http.StatusText(response.StatusCode)
 		}
 		return nil, messages.Errorf("Upstream returned HTTP %d: %s", response.StatusCode, message)
-	}
-	if object == nil {
-		return nil, messages.Errorf("Invalid upstream response")
 	}
 	return object, nil
 }
@@ -446,13 +542,57 @@ func (a *App) fetchCodexQuota(callbackID, token, accountID string, result *authQ
 		}
 		appendCodexRateLimit(result, name+" ", objectMap(additional, "rate_limit", "rateLimit"))
 	}
-	if credits := objectMap(object, "rate_limit_reset_credits", "rateLimitResetCredits"); credits != nil {
-		if count, ok := intValue(credits, "available_count", "availableCount"); ok {
-			value := int(count)
-			result.RateLimitResetCreditsAvailableCount = &value
-		}
+	usageCredits := normalizeCodexResetCredits(objectMap(object, "rate_limit_reset_credits", "rateLimitResetCredits"))
+	result.RateLimitResetCreditsAvailableCount = usageCredits.availableCount
+	headers.Set("Accept", "application/json")
+	headers.Set("OpenAI-Beta", "codex-1")
+	headers.Set("Originator", "Codex Desktop")
+	credits, err := a.upstream(callbackID, http.MethodGet, "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits", token, headers, nil)
+	details := normalizeCodexResetCredits(credits)
+	result.RateLimitResetCreditsUnavailable = err != nil || details.invalidPayload
+	if result.RateLimitResetCreditsUnavailable {
+		return nil
+	}
+	result.RateLimitResetCredits = details.credits
+	// Match CPAMC: detail count, then non-empty available details, then usage count.
+	if details.availableCount != nil {
+		result.RateLimitResetCreditsAvailableCount = details.availableCount
+	} else if count := len(details.credits); count > 0 {
+		result.RateLimitResetCreditsAvailableCount = &count
 	}
 	return nil
+}
+
+type codexResetCreditsSummary struct {
+	availableCount *int
+	credits        []resetCreditExpiry
+	invalidPayload bool
+}
+
+func normalizeCodexResetCredits(object map[string]any) codexResetCreditsSummary {
+	result := codexResetCreditsSummary{invalidPayload: true}
+	for _, key := range []string{"credits", "available_count", "availableCount", "applicable_available_count", "applicableAvailableCount"} {
+		if _, ok := object[key]; ok {
+			result.invalidPayload = false
+			break
+		}
+	}
+	if count, ok := floatValue(object, "available_count", "availableCount"); ok && !math.IsNaN(count) && !math.IsInf(count, 0) {
+		value := int(count)
+		result.availableCount = &value
+	}
+	for _, raw := range objectSlice(object, "credits") {
+		credit, ok := raw.(map[string]any)
+		if !ok || firstString(credit, "reset_type", "resetType") != "codex_rate_limits" || firstString(credit, "status") != "available" {
+			continue
+		}
+		expiresAt := firstString(credit, "expires_at", "expiresAt")
+		if expiresAt != "" {
+			// Preserve non-empty dates as CPAMC does, even if their format is unknown.
+			result.credits = append(result.credits, resetCreditExpiry{ExpiresAt: expiresAt})
+		}
+	}
+	return result
 }
 
 func appendCodexRateLimit(result *authQuotaResponse, labelPrefix string, info map[string]any) {

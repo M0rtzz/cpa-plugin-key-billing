@@ -321,6 +321,22 @@
     "key": "backend.runtime_only_auth_files_have_no_readable_credentials",
     "formats": []
   },
+  "Quota resets are disabled for API key users": {
+    "key": "backend.api_key_quota_reset_disabled",
+    "formats": []
+  },
+  "Invalid quota reset request ID": {
+    "key": "backend.invalid_quota_reset_id",
+    "formats": []
+  },
+  "Auth file changed; refresh the auth file list and try again": {
+    "key": "backend.auth_file_changed_refresh_and_try_again",
+    "formats": []
+  },
+  "Quota resets are not supported for this auth file type": {
+    "key": "backend.auth_quota_reset_unsupported",
+    "formats": []
+  },
   "This CLIProxyAPI version does not support reading auth files": {
     "key": "backend.this_cliproxyapi_version_does_not_support_reading_auth_files",
     "formats": []

@@ -179,7 +179,7 @@ func TestAccountRequestEventsUseSharedShapeWithoutCrossingScopes(t *testing.T) {
 		t.Fatalf("view = %+v", view)
 	}
 	if view.Filters == nil || len(view.Filters.Models) != 1 || view.Filters.Models[0] != "gpt-5.5" ||
-		len(view.Filters.Sources) != 0 {
+		len(view.Filters.Sources) != 0 || len(view.Filters.SourceOptions) != 0 {
 		t.Fatalf("account request event filter options = %+v", view.Filters)
 	}
 	from := view.Entries[0].At.Format(time.RFC3339Nano)
@@ -271,13 +271,51 @@ func TestAccountRequestEventsHideTheAdministratorSource(t *testing.T) {
 		view.Entries[0].Source != "" || view.Entries[0].Account != "" {
 		t.Fatalf("account request event = %+v", view)
 	}
-	if view.Filters == nil || len(view.Filters.Sources) != 0 {
+	if view.Filters == nil || len(view.Filters.Sources) != 0 || len(view.Filters.SourceOptions) != 0 {
 		t.Fatalf("account request event source filters = %+v", view.Filters)
 	}
 	filtered := callAccount(t, app, routeEvents, accountTestKeyA,
 		url.Values{"source": {"codex · unknown@example.com"}})
 	if errDecode := json.Unmarshal(filtered.Body, &view); errDecode != nil || view.Total != 1 {
 		t.Fatalf("source-filtered account request events = %+v, err = %v", view, errDecode)
+	}
+}
+
+func TestAccountEmailMasking(t *testing.T) {
+	app, path := newAppWithPriceAndState(t, true)
+	raw, errHandle := app.HandleMethod(MethodPluginReconfigure, mustMarshal(t, LifecycleRequest{ConfigYAML: []byte(
+		"enabled: true\nmask_api_key_view_emails: true\nstate_file: \"" + path + "\"\n",
+	)}))
+	if errHandle != nil {
+		t.Fatal(errHandle)
+	}
+	decodeResult(t, raw, nil)
+	if _, errSync := app.store.SyncKeys([]string{accountTestKeyA}, false); errSync != nil {
+		t.Fatal(errSync)
+	}
+	if errLabel := app.store.SetLabel(billing.CallerScope(accountTestKeyA), "owner@example.com"); errLabel != nil {
+		t.Fatal(errLabel)
+	}
+	publishUsageRecord(t, app, UsageRecord{
+		Provider: "codex", Model: "gpt-5.5", Alias: "gpt-5.5", APIKey: accountTestKeyA,
+		AuthType: "oauth", Source: "private@example.com", Failed: true,
+		Failure: UsageFailure{Body: `{"error":{"message":"contact private@example.com"}}`},
+	})
+	profile := callAccount(t, app, routeProfile, accountTestKeyA, nil)
+	if strings.Contains(string(profile.Body), "owner@example.com") || !strings.Contains(string(profile.Body), "ow**r@example.com") {
+		t.Fatalf("masked profile = %s", profile.Body)
+	}
+	response := callAccount(t, app, routeEvents, accountTestKeyA, nil)
+	if strings.Contains(string(response.Body), "private@example.com") {
+		t.Fatalf("masked events = %s", response.Body)
+	}
+	var view billing.RequestEventView
+	if errDecode := json.Unmarshal(response.Body, &view); errDecode != nil {
+		t.Fatal(errDecode)
+	}
+	if len(view.Entries) != 1 || view.Entries[0].Source != "" || view.Entries[0].ErrorBody != "" ||
+		view.Filters == nil || len(view.Filters.SourceOptions) != 0 {
+		t.Fatalf("masked event view = %+v", view)
 	}
 }
 

@@ -11,6 +11,48 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
+func TestFeatureBranchV15MigrationPreservesBillingHistory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "feature-v15.db")
+	legacy, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := legacy.db.Exec(`
+		ALTER TABLE request_events DROP COLUMN response_service_tier;
+		ALTER TABLE request_events DROP COLUMN response_model;
+		ALTER TABLE request_events DROP COLUMN response_headers_json;
+		ALTER TABLE request_errors ADD COLUMN reason TEXT NOT NULL DEFAULT '';
+		PRAGMA user_version=15;
+		INSERT INTO request_events(id,at,scope,failed,price_source,billing_multiplier,service_tier_multiplier,total_usd)
+			VALUES(1,1,'dummy-scope',0,'custom',0.2,2.5,0.5),(2,2,'dummy-scope',1,'none',1,1,0);
+		INSERT INTO request_errors(request_event_id,status_code,reason,body) VALUES(2,502,'failure','upstream body');
+		INSERT INTO billing_adjustments(operation_id,multiplier,completed_at,result_json)
+			VALUES('dummy-operation',0.2,3,'{}');`); err != nil {
+		t.Fatal(err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatal(err)
+	}
+	migrated, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer migrated.Close()
+	var version, events, failures, adjustments int
+	if err := migrated.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != schemaVersion {
+		t.Fatal(version, err)
+	}
+	if err := migrated.db.QueryRow("SELECT count(*) FROM request_events WHERE id=1 AND billing_multiplier=0.2 AND service_tier_multiplier=2.5 AND total_usd=0.5").Scan(&events); err != nil || events != 1 {
+		t.Fatal(events, err)
+	}
+	if err := migrated.db.QueryRow("SELECT count(*) FROM request_events r JOIN request_errors e ON e.request_event_id=r.id WHERE r.id=2 AND r.failed=1 AND r.total_usd=0 AND e.body='upstream body'").Scan(&failures); err != nil || failures != 1 {
+		t.Fatal(failures, err)
+	}
+	if err := migrated.db.QueryRow("SELECT count(*) FROM billing_adjustments WHERE operation_id='dummy-operation'").Scan(&adjustments); err != nil || adjustments != 1 {
+		t.Fatal(adjustments, err)
+	}
+}
+
 func TestV12PriceMigrationPreservesModelIDsAndHistory(t *testing.T) {
 	for _, modelIDs := range [][]string{
 		{"model-a", "model-b"},
@@ -42,7 +84,7 @@ func TestV12PriceMigrationPreservesModelIDsAndHistory(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer database.Close()
-			assertMigratedReferencePriceSchema(t, database)
+			assertMigratedSchema(t, database)
 			state := mustLoad(t, database).State
 			if len(state.Prices) != len(modelIDs) {
 				t.Fatalf("prices lost: %+v", state.Prices)
@@ -63,7 +105,7 @@ func TestV12PriceMigrationPreservesModelIDsAndHistory(t *testing.T) {
 
 func TestV10V11PricingMigrationIsAtomicAndPreservesLegacyJSON(t *testing.T) {
 	for _, version := range []int{10, 11} {
-		for _, conflict := range []string{"", "reference-prices", "credentials"} {
+		for _, conflict := range []string{"", "reference-prices", "credentials", "response-headers"} {
 			t.Run(fmt.Sprintf("v%d/conflict=%s", version, conflict), func(t *testing.T) {
 				path := filepath.Join(t.TempDir(), "legacy.db")
 				raw, err := sql.Open("sqlite3", path)
@@ -77,7 +119,7 @@ INSERT INTO plans(position,id,name,amount_usd) VALUES(0,'plan','legacy plan',100
 INSERT INTO prices(position,pattern) VALUES(0,'model-a');
 INSERT INTO credentials VALUES('auth','codex','user@example.com','old format');
 INSERT INTO request_events(id,at,scope,auth_index,failed) VALUES(1,1,'legacy-scope','auth',1),(2,2,'legacy-scope','auth',0);
-INSERT INTO request_errors(request_event_id,status_code,reason) VALUES(1,502,'preserved failure');`
+INSERT INTO request_errors(request_event_id,status_code,reason,body) VALUES(1,502,'HTTP 502','{"error":"preserved"}');`
 				if version == 10 {
 					old += `DROP TABLE routes;
 ALTER TABLE api_keys DROP COLUMN route_bindings_json;
@@ -106,6 +148,9 @@ VALUES('legacy-scope','plan',4.5,'[{"kind":"model","value":"model-a"}]');`
 					// Fail after the earlier migration steps have transformed legacy
 					// bindings and periods, proving the entire chain rolls back.
 					old += `CREATE TABLE reference_prices_metadata(marker TEXT); INSERT INTO reference_prices_metadata VALUES('keep');`
+				}
+				if conflict == "response-headers" {
+					old += `ALTER TABLE request_events ADD COLUMN response_headers_json TEXT NOT NULL DEFAULT '{}';`
 				}
 				if conflict == "credentials" {
 					old += `ALTER TABLE credentials ADD COLUMN unknown_field TEXT;`
@@ -144,7 +189,7 @@ VALUES('legacy-scope','plan',4.5,'[{"kind":"model","value":"model-a"}]');`
 					t.Fatal(err)
 				}
 				defer d.Close()
-				assertMigratedReferencePriceSchema(t, d)
+				assertMigratedSchema(t, d)
 				var accounts int
 				if err := raw.QueryRow("SELECT count(*) FROM request_events WHERE provider='codex' AND account='user@example.com'").Scan(&accounts); err != nil || accounts != 2 {
 					t.Fatal("event accounts were not migrated", accounts, err)
@@ -166,9 +211,11 @@ VALUES('legacy-scope','plan',4.5,'[{"kind":"model","value":"model-a"}]');`
 				if key == nil || key.Cycles["default"].SpentUSD != 4.5 || (len(key.RouteBindings.Models) == 0 && len(key.RouteBindings.RouteIDs) == 0) {
 					t.Fatal("legacy key state was lost", key)
 				}
-				var reason string
-				if err := raw.QueryRow("SELECT reason FROM request_errors WHERE request_event_id=1").Scan(&reason); err != nil || reason != "preserved failure" {
-					t.Fatal("failed event details were lost", reason, err)
+				var status int
+				var body string
+				if err := raw.QueryRow("SELECT status_code, body FROM request_errors WHERE request_event_id=1").Scan(&status, &body); err != nil ||
+					status != 502 || body != `{"error":"preserved"}` {
+					t.Fatal("failed event details were lost", status, body, err)
 				}
 			})
 		}
@@ -177,8 +224,12 @@ VALUES('legacy-scope','plan',4.5,'[{"kind":"model","value":"model-a"}]');`
 
 // Each migration must produce the same reference-price tables and index as a
 // fresh database, including the absence of any derived alias table.
-func assertMigratedReferencePriceSchema(t *testing.T, migrated *DB) {
+func assertMigratedSchema(t *testing.T, migrated *DB) {
 	t.Helper()
+	var missingHeaders int
+	if err := migrated.db.QueryRow("SELECT count(*) FROM request_events WHERE response_headers_json != '{}' OR response_headers_json IS NULL").Scan(&missingHeaders); err != nil || missingHeaders != 0 {
+		t.Fatal("historical response headers must remain unreported", missingHeaders, err)
+	}
 	fresh := openTestDB(t)
 	readSchema := func(database *DB) string {
 		rows, err := database.db.Query(`
@@ -500,6 +551,216 @@ func TestV12QuotaWindowsMigrationAndRollback(t *testing.T) {
 				t.Fatal(err)
 			}
 			reopened.Close()
+		})
+	}
+}
+
+func TestResponseHeadersMigrationAndRollback(t *testing.T) {
+	for _, version := range []int{12, 13, 14} {
+		for _, conflict := range []bool{false, true} {
+			t.Run(fmt.Sprintf("v%d/conflict=%v", version, conflict), func(t *testing.T) {
+				path := filepath.Join(t.TempDir(), "legacy.db")
+				raw, err := sql.Open("sqlite3", path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer raw.Close()
+				if _, err := raw.Exec(legacyPricingSchemaSQL); err != nil {
+					t.Fatal(err)
+				}
+				fixture := &DB{db: raw}
+				if err := fixture.transact(func(tx *sql.Tx) error {
+					if version >= 13 {
+						if err := migrateModelPricing(tx); err != nil {
+							return err
+						}
+						if err := migrateQuotaWindows(tx); err != nil {
+							return err
+						}
+					}
+					if version >= 14 {
+						return migrateCredentials(tx)
+					}
+					return nil
+				}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := raw.Exec(fmt.Sprintf("PRAGMA user_version=%d;", version) + `
+					INSERT INTO request_events(id,at,scope,failed,total_usd) VALUES
+					(1,1,'s',0,2.5),(2,2,'s',1,0),(3,3,'s',0,0);
+					INSERT INTO request_errors(request_event_id,status_code,body) VALUES(2,502,'preserved failure');`); err != nil {
+					t.Fatal(err)
+				}
+				if version == 14 {
+					if _, err := raw.Exec(`CREATE TRIGGER reject_update BEFORE UPDATE ON request_events BEGIN SELECT RAISE(ABORT,'history rewritten'); END;
+						CREATE TRIGGER reject_delete BEFORE DELETE ON request_events BEGIN SELECT RAISE(ABORT,'history deleted'); END;`); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if conflict {
+					// Fail after adding the column, during index synchronization.
+					if _, err := raw.Exec("DROP INDEX request_events_at; CREATE TABLE request_events_at(marker TEXT)"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				var before, after string
+				const schemaSQL = "SELECT group_concat(sql, char(10)) FROM (SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name)"
+				if err := raw.QueryRow(schemaSQL).Scan(&before); err != nil {
+					t.Fatal(err)
+				}
+				database, err := Open(path)
+				if conflict {
+					if err == nil {
+						database.Close()
+						t.Fatal("conflicting migration succeeded")
+					}
+					if err := raw.QueryRow(schemaSQL).Scan(&after); err != nil || before != after {
+						t.Fatal("migration did not restore the entire schema", err)
+					}
+				} else {
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer database.Close()
+					var empty int
+					if err := raw.QueryRow("SELECT count(*) FROM request_events WHERE response_headers_json='{}'").Scan(&empty); err != nil || empty != 3 {
+						t.Fatal("historical headers must remain unreported", empty, err)
+					}
+					view, err := database.RequestEvents(billing.RequestEventQuery{}, time.Time{})
+					if err != nil || view.Total != 3 || view.Statuses.Failed != 1 {
+						t.Fatalf("migrated view = %+v, err = %v", view, err)
+					}
+				}
+				var gotVersion, events, failures int
+				var cost float64
+				wantVersion := schemaVersion
+				if conflict {
+					wantVersion = version
+				}
+				if err := raw.QueryRow("PRAGMA user_version").Scan(&gotVersion); err != nil || gotVersion != wantVersion {
+					t.Fatal("incorrect schema version", gotVersion, err)
+				}
+				if err := raw.QueryRow("SELECT count(*),sum(failed),sum(total_usd) FROM request_events").Scan(&events, &failures, &cost); err != nil || events != 3 || failures != 1 || cost != 2.5 {
+					t.Fatal("history changed", events, failures, cost, err)
+				}
+				var body string
+				if err := raw.QueryRow("SELECT body FROM request_errors WHERE request_event_id=2").Scan(&body); err != nil || body != "preserved failure" {
+					t.Fatal("failure details changed", body, err)
+				}
+			})
+		}
+	}
+}
+
+func TestUpstreamResponseReportsMigration(t *testing.T) {
+	for _, version := range []int{15, 16} {
+		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "legacy.db")
+			raw, err := sql.Open("sqlite3", path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer raw.Close()
+			if _, err := raw.Exec(legacyPricingSchemaSQL); err != nil {
+				t.Fatal(err)
+			}
+			fixture := &DB{db: raw}
+			if err := fixture.transact(func(tx *sql.Tx) error {
+				steps := []func(*sql.Tx) error{migrateModelPricing, migrateQuotaWindows, migrateCredentials, migrateResponseHeaders}
+				if version >= 16 {
+					steps = append(steps, migrateRequestErrorReason)
+				}
+				for _, step := range steps {
+					if err := step(tx); err != nil {
+						return err
+					}
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			legacy := fmt.Sprintf("PRAGMA user_version=%d;", version) + `
+				INSERT INTO request_events(id,at,scope,service_tier,upstream_model,billing_model,failed,total_usd)
+					VALUES(1,1,'s','priority','gpt-5.5','gpt-5.5',0,2.5),(2,2,'s','','','',1,0);`
+			if version >= 16 {
+				legacy += `INSERT INTO request_errors(request_event_id,status_code,error_type,body)
+					VALUES(2,502,'upstream_error','preserved failure');`
+			} else {
+				legacy += `INSERT INTO request_errors(request_event_id,status_code,error_type,reason,body)
+					VALUES(2,502,'upstream_error','HTTP 502','preserved failure');`
+			}
+			if _, err := raw.Exec(legacy); err != nil {
+				t.Fatal(err)
+			}
+			database, err := Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer database.Close()
+			view, err := database.RequestEvents(billing.RequestEventQuery{}, time.Time{})
+			if err != nil || view.Total != 2 || view.Statuses.Failed != 1 {
+				t.Fatalf("migrated view = %+v, err = %v", view, err)
+			}
+			if entry := view.Entries[1]; entry.ServiceTier != "priority" || entry.ResponseServiceTier != "" ||
+				entry.UpstreamModel != "gpt-5.5" || entry.ResponseModel != "" || entry.Cost.TotalUSD != 2.5 {
+				t.Fatalf("migrated entry = %+v", entry)
+			}
+			if entry := view.Entries[0]; !entry.Failed || entry.ErrorBody != "preserved failure" {
+				t.Fatalf("migrated failure = %+v", entry)
+			}
+		})
+	}
+}
+
+func TestRequestErrorReasonMigration(t *testing.T) {
+	for _, version := range []int{14, 15} {
+		t.Run(fmt.Sprintf("v%d", version), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "legacy.db")
+			raw, err := sql.Open("sqlite3", path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer raw.Close()
+			if _, err := raw.Exec(legacyPricingSchemaSQL); err != nil {
+				t.Fatal(err)
+			}
+			fixture := &DB{db: raw}
+			if err := fixture.transact(func(tx *sql.Tx) error {
+				for _, step := range []func(*sql.Tx) error{migrateModelPricing, migrateQuotaWindows, migrateCredentials} {
+					if err := step(tx); err != nil {
+						return err
+					}
+				}
+				if version >= 15 {
+					return migrateResponseHeaders(tx)
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := raw.Exec(fmt.Sprintf("PRAGMA user_version=%d;", version) + `
+				INSERT INTO request_events(id,at,scope,failed,total_usd) VALUES(1,1,'s',1,0);
+				INSERT INTO request_errors(request_event_id,status_code,error_type,reason,body)
+					VALUES(1,502,'upstream_error','HTTP 502','{"error":"preserved"}');`); err != nil {
+				t.Fatal(err)
+			}
+			database, err := Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer database.Close()
+			var dropped int
+			if err := raw.QueryRow("SELECT count(*) FROM pragma_table_info('request_errors') WHERE name='reason'").
+				Scan(&dropped); err != nil || dropped != 0 {
+				t.Fatal("the reason column survived the migration", dropped, err)
+			}
+			var status int
+			var errorType, body string
+			if err := raw.QueryRow("SELECT status_code, error_type, body FROM request_errors WHERE request_event_id=1").
+				Scan(&status, &errorType, &body); err != nil ||
+				status != 502 || errorType != "upstream_error" || body != `{"error":"preserved"}` {
+				t.Fatal("failed event details were lost", status, errorType, body, err)
+			}
 		})
 	}
 }

@@ -84,6 +84,43 @@ func TestAccountQuotaSummaryReadOnlyDisabledAndStale(t *testing.T) {
 	}
 }
 
+func TestAccountQuotaResetMetadataRequiresOptIn(t *testing.T) {
+	app := newConfiguredApp(t)
+	file := hostAuthFile{ID: "dummy-id", AuthIndex: "dummy-index", Name: "private@example.com.json", Type: "codex", ModTime: time.Date(2026, 9, 25, 0, 0, 0, 0, time.UTC)}
+	quotaTestHost(t, app, []hostAuthFile{file})
+	count := 2
+	app.storeAuthQuota(file, authQuotaResponse{
+		FetchedAt: time.Now(), RateLimitResetCreditsAvailableCount: &count,
+		RateLimitResetCredits: []resetCreditExpiry{{ExpiresAt: "2026-10-01T00:00:00Z"}}, Quota: []quotaRow{},
+	})
+	access := viewAccess{APIKey: true, Scope: billing.CallerScope(accountTestKeyA)}
+	read := func() accountQuotaAccount {
+		t.Helper()
+		response := app.accountQuotaSummary(ManagementRequest{}, access)
+		var summary accountQuotaSummaryResponse
+		if response.StatusCode != http.StatusOK || json.Unmarshal(response.Body, &summary) != nil || len(summary.Accounts) != 1 {
+			t.Fatalf("summary = %d %s", response.StatusCode, response.Body)
+		}
+		if strings.Contains(string(response.Body), file.Name) || strings.Contains(string(response.Body), file.AuthIndex) {
+			t.Fatalf("summary disclosed auth identity: %s", response.Body)
+		}
+		return summary.Accounts[0]
+	}
+	if account := read(); account.RateLimitResetCreditsAvailableCount != nil || len(account.RateLimitResetCredits) != 0 {
+		t.Fatalf("disabled reset disclosed credit metadata: %+v", account)
+	}
+	cfg := app.store.Config()
+	cfg.AllowAPIKeyQuotaReset = true
+	if err := app.store.Configure(cfg); err != nil {
+		t.Fatal(err)
+	}
+	account := read()
+	if account.CacheRevision != authFileRevision(file) || account.RateLimitResetCreditsAvailableCount == nil ||
+		*account.RateLimitResetCreditsAvailableCount != 2 || len(account.RateLimitResetCredits) != 1 {
+		t.Fatalf("enabled reset metadata = %+v", account)
+	}
+}
+
 func TestAccountQuotaSummaryCredentialDenyAndModelScope(t *testing.T) {
 	app := newConfiguredApp(t)
 	scope := billing.CallerScope(accountTestKeyA)

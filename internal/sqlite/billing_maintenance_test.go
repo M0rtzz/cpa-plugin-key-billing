@@ -13,7 +13,7 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
-// Create the deployed v14 shape, including the old fast-mode source encoding.
+// Create the deployed v17 shape, including the old fast-mode source encoding.
 // Rows older than retention deliberately exercise maintenance without pruning.
 func billingMaintenanceFixture(t *testing.T) string {
 	t.Helper()
@@ -27,14 +27,14 @@ func billingMaintenanceFixture(t *testing.T) string {
 		ALTER TABLE request_events DROP COLUMN billing_multiplier;
 		ALTER TABLE request_events DROP COLUMN service_tier_multiplier;
 		DROP TABLE billing_adjustments;
-		PRAGMA user_version=14;
+		PRAGMA user_version=17;
 		INSERT INTO request_events(id,at,scope,price_source,total_usd,uncached_input_usd,cache_read_usd,cache_write_usd,output_usd,
 			applied_input_per_1m,applied_output_per_1m,applied_cache_read_per_1m,applied_cache_write_per_1m,
 			uncached_input_tokens,cache_read_tokens,cache_write_tokens,billed_output_tokens)
 		VALUES(1,1,'a','custom',10,1,2,3,4,5,6,7,8,101,102,103,104),
 			(2,2,'deleted','reference:x2.5',2.5,0,0,0,0,0,0,0,0,0,0,0,0);
 		INSERT INTO request_events(id,at,scope,failed) VALUES(3,3,'deleted',1);
-		INSERT INTO request_errors(request_event_id,status_code,reason) VALUES(3,502,'preserve failure');
+		INSERT INTO request_errors(request_event_id,status_code,body) VALUES(3,502,'preserve failure');
 		INSERT INTO api_keys(scope,preview,cycles_json) VALUES('a','masked',
 			'{"old":{"spent_usd":25,"used_tokens":9007199254740993,"used_requests":11,"start_at":"2024-01-01T00:00:00Z","custom":{"value":9007199254740995}}}');
 		INSERT INTO api_keys(scope,preview,deleted_at,cycles_json) VALUES('deleted','masked',1,
@@ -59,7 +59,7 @@ func maintenanceRawDB(t *testing.T, path string) *sql.DB {
 	return db
 }
 
-func TestV15MigrationPreservesLegacyCostsAndFastMode(t *testing.T) {
+func TestV18MigrationPreservesLegacyCostsAndFastMode(t *testing.T) {
 	path := billingMaintenanceFixture(t)
 	db, err := Open(path)
 	if err != nil {
@@ -134,7 +134,7 @@ func TestBillingBackfillPreviewApplyAndReplay(t *testing.T) {
 	}
 	db := maintenanceRawDB(t, path)
 	var version int
-	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 15 {
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 18 {
 		t.Fatal(version, err)
 	}
 	var total, global, service, rate float64
@@ -146,7 +146,7 @@ func TestBillingBackfillPreviewApplyAndReplay(t *testing.T) {
 		total != 0.5 || global != 0.2 || service != 2.5 {
 		t.Fatal("fast-mode legacy total with absent breakdown changed", total, global, service, err)
 	}
-	var raw, reason, originalLog, plan string
+	var raw, body, originalLog, plan string
 	if err := db.QueryRow("SELECT cycles_json FROM api_keys WHERE scope='a'").Scan(&raw); err != nil {
 		t.Fatal(err)
 	}
@@ -163,8 +163,8 @@ func TestBillingBackfillPreviewApplyAndReplay(t *testing.T) {
 	if err := db.QueryRow("SELECT input_per_1m FROM prices").Scan(&rate); err != nil || rate != 15 {
 		t.Fatal("base model prices changed", rate, err)
 	}
-	if err := db.QueryRow("SELECT reason FROM request_errors WHERE request_event_id=3").Scan(&reason); err != nil || reason != "preserve failure" {
-		t.Fatal(reason, err)
+	if err := db.QueryRow("SELECT body FROM request_errors WHERE request_event_id=3").Scan(&body); err != nil || body != "preserve failure" {
+		t.Fatal(body, err)
 	}
 	if err := db.QueryRow("SELECT message FROM plugin_logs WHERE id=1").Scan(&originalLog); err != nil || originalLog != "Original expense $10.00" {
 		t.Fatal("historical audit log rewritten", originalLog, err)
@@ -207,7 +207,7 @@ func TestBillingBackfillRollsBackInvalidDataAndSchema(t *testing.T) {
 			}
 			var version, columns int
 			var total float64
-			if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 14 {
+			if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 17 {
 				t.Fatal("schema migration did not roll back", version, err)
 			}
 			if err := db.QueryRow("SELECT count(*) FROM pragma_table_info('request_events') WHERE name='billing_multiplier'").Scan(&columns); err != nil || columns != 0 {
@@ -290,7 +290,7 @@ func TestBillingBackfillDryRunIncludesWAL(t *testing.T) {
 		t.Fatal("consistent preview omitted committed WAL rows", result, err)
 	}
 	var version int
-	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 14 {
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 17 {
 		t.Fatal("dry run migrated the live source", version, err)
 	}
 }

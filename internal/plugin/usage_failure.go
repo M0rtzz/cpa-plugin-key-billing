@@ -1,171 +1,87 @@
 package plugin
 
 import (
+	"bytes"
 	"encoding/json"
-	"strconv"
 	"strings"
+
+	"cpa-key-billing/internal/billing"
 )
 
-const maxFailureReason = 300
-
-type usageFailureView struct {
-	StatusCode int
-	ErrorType  string
-	Reason     string
-	Body       string
-}
-
-type normalizedFailureEnvelope struct {
-	Error normalizedFailure `json:"error"`
-}
-
-type normalizedFailure struct {
-	Message string `json:"message,omitempty"`
-	Type    string `json:"type,omitempty"`
-	Code    string `json:"code,omitempty"`
-	Status  int    `json:"status,omitempty"`
-}
-
-// Keep only the error scalars exposed by usage.handle; unrelated response
-// fields must not enter the stored error event.
-func usageFailureDetails(failure UsageFailure) usageFailureView {
-	statusCode := validFailureStatus(failure.StatusCode)
-	raw := strings.TrimSpace(failure.Body)
-	normalized, qualifier := parseJSONFailure(raw)
-	if normalized == (normalizedFailure{}) {
-		normalized.Message = raw
-	}
-	reason := formatFailureReason(statusCode, qualifyFailure(normalized.Message, qualifier))
-	normalized.Message = truncateFailureReason(stripFailureStatus(normalized.Message, statusCode))
-	if statusCode != 0 {
-		normalized.Status = statusCode
-	}
-	errorType := normalized.Code
-	if errorType == "" {
-		errorType = normalized.Type
-	}
-	return usageFailureView{
-		StatusCode: statusCode,
-		ErrorType:  errorType,
-		Reason:     reason,
-		Body:       marshalNormalizedFailure(normalized),
+func usageFailureDetails(failure UsageFailure) billing.RequestError {
+	body := normalizeFailureBody(failure.Body)
+	return billing.RequestError{
+		StatusCode: validFailureStatus(failure.StatusCode),
+		ErrorType:  failureErrorType(body),
+		Body:       body,
 	}
 }
 
-func parseJSONFailure(raw string) (normalizedFailure, string) {
-	if raw == "" {
-		return normalizedFailure{}, ""
+// A body may arrive as a JSON-encoded string, possibly nested; unwrap it so
+// the stored text carries no transport escaping.
+func normalizeFailureBody(body string) string {
+	body = strings.TrimSpace(body)
+	for {
+		var unwrapped string
+		if json.Unmarshal([]byte(body), &unwrapped) != nil {
+			break
+		}
+		body = strings.TrimSpace(unwrapped)
 	}
-	if start := strings.IndexByte(raw, '{'); start > 0 {
-		raw = raw[start:]
+	var compact bytes.Buffer
+	if json.Compact(&compact, []byte(body)) == nil {
+		return compact.String()
 	}
-	decoder := json.NewDecoder(strings.NewReader(raw))
+	return body
+}
+
+func failureErrorType(body string) string {
+	code, errorType := parseUpstreamFailure(body)
+	switch {
+	case code != "":
+		return code
+	case errorType != "":
+		return errorType
+	default:
+		return inferredFailureType(body)
+	}
+}
+
+func inferredFailureType(body string) string {
+	body = strings.ToLower(body)
+	switch {
+	case strings.Contains(body, "websocket: close 1006"):
+		return "websocket_abnormal_closure"
+	case strings.Contains(body, "context canceled"):
+		return "context_canceled"
+	default:
+		return ""
+	}
+}
+
+func parseUpstreamFailure(body string) (code, errorType string) {
+	if start := strings.IndexByte(body, '{'); start > 0 {
+		body = body[start:]
+	}
+	decoder := json.NewDecoder(strings.NewReader(body))
 	decoder.UseNumber()
 	var root map[string]any
 	if decoder.Decode(&root) != nil || root == nil {
-		return normalizedFailure{}, ""
+		return "", ""
 	}
-
-	var node map[string]any
+	node := root
 	for _, path := range [][]string{{"error"}, {"response", "error"}, {"body", "error"}} {
-		if node = failureObjectAt(root, path...); node != nil {
+		if found := failureObjectAt(root, path...); found != nil {
+			node = found
 			break
 		}
 	}
-	rootNode := false
-	message := ""
-	if node != nil {
-		message = failureString(node["message"])
-	} else if value := failureString(root["error"]); value != "" {
-		message = value
-		node = root
-		rootNode = true
-	} else if value := failureString(root["message"]); value != "" {
-		message = value
-		node = root
-		rootNode = true
-	}
-	if node == nil {
-		return normalizedFailure{}, ""
-	}
-
-	errorType := failureString(node["type"])
-	qualifier := errorType
-	if rootNode && strings.EqualFold(errorType, "error") {
+	errorType = failureString(node["type"])
+	if strings.EqualFold(errorType, "error") {
+		// The generic wrapper around a nested error object, not a category.
 		errorType = ""
-		qualifier = failureString(node["code"])
-	} else if qualifier == "" {
-		qualifier = failureString(node["status"])
-		if qualifier == "" {
-			qualifier = failureString(node["code"])
-		}
 	}
-	return normalizedFailure{
-		Message: message,
-		Type:    errorType,
-		Code:    failureString(node["code"]),
-		Status:  failureStatus(node["status"]),
-	}, qualifier
-}
-
-func marshalNormalizedFailure(failure normalizedFailure) string {
-	if failure == (normalizedFailure{}) {
-		return ""
-	}
-	raw, _ := json.Marshal(normalizedFailureEnvelope{Error: failure})
-	return string(raw)
-}
-
-func validFailureStatus(status int) int {
-	if status < 100 || status > 599 {
-		return 0
-	}
-	return status
-}
-
-func failureStatus(value any) int {
-	var raw string
-	switch value := value.(type) {
-	case json.Number:
-		raw = value.String()
-	case string:
-		raw = strings.TrimSpace(value)
-	default:
-		return 0
-	}
-	status, errStatus := strconv.Atoi(raw)
-	if errStatus != nil {
-		return 0
-	}
-	return validFailureStatus(status)
-}
-
-func stripFailureStatus(message string, statusCode int) string {
-	if statusCode == 0 {
-		return message
-	}
-	for _, separator := range []string{"：", ":"} {
-		prefix := "HTTP " + strconv.Itoa(statusCode) + separator
-		if strings.HasPrefix(message, prefix) {
-			return strings.TrimSpace(strings.TrimPrefix(message, prefix))
-		}
-	}
-	return message
-}
-
-func formatFailureReason(statusCode int, message string) string {
-	status := ""
-	if statusCode != 0 {
-		status = "HTTP " + strconv.Itoa(statusCode)
-	}
-	switch {
-	case message == "":
-		return status
-	case status == "" || strings.Contains(message, status):
-		return truncateFailureReason(message)
-	default:
-		return truncateFailureReason(status + "：" + message)
-	}
+	return failureString(node["code"]), errorType
 }
 
 func failureObjectAt(root map[string]any, path ...string) map[string]any {
@@ -192,18 +108,9 @@ func failureString(value any) string {
 	}
 }
 
-func qualifyFailure(message, code string) string {
-	if message == "" || code == "" || strings.Contains(message, code) {
-		return message
+func validFailureStatus(status int) int {
+	if status < 100 || status > 599 {
+		return 0
 	}
-	return message + "（" + code + "）"
-}
-
-func truncateFailureReason(reason string) string {
-	reason = strings.TrimSpace(reason)
-	runes := []rune(reason)
-	if len(runes) <= maxFailureReason {
-		return reason
-	}
-	return strings.TrimSpace(string(runes[:maxFailureReason])) + "…"
+	return status
 }

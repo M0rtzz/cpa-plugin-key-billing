@@ -5,7 +5,6 @@ import "time"
 type RequestError struct {
 	StatusCode int    `json:"status_code,omitempty"`
 	ErrorType  string `json:"error_type,omitempty"`
-	Reason     string `json:"reason,omitempty"`
 	Body       string `json:"body,omitempty"`
 }
 
@@ -52,12 +51,13 @@ type RequestErrorView struct {
 }
 
 type RequestErrorFilterValues struct {
-	Models      []string `json:"models"`
-	Sources     []string `json:"sources"`
-	Executors   []string `json:"executors,omitempty"`
-	Providers   []string `json:"providers,omitempty"`
-	StatusCodes []int    `json:"status_codes,omitempty"`
-	ErrorTypes  []string `json:"error_types,omitempty"`
+	Models        []string              `json:"models"`
+	Sources       []string              `json:"-"`
+	SourceOptions []RequestSourceOption `json:"source_options"`
+	Executors     []string              `json:"executors,omitempty"`
+	Providers     []string              `json:"providers,omitempty"`
+	StatusCodes   []int                 `json:"status_codes,omitempty"`
+	ErrorTypes    []string              `json:"error_types,omitempty"`
 }
 
 func (s *Store) RequestErrors(query RequestErrorQuery) (RequestErrorView, error) {

@@ -2,8 +2,11 @@ package plugin
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -204,7 +207,7 @@ func TestAdminAuthQuotaPopulatesReadOnlyAccountCache(t *testing.T) {
 	if response := app.authQuota(request, viewAccess{}); response.StatusCode != http.StatusOK {
 		t.Fatalf("admin status = %d, body = %s", response.StatusCode, response.Body)
 	}
-	if secretCalls != 2 {
+	if secretCalls != 3 {
 		t.Fatalf("admin secret calls = %d", secretCalls)
 	}
 	access := viewAccess{APIKey: true, Scope: billing.CallerScope(accountTestKeyA)}
@@ -221,7 +224,7 @@ func TestAdminAuthQuotaPopulatesReadOnlyAccountCache(t *testing.T) {
 	if result.Status != "ready" || result.Plan != "pro-20x" || len(result.Quota) != 1 || result.Stale {
 		t.Fatalf("result = %+v", result)
 	}
-	if secretCalls != 2 {
+	if secretCalls != 3 {
 		t.Fatalf("user triggered secret calls: %d", secretCalls)
 	}
 	request.Query.Set("auth_index", file.AuthIndex)
@@ -330,6 +333,9 @@ func TestCodexQuotaPreservesAdditionalDynamicWindows(t *testing.T) {
 			return json.RawMessage(`{"auth_index":"codex-1","json":{"access_token":"dummy-token","account_id":"dummy-account"}}`), nil
 		case hostHTTPDo:
 			request := payload.(hostHTTPRequest)
+			if strings.HasSuffix(request.URL, "/rate-limit-reset-credits") {
+				return mustJSONRaw(t, hostHTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2026-10-04T02:27:00Z"}]}`)}), nil
+			}
 			endpoint = request.URL
 			if request.Headers.Get("Authorization") != "Bearer dummy-token" || request.Headers.Get("Chatgpt-Account-Id") != "dummy-account" {
 				t.Fatalf("headers = %#v", request.Headers)
@@ -355,6 +361,9 @@ func TestCodexQuotaPreservesAdditionalDynamicWindows(t *testing.T) {
 	if result.Plan != "pro-20x" || len(result.Quota) != 3 {
 		t.Fatalf("quota = %+v", result)
 	}
+	if len(result.RateLimitResetCredits) != 1 || result.RateLimitResetCredits[0].ExpiresAt != "2026-10-04T02:27:00Z" {
+		t.Fatalf("reset credits = %+v", result.RateLimitResetCredits)
+	}
 	if result.Quota[0].RemainingPercent == nil || *result.Quota[0].RemainingPercent != 62 {
 		t.Fatalf("remaining percent = %+v", result.Quota[0].RemainingPercent)
 	}
@@ -363,6 +372,77 @@ func TestCodexQuotaPreservesAdditionalDynamicWindows(t *testing.T) {
 		if result.Quota[index].Label != want {
 			t.Fatalf("quota[%d].Label = %q, want %q", index, result.Quota[index].Label, want)
 		}
+	}
+}
+
+func TestCodexResetCreditExpiry(t *testing.T) {
+	for _, tc := range []struct {
+		name, usage, credits           string
+		status, wantCount, wantCredits int
+		unavailable                    bool
+	}{
+		{"available only", `{"available_count":9}`, `{"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2026-10-04T10:27:00+08:00"},{"resetType":"codex_rate_limits","status":"available","expiresAt":"2026-10-05T06:45:00+08:00"},{"reset_type":"codex_rate_limits","status":"consumed","expires_at":"2026-10-04T02:27:00Z"},{"reset_type":"other","status":"available","expires_at":"2026-10-04T02:27:00Z"},{"reset_type":"codex_rate_limits","status":"available","expires_at":""}]}`, 200, 2, 2, false},
+		{"failure preserves windows and usage count", `{"available_count":1}`, `{}`, 503, 1, 0, true},
+		{"invalid response", `{"available_count":1}`, `{}`, 200, 1, 0, true},
+		{"no available credits", `{"available_count":0}`, `{"credits":[]}`, 200, 0, 0, false},
+		{"unknown count stays unknown", `{}`, `{"credits":[]}`, 200, -1, 0, false},
+		{"empty details preserve usage count", `{"available_count":2}`, `{"credits":[]}`, 200, 2, 0, false},
+		{"detail count wins", `{"available_count":9}`, `{"availableCount":"3","credits":[]}`, 200, 3, 0, false},
+		{"explicit zero wins", `{"available_count":9}`, `{"available_count":0,"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2026-10-04T10:27:00+08:00"}]}`, 200, 0, 1, false},
+		{"missing usage count still queries details", `{}`, `{"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2026-10-04T10:27:00+08:00"}]}`, 200, 1, 1, false},
+		{"zero usage count still queries details", `{"available_count":0}`, `{"available_count":2}`, 200, 2, 0, false},
+		{"applicable count is not total count", `{"available_count":2}`, `{"applicable_available_count":0}`, 200, 2, 0, false},
+		{"nonfinite detail count falls back", `{"available_count":2}`, `{"available_count":"NaN"}`, 200, 2, 0, false},
+		{"failure without usage count", `{}`, `{}`, 503, -1, 0, true},
+		{"malformed JSON", `{"available_count":1}`, `{`, 200, 1, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := newConfiguredApp(t)
+			calls := 0
+			app.SetHostCaller(func(method string, payload any) (json.RawMessage, error) {
+				request := payload.(hostHTTPRequest)
+				calls++
+				if method != hostHTTPDo || request.Method != http.MethodGet || request.HostCallbackID != "dummy-callback" || request.Headers.Get("Chatgpt-Account-Id") != "dummy-account" || request.Headers.Get("Authorization") != "Bearer dummy-token" {
+					t.Fatalf("unexpected request: %s %+v", method, request)
+				}
+				if strings.HasSuffix(request.URL, "/usage") {
+					body := `{"rate_limit":{"primary_window":{"used_percent":38}},"rate_limit_reset_credits":` + tc.usage + `}`
+					return mustJSONRaw(t, hostHTTPResponse{StatusCode: 200, Body: []byte(body)}), nil
+				}
+				if request.URL != "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits" || request.Headers.Get("OpenAI-Beta") != "codex-1" || request.Headers.Get("Originator") != "Codex Desktop" {
+					t.Fatalf("unexpected expiry request: %+v", request)
+				}
+				return mustJSONRaw(t, hostHTTPResponse{StatusCode: tc.status, Body: []byte(tc.credits)}), nil
+			})
+			result := authQuotaResponse{}
+			if err := app.fetchCodexQuota("dummy-callback", "dummy-token", "dummy-account", &result); err != nil {
+				t.Fatal(err)
+			}
+			if calls != 2 || len(result.RateLimitResetCredits) != tc.wantCredits || result.RateLimitResetCreditsUnavailable != tc.unavailable || len(result.Quota) != 1 || *result.Quota[0].RemainingPercent != 62 {
+				t.Fatalf("calls = %d, result = %+v", calls, result)
+			}
+			if tc.wantCount < 0 {
+				if result.RateLimitResetCreditsAvailableCount != nil {
+					t.Fatalf("unexpected count: %d", *result.RateLimitResetCreditsAvailableCount)
+				}
+			} else if result.RateLimitResetCreditsAvailableCount == nil || *result.RateLimitResetCreditsAvailableCount != tc.wantCount {
+				t.Fatalf("count = %v, want %d", result.RateLimitResetCreditsAvailableCount, tc.wantCount)
+			}
+			if tc.wantCredits > 0 && result.RateLimitResetCredits[0].ExpiresAt != "2026-10-04T10:27:00+08:00" {
+				t.Fatalf("expiry not preserved: %+v", result.RateLimitResetCredits)
+			}
+		})
+	}
+}
+
+func TestCodexResetCreditPreservesUnknownDateFormat(t *testing.T) {
+	var object map[string]any
+	if err := json.Unmarshal([]byte(`{"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"unknown-date-format"}]}`), &object); err != nil {
+		t.Fatal(err)
+	}
+	result := normalizeCodexResetCredits(object)
+	if result.invalidPayload || len(result.credits) != 1 || result.credits[0].ExpiresAt != "unknown-date-format" {
+		t.Fatalf("summary = %+v", result)
 	}
 }
 
@@ -547,6 +627,208 @@ func TestXAIQuotaCombinesWeeklyMonthlyAndOnDemand(t *testing.T) {
 	monthly := result.Quota[1]
 	if monthly.Currency != "USD" || monthly.Used == nil || *monthly.Used != 10 || monthly.Limit == nil || *monthly.Limit != 10 || monthly.RemainingPercent == nil || *monthly.RemainingPercent != 0 {
 		t.Fatalf("monthly quota = %+v", monthly)
+	}
+}
+
+func TestAuthQuotaReset(t *testing.T) {
+	const resetID = "00112233-4455-4677-8899-aabbccddeeff"
+	for _, tc := range []struct {
+		name           string
+		upstreamStatus int
+		upstreamBody   string
+		want           int
+	}{
+		{"admin", 204, "", 200},
+		{"account", 204, "", 200},
+		{"masked name", 204, "", 200},
+		{"refresh failure", 204, "", 200},
+		{"non-JSON success", 200, "accepted", 200},
+		{"no credits", 409, `{"error":{"message":"No reset credits available"}}`, 502},
+		{"expired credentials", 401, `{"error":{"message":"dummy-upstream-token expired"}}`, 502},
+		{"transport failure", 0, "", 502},
+		{"permission disabled", 0, "", 403},
+		{"unknown key", 0, "", 401},
+		{"invalid reset ID", 0, "", 400},
+		{"missing revision", 0, "", 409},
+		{"replaced file", 0, "", 409},
+		{"missing file", 0, "", 404},
+		{"unsupported provider", 0, "", 422},
+		{"disabled file", 0, "", 422},
+		{"denied credential", 0, "", 404},
+		{"outside allowlist", 0, "", 404},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := newTestApp(t)
+			t.Cleanup(app.Shutdown)
+			validator := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "Bearer "+accountTestKeyA {
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+				_, _ = w.Write([]byte(`{"object":"list","data":[]}`))
+			}))
+			t.Cleanup(validator.Close)
+			allowed := tc.name != "admin" && tc.name != "permission disabled"
+			config := string(testConfigYAML(t, true)) + "allow_api_key_quota_reset: " + strconv.FormatBool(allowed) +
+				"\nmask_api_key_view_emails: " + strconv.FormatBool(tc.name == "masked name") +
+				"\naccount_api_base_url: " + validator.URL + "\n"
+			if err := app.configure(mustMarshal(t, LifecycleRequest{ConfigYAML: []byte(config)})); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := app.store.SyncKeys([]string{accountTestKeyA}, false); err != nil {
+				t.Fatal(err)
+			}
+			file := hostAuthFile{ID: "reset-file", AuthIndex: "codex-1", Name: "user@example.com.json", Type: "codex", Source: "file"}
+			req := ManagementRequest{
+				Method: http.MethodGet, Path: resourceBase + routeAuthQuotaReset, HostCallbackID: "reset-callback",
+				Headers: http.Header{"Authorization": {"Bearer " + accountTestKeyA}},
+				Query:   url.Values{"auth_index": {file.AuthIndex}, "auth_name": {file.Name}, "auth_revision": {""}},
+			}
+			if tc.name != "admin" {
+				id, name := app.accountAuthIdentity(file, billing.CallerScope(accountTestKeyA))
+				req.Query.Set("auth_index", id)
+				req.Query.Set("auth_name", name)
+			}
+			req.Headers.Set("X-Quota-Reset-ID", resetID)
+			switch tc.name {
+			case "admin":
+				req.Method, req.Path = http.MethodPost, managementBase+routeAuthQuotaReset
+			case "unknown key":
+				req.Headers.Set("Authorization", "Bearer dummy-unknown-key")
+			case "invalid reset ID":
+				req.Headers.Set("X-Quota-Reset-ID", "invalid")
+			case "missing revision":
+				req.Query.Del("auth_revision")
+			case "replaced file":
+				file.ModTime = time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)
+			case "missing file":
+				req.Query.Set("auth_index", "missing")
+			case "unsupported provider":
+				file.Type = "claude"
+				id, _ := app.accountAuthIdentity(file, billing.CallerScope(accountTestKeyA))
+				req.Query.Set("auth_index", id)
+			case "disabled file":
+				file.Disabled = true
+			case "denied credential", "outside allowlist":
+				rule := billing.RouteRule{DeniedCredentialIDs: []string{billing.CredentialFingerprint(file.ID)}}
+				if tc.name == "outside allowlist" {
+					rule = billing.RouteRule{CredentialIDs: []string{billing.CredentialFingerprint("another-file")}}
+				}
+				if _, err := app.store.CreateRoute(billing.Route{Name: "reset access", Rule: rule}, []string{billing.CallerScope(accountTestKeyA)}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			hostCalls, reads, consumes, refreshes := 0, 0, 0, 0
+			app.SetHostCaller(func(method string, payload any) (json.RawMessage, error) {
+				hostCalls++
+				switch method {
+				case hostAuthList:
+					return mustJSONRaw(t, hostAuthListResponse{Files: []hostAuthFile{file}}), nil
+				case hostAuthGet:
+					reads++
+					return json.RawMessage(`{"json":{"access_token":"dummy-upstream-token","account_id":"account-7"}}`), nil
+				case hostHTTPDo:
+					upstream := payload.(hostHTTPRequest)
+					if upstream.Method == http.MethodGet {
+						refreshes++
+						if tc.name == "refresh failure" {
+							return nil, fmt.Errorf("dummy-upstream-token: connection closed")
+						}
+						switch upstream.URL {
+						case "https://chatgpt.com/backend-api/wham/usage":
+							return mustJSONRaw(t, hostHTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"rate_limit":{"primary_window":{"used_percent":20,"limit_window_seconds":18000}},"rate_limit_reset_credits":{"available_count":1}}`)}), nil
+						case "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits":
+							return mustJSONRaw(t, hostHTTPResponse{StatusCode: http.StatusOK, Body: []byte(`{"credits":[],"available_count":1}`)}), nil
+						default:
+							t.Fatalf("unexpected quota refresh: %+v", upstream)
+						}
+					}
+					consumes++
+					if upstream.Method != http.MethodPost || upstream.URL != "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume" ||
+						upstream.HostCallbackID != req.HostCallbackID || upstream.Headers.Get("Chatgpt-Account-Id") != "account-7" {
+						t.Fatalf("unexpected reset request: %+v", upstream)
+					}
+					var body map[string]string
+					if err := json.Unmarshal(upstream.Body, &body); err != nil || body["redeem_request_id"] != resetID {
+						t.Fatalf("reset ID was not preserved: %s", upstream.Body)
+					}
+					if tc.name == "transport failure" {
+						return nil, fmt.Errorf("dummy-upstream-token: connection closed")
+					}
+					return mustJSONRaw(t, hostHTTPResponse{StatusCode: tc.upstreamStatus, Body: []byte(tc.upstreamBody)}), nil
+				default:
+					t.Fatalf("unexpected host method %q", method)
+					return nil, nil
+				}
+			})
+			access, _ := app.apiKeyViewAccess(req)
+			var profile accountProfileResponse
+			if err := json.Unmarshal(app.accountProfile(access).Body, &profile); err != nil {
+				t.Fatal(err)
+			}
+			if profile.CanResetAuthQuota != (allowed && access.Tracked) {
+				t.Fatalf("incorrect reset permission: %+v", profile)
+			}
+			if tc.name == "masked name" {
+				var files authFileListResponse
+				if err := json.Unmarshal(app.authFiles(access).Body, &files); err != nil {
+					t.Fatal(err)
+				}
+				if files.Files[0].Name == file.Name {
+					t.Fatal("file name was not masked")
+				}
+				req.Query.Set("auth_name", files.Files[0].Name)
+			}
+			raw, err := app.handleManagement(mustMarshal(t, req))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var response ManagementResponse
+			decodeResult(t, raw, &response)
+			if response.StatusCode != tc.want {
+				t.Fatalf("status = %d, want %d: %s", response.StatusCode, tc.want, response.Body)
+			}
+			wantCalls := 0
+			if tc.want == 200 || tc.want == 502 {
+				wantCalls = 1
+			}
+			wantRefreshes := 0
+			if tc.want == 200 && tc.name != "admin" {
+				wantRefreshes = 2
+				if tc.name == "refresh failure" {
+					wantRefreshes = 1
+				}
+			}
+			wantReads := wantCalls
+			if wantRefreshes > 0 {
+				wantReads++
+			}
+			if reads != wantReads || consumes != wantCalls || refreshes != wantRefreshes {
+				t.Fatalf("credential reads = %d, resets = %d, refreshes = %d", reads, consumes, refreshes)
+			}
+			if (tc.want == 400 || tc.want == 401 || tc.want == 403) && hostCalls != 0 {
+				t.Fatalf("rejected request made %d host calls", hostCalls)
+			}
+			if tc.want == 200 && !strings.Contains(string(response.Body), `"reset":true`) {
+				t.Fatalf("unexpected reset result: %s", response.Body)
+			}
+			if tc.name == "refresh failure" {
+				if !strings.Contains(string(response.Body), `"refresh_failed":true`) || app.accountCachedQuota(file).Status != "failed" {
+					t.Fatalf("successful reset hid a failed refresh: %s", response.Body)
+				}
+			} else if tc.want == 200 && tc.name != "admin" {
+				cached := app.accountCachedQuota(file)
+				if cached.Status != "ready" || cached.Stale || len(cached.Quota) != 1 {
+					t.Fatalf("reset did not refresh account cache: %+v", cached)
+				}
+			}
+			if strings.Contains(string(response.Body), "dummy-upstream-token") {
+				t.Fatal("response leaked credentials")
+			}
+			if tc.name != "admin" && !strings.Contains(response.Headers.Get("Cache-Control"), "no-store") {
+				t.Fatal("resource response is cacheable")
+			}
+		})
 	}
 }
 

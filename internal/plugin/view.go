@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -17,11 +19,45 @@ const (
 	maxEventPageSize     = 1000
 )
 
+func sourceFilterToken(scope, source string) string {
+	digest := sha256.Sum256([]byte("filter:v1\x00source\x00" + scope + "\x00" + source))
+	return hex.EncodeToString(digest[:])
+}
+
+func validSourceFilterToken(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
+}
+
+func resolveSourceFilter(scope, token string, sources []string) (string, bool) {
+	for _, source := range sources {
+		if sourceFilterToken(scope, source) == token {
+			return source, true
+		}
+	}
+	return "", false
+}
+
+func sourceFilterOptions(scope string, sources []string) []billing.RequestSourceOption {
+	options := make([]billing.RequestSourceOption, 0, len(sources))
+	for _, source := range sources {
+		options = append(options, billing.RequestSourceOption{
+			Value: sourceFilterToken(scope, source),
+			Label: source,
+		})
+	}
+	return options
+}
+
 type viewAccess struct {
-	APIKey  bool
-	Scope   string
-	Tracked bool
-	Key     billing.KeyView
+	APIKey     bool
+	Scope      string
+	Tracked    bool
+	MaskEmails bool
+	Key        billing.KeyView
 }
 
 func (a *App) apiKeyViewAccess(req ManagementRequest) (viewAccess, bool) {
@@ -33,7 +69,7 @@ func (a *App) apiKeyViewAccess(req ManagementRequest) (viewAccess, bool) {
 	if !tracked {
 		view.QuotaView = billing.QuotaView{Unlimited: true, Windows: []billing.QuotaWindowView{}}
 	}
-	return viewAccess{APIKey: true, Scope: scope, Tracked: tracked, Key: view}, true
+	return viewAccess{APIKey: true, Scope: scope, Tracked: tracked, MaskEmails: a.store.MaskAPIKeyViewEmails(), Key: view}, true
 }
 
 func (a *App) routeResource(req ManagementRequest, suffix string) ManagementResponse {
@@ -89,6 +125,26 @@ func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) Manage
 	if errQuery := requestPageParams(req.Query, &query.Offset, &query.Limit, &query.From, &query.To, &query.SnapshotID); errQuery != nil {
 		return viewErrorResponse(access, errQuery)
 	}
+	if query.Source != "" {
+		if !validSourceFilterToken(query.Source) {
+			return viewJSONError(access, http.StatusBadRequest, "invalid_filter", "Invalid source filter; refresh the page")
+		}
+		probe, err := a.store.RequestEvents(billing.RequestEventQuery{
+			Scope: access.Scope, From: query.From, To: query.To, SnapshotID: query.SnapshotID, IncludeFilters: true, Limit: 1,
+		})
+		if err != nil {
+			return viewErrorResponse(access, err)
+		}
+		query.SnapshotID = &probe.SnapshotID
+		if probe.Filters == nil {
+			return viewJSONError(access, http.StatusBadRequest, "expired_filter", "Source filter expired; refresh the page")
+		}
+		var found bool
+		query.Source, found = resolveSourceFilter(access.Scope, query.Source, probe.Filters.Sources)
+		if !found {
+			return viewJSONError(access, http.StatusBadRequest, "expired_filter", "Source filter expired; refresh the page")
+		}
+	}
 	query.IncludeFilters = query.Offset == 0
 	view, err := a.store.RequestEvents(query)
 	if err != nil {
@@ -102,10 +158,14 @@ func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) Manage
 			view.Entries[i].Label = ""
 			view.Entries[i].Account = ""
 			view.Entries[i].Source = ""
+			view.Entries[i].ErrorBody = ""
 		}
 		if view.Filters != nil {
 			view.Filters.Sources = []string{}
 		}
+	}
+	if view.Filters != nil {
+		view.Filters.SourceOptions = sourceFilterOptions(access.Scope, view.Filters.Sources)
 	}
 	return viewJSON(access, http.StatusOK, view)
 }
@@ -137,6 +197,26 @@ func (a *App) listRequestErrors(req ManagementRequest, access viewAccess) Manage
 	if err := requestPageParams(req.Query, &query.Offset, &query.Limit, &query.From, &query.To, &query.SnapshotID); err != nil {
 		return viewErrorResponse(access, err)
 	}
+	if query.Source != "" {
+		if !validSourceFilterToken(query.Source) {
+			return viewJSONError(access, http.StatusBadRequest, "invalid_filter", "Invalid source filter; refresh the page")
+		}
+		probe, err := a.store.RequestErrors(billing.RequestErrorQuery{
+			Scope: access.Scope, From: query.From, To: query.To, SnapshotID: query.SnapshotID, IncludeFilters: true, Limit: 1,
+		})
+		if err != nil {
+			return viewErrorResponse(access, err)
+		}
+		query.SnapshotID = &probe.SnapshotID
+		if probe.Filters == nil {
+			return viewJSONError(access, http.StatusBadRequest, "expired_filter", "Source filter expired; refresh the page")
+		}
+		var found bool
+		query.Source, found = resolveSourceFilter(access.Scope, query.Source, probe.Filters.Sources)
+		if !found {
+			return viewJSONError(access, http.StatusBadRequest, "expired_filter", "Source filter expired; refresh the page")
+		}
+	}
 	query.IncludeFilters = query.Offset == 0
 	view, err := a.store.RequestErrors(query)
 	if err != nil {
@@ -147,15 +227,14 @@ func (a *App) listRequestErrors(req ManagementRequest, access viewAccess) Manage
 			view.Entries[i].Scope, view.Entries[i].AuthIndex = "", ""
 			view.Entries[i].Preview, view.Entries[i].Label = "", ""
 			view.Entries[i].Source, view.Entries[i].Body, view.Entries[i].ErrorType = "", "", ""
-			view.Entries[i].Reason = http.StatusText(view.Entries[i].StatusCode)
-			if view.Entries[i].Reason == "" {
-				view.Entries[i].Reason = "Request failed"
-			}
 		}
 		view.ErrorTypeCounts = map[string]int{"": view.Total}
 		if view.Filters != nil {
 			view.Filters.Sources, view.Filters.ErrorTypes = []string{}, []string{}
 		}
+	}
+	if view.Filters != nil {
+		view.Filters.SourceOptions = sourceFilterOptions(access.Scope, view.Filters.Sources)
 	}
 	return viewJSON(access, http.StatusOK, view)
 }
@@ -266,21 +345,26 @@ func countParam(query url.Values, name string, target *int) error {
 
 func viewJSON(access viewAccess, status int, payload any) ManagementResponse {
 	if access.APIKey {
-		return apiKeyJSON(status, payload)
+		handled := false
+		if access.MaskEmails {
+			payload, handled = maskAPIKeyPayload(payload)
+		}
+		response := apiKeyJSON(status, payload)
+		return protectAPIKeyResponse(access, response, handled)
 	}
 	return JSONResponse(status, payload)
 }
 
 func viewJSONError(access viewAccess, status int, code, message string) ManagementResponse {
 	if access.APIKey {
-		return apiKeyJSONError(status, code, message)
+		return protectAPIKeyResponse(access, apiKeyJSONError(status, code, message), false)
 	}
 	return JSONError(status, code, message)
 }
 
 func viewDetailedError(access viewAccess, status int, code string, err error) ManagementResponse {
 	if access.APIKey {
-		return apiKeyJSONError(status, code, "Unable to read account data; contact your administrator")
+		return protectAPIKeyResponse(access, apiKeyJSONError(status, code, "Unable to read account data; contact your administrator"), false)
 	}
 	return jsonMessageError(status, code, messages.FromError(err))
 }
@@ -291,7 +375,17 @@ func viewErrorResponse(access viewAccess, err error) ManagementResponse {
 	}
 	response := errorResponse(err)
 	if access.APIKey {
+		response = protectAPIKeyResponse(access, response, false)
+	}
+	return response
+}
+
+func protectAPIKeyResponse(access viewAccess, response ManagementResponse, handled bool) ManagementResponse {
+	if access.APIKey {
 		secureAPIKeyResponse(&response)
+		if access.MaskEmails && !handled {
+			response.Body = []byte(maskEmails(string(response.Body)))
+		}
 	}
 	return response
 }

@@ -141,7 +141,7 @@ func TestSelfServiceHidesUpstreamIdentitiesWithoutChangingAdminData(t *testing.T
 	}
 	app.store.RecordUsage(event)
 	app.store.RecordUsageError(event, billing.RequestError{
-		StatusCode: http.StatusForbidden, ErrorType: failureType, Reason: account, Body: failureBody,
+		StatusCode: http.StatusForbidden, ErrorType: failureType, Body: failureBody,
 	})
 	foreign := event
 	foreign.Scope = billing.CallerScope("sk-another-user-dummy")
@@ -171,7 +171,7 @@ func TestSelfServiceHidesUpstreamIdentitiesWithoutChangingAdminData(t *testing.T
 				if err := json.Unmarshal(response.Body, &view); err != nil || view.Total != 1 || view.Filters == nil || len(view.Filters.Sources) != 0 || len(view.Filters.ErrorTypes) != 0 {
 					t.Fatalf("user error filtering leaked a record-count oracle: %s", response.Body)
 				}
-				if len(view.Entries) != 1 || view.Entries[0].Reason != "Forbidden" || view.Entries[0].StatusCode != http.StatusForbidden {
+				if len(view.Entries) != 1 || view.Entries[0].StatusCode != http.StatusForbidden {
 					t.Fatal("user error lost safe status information")
 				}
 			case routeAnalysis:
@@ -190,11 +190,20 @@ func TestSelfServiceHidesUpstreamIdentitiesWithoutChangingAdminData(t *testing.T
 		})
 	}
 	for _, path := range []string{routeEvents, routeErrors} {
-		response := callManagement(t, app, http.MethodGet, path, url.Values{"source": {"nonexistent-source"}}, nil)
+		unfiltered := callManagement(t, app, http.MethodGet, path, nil, nil)
+		var available struct {
+			Filters struct {
+				SourceOptions []billing.RequestSourceOption `json:"source_options"`
+			} `json:"filter_options"`
+		}
+		if unfiltered.StatusCode != http.StatusOK || json.Unmarshal(unfiltered.Body, &available) != nil || len(available.Filters.SourceOptions) == 0 {
+			t.Fatalf("admin source options missing: %s", unfiltered.Body)
+		}
+		response := callManagement(t, app, http.MethodGet, path, url.Values{"source": {available.Filters.SourceOptions[0].Value}}, nil)
 		var view struct {
 			Total int `json:"total"`
 		}
-		if response.StatusCode != http.StatusOK || json.Unmarshal(response.Body, &view) != nil || view.Total != 0 {
+		if response.StatusCode != http.StatusOK || json.Unmarshal(response.Body, &view) != nil || view.Total == 0 {
 			t.Fatalf("admin source filter changed: %s", response.Body)
 		}
 	}

@@ -1,6 +1,7 @@
 "use strict";
 (() => {
   const storageKey = "cpa-key-billing:language";
+  const LANGUAGES = [["zh-CN", "简体中文"], ["en", "English"]];
   const embedded = window.parent !== window;
   const bindings = new WeakMap();
   const normalize = (value) => /^zh(?:-|$)/i.test(String(value || "")) ? "zh-CN" : "en";
@@ -55,7 +56,6 @@
       if (value instanceof Message) node.nodeValue = String(value);
       else if (value) for (const [name, msg] of value) node.setAttribute(name, String(msg));
     } while (walker.nextNode());
-    for (const select of document.querySelectorAll('[data-page-action="language"]')) select.value = language;
   }
   function apply(value, persist = false) {
     const next = normalize(value), changed = language !== next;
@@ -71,19 +71,6 @@
       for (const attr of node.attributes) {
         if (attr.name.startsWith("data-i18n-")) setAttribute(node, attr.name.slice(10), message(attr.value));
       }
-    }
-    for (const group of document.querySelectorAll(".standalone-actions")) {
-      const select = document.createElement("select");
-      select.className = "language-select";
-      select.dataset.pageAction = "language";
-      setAttribute(select, "aria-label", message("language.select"));
-      for (const [value, label] of [["en", "English"], ["zh-CN", "简体中文"]]) {
-        const option = document.createElement("option");
-        option.value = value; option.textContent = label; select.append(option);
-      }
-      select.value = language;
-      select.addEventListener("change", () => apply(select.value, true));
-      group.prepend(select);
     }
     refreshBindings();
   }
@@ -131,5 +118,6 @@
     if (event.key === storageKey || event.key === null) apply(readStored());
   });
   window.billingI18n = { message, date: (value, options) => new DateMessage(value, options), setText, setAttribute, textNode, initialize, serverMessage, UIError, boundText, isMessage, chartValue,
+    languages: () => LANGUAGES.map(([value, label]) => ({ value, label })), select: (value) => apply(value, true),
     current: () => language, locale: () => language === "en" ? "en-US" : "zh-CN", normalize };
 })();

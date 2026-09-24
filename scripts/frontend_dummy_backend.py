@@ -5,6 +5,7 @@ import hashlib
 import json
 import random
 import secrets
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from http.cookies import SimpleCookie
@@ -447,7 +448,11 @@ def quota_row(label, remaining_percent, reset_seconds, **extra):
 AUTH_FILE_QUOTAS = {
     "auth-demo-codex-pro": {
         "plan": "pro-20x",
-        "rate_limit_reset_credits_available_count": 1,
+        "rate_limit_reset_credits_available_count": 2,
+        "rate_limit_reset_credits": [
+            {"expires_at": iso(NOW + timedelta(days=13, hours=14))},
+            {"expires_at": iso(NOW + timedelta(days=14, hours=10))},
+        ],
         "quota": [
             quota_row("周限额", 62, 432000),
             quota_row(
@@ -465,6 +470,7 @@ AUTH_FILE_QUOTAS = {
     "auth-demo-codex-plus": {
         "plan": "plus",
         "rate_limit_reset_credits_available_count": 1,
+        "rate_limit_reset_credits": [{"expires_at": iso(NOW + timedelta(days=7))}],
         "quota": [
             quota_row("5 小时限额", 35, 14400),
             quota_row("周限额", 90, 518400),
@@ -714,6 +720,8 @@ def event_sample(
     rates,
     *,
     billing_model="",
+    response_model="",
+    response_tier="",
     long_context=False,
     failed=False,
     multiplier=1,
@@ -729,7 +737,9 @@ def event_sample(
         "executor_type": executor,
         "reasoning_effort": effort,
         "service_tier": tier,
+        "response_service_tier": response_tier,
         "upstream_model": model,
+        "response_model": response_model,
         "billing_model": billing_model or model,
         "failed": failed,
         "latency_ms": latency_ms,
@@ -754,11 +764,11 @@ def event_sample(
 # Numeric usage and timing values are sampled from a real export. All identities
 # below are synthetic and intentionally unrelated to the source records.
 SUCCESS_EVENT_SAMPLES = [
-    event_sample(0, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "high", "priority", 11513, 8209, 266, (712, 91648, 4096, 425), (4, 0.4, 5, 20), multiplier=2.5),
-    event_sample(5, "codex · dev-team@example.com", "codex", "gpt-5.6-luna", "CodexWebsocketsExecutor", "low", "auto", 2516, 1431, 10, (1030, 49920, 0, 75), (0.2, 0.02, 0.25, 1.2)),
+    event_sample(0, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "high", "priority", 11513, 8209, 266, (712, 91648, 4096, 425), (4, 0.4, 5, 20), multiplier=2.5, response_tier="priority"),
+    event_sample(5, "codex · dev-team@example.com", "codex", "codex-auto-review", "CodexWebsocketsExecutor", "low", "auto", 2516, 1431, 10, (1030, 49920, 0, 75), (0.2, 0.02, 0.25, 1.2), response_model="gpt-5.6-luna", response_tier="default"),
     event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "medium", "auto", 2417, 1103, 0, (1194, 95616, 0, 73), (5, 0.5, 5, 30), billing_multiplier=1),
-    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "high", "priority", 5306, 2121, 21, (798, 169984, 0, 201), (4, 0.4, 5, 20), billing_multiplier=1, multiplier=2.5),
-    event_sample(2, "claude · platform@example.com", "claude", "deepseek-v4-pro", "ClaudeExecutor", "high", "auto", 10061, 637, 0, (38049, 0, 0, 474), (0.435, 0.003625, 0.435, 0.87), billing_model="claude/deepseek-v4-pro"),
+    event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "high", "priority", 5306, 2121, 21, (798, 169984, 0, 201), (4, 0.4, 5, 20), billing_multiplier=1, multiplier=2.5, response_tier="priority"),
+    event_sample(2, "claude · platform@example.com", "claude", "deepseek-v4-pro", "ClaudeExecutor", "high", "auto", 10061, 637, 0, (38049, 0, 0, 474), (0.435, 0.003625, 0.435, 0.87), billing_model="claude/deepseek-v4-pro", response_model="deepseek-v4-pro"),
     event_sample(7, "codex · sk-proxy…7f3a", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "high", "auto", 7288, 4130, 188, (8502, 45440, 0, 309), (5, 0.5, 5, 30)),
     event_sample(6, "codex · dev-team@example.com", "codex", "gpt-5.6-terra", "CodexWebsocketsExecutor", "medium", "auto", 10120, 3379, 81, (1300, 69376, 0, 477), (2, 0.2, 2.5, 12), billing_multiplier=2.5),
     event_sample(4, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "high", "auto", 2609, 1881, 6, (1368, 237824, 0, 46), (4, 0.4, 5, 20)),
@@ -794,6 +804,13 @@ def make_request_events():
 
 REQUEST_EVENTS = make_request_events()
 
+def source_filter_token(scope, source):
+    payload = "filter:v1\0source\0" + scope + "\0" + source
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+def source_filter_options(scope, sources):
+    return [{"value": source_filter_token(scope, source), "label": source} for source in sources]
+
 def event_snapshot(query):
     return int(query.get("snapshot_id", [str(max((int(entry["id"]) for entry in REQUEST_EVENTS), default=0))])[0])
 
@@ -801,7 +818,7 @@ def request_event_view(query, scope=""):
     snapshot = event_snapshot(query)
     selected_key = "" if scope else query.get("api_key", [""])[0]
     selected_model = query.get("model", [""])[0]
-    selected_source = query.get("source", [""])[0]
+    selected_source = "" if scope else query.get("source", [""])[0]
     selected_provider = query.get("provider", [""])[0]
     selected_executor = query.get("executor", [""])[0]
     selected_failed = query.get("failed", [""])[0]
@@ -810,13 +827,17 @@ def request_event_view(query, scope=""):
     time_matched = filter_event_time([entry for entry in REQUEST_EVENTS
                                      if int(entry["id"]) <= snapshot and (not scope or entry["scope"] == scope)], query)
     time_matched.sort(key=lambda entry: (entry["at"], int(entry["id"])), reverse=True)
+    source_values = sorted({entry.get("source", "") for entry in time_matched} - {""}, key=str.lower)
     filter_options = {
         "models": sorted({entry.get("billing_model") or entry.get("upstream_model", "")
                           for entry in time_matched} - {""}, key=str.lower),
-        "sources": sorted({entry.get("source", "") for entry in time_matched} - {""}, key=str.lower),
+        "source_options": [] if scope else source_filter_options(scope, source_values),
         "providers": sorted({entry.get("provider", "") for entry in time_matched} - {""}, key=str.lower),
         "executors": sorted({entry.get("executor_type", "") for entry in time_matched} - {""}, key=str.lower),
     }
+    if selected_source:
+        selected_source = next((source for source in source_values
+                                if source_filter_token(scope, source) == selected_source), "\0")
     counts = {"all": 0, "normal": 0, "failed": 0}
     matched = []
     for entry in time_matched:
@@ -839,7 +860,7 @@ def request_event_view(query, scope=""):
     page = matched[offset:offset + limit] if limit else matched[offset:]
     if scope:
         page = [{key: value for key, value in entry.items()
-                 if key not in {"scope", "auth_index", "preview", "label"}} for entry in page]
+                 if key not in {"scope", "auth_index", "preview", "label", "source", "account", "error_body"}} for entry in page]
     result = {"entries": page, "total": len(matched), "snapshot_id": str(snapshot), "status_counts": counts}
     if offset == 0:
         result["filter_options"] = filter_options
@@ -873,7 +894,8 @@ def account_routing(index):
 def account_routing_view(index):
     models, refs, providers, denied_models, denied_refs, denied_providers = account_routing(index)
     def credential_view(item):
-        return {"source": item["source"], "provider": item["provider"], "name": item["display_name"], "status": item["status"],
+        identity = hashlib.sha256((LIVE_KEYS[index]["scope"] + "\0" + item["ref"]).encode()).hexdigest()[:8]
+        return {"source": item["source"], "provider": item["provider"], "name": item["provider"].title() + " account " + identity, "status": item["status"],
                 "denied": item["ref"] in denied_refs or (item["source"], item["provider"]) in denied_providers}
     return {
         "models": sorted(models), "denied_models": sorted(denied_models),
@@ -884,7 +906,7 @@ def account_routing_view(index):
     }
 
 
-def account_auth_files(index):
+def account_auth_files_raw(index):
     _, refs, providers, _, denied_refs, denied_providers = account_routing(index)
     return [item for item in AUTH_FILES
             if (not refs and not providers or AUTH_FILE_CREDENTIAL_REFS.get(item["auth_index"]) in refs or ("auth-files", item["category"]) in providers)
@@ -892,19 +914,32 @@ def account_auth_files(index):
             and ("auth-files", item["category"]) not in denied_providers]
 
 
+def account_auth_files(index):
+    scope = LIVE_KEYS[index]["scope"]
+    views = []
+    for item in account_auth_files_raw(index):
+        identifier = "account_" + hashlib.sha256((scope + "\0" + item["auth_index"]).encode()).hexdigest()
+        views.append({**item, "auth_index": identifier,
+                      "name": item["category"].title() + " account " + identifier[8:16], "email": ""})
+    return views
 
-def quota_summary(index, scenario=""):
+
+
+def quota_summary(index, scenario="", allow_reset=False):
     key = LIVE_KEYS[index]
     refresh_key_quota(key)
     accounts = []
-    for item in account_auth_files(index):
-        identifier = hashlib.sha256((key["scope"] + item["auth_index"]).encode()).hexdigest()[:16]
+    for item, view in zip(account_auth_files_raw(index), account_auth_files(index)):
+        identifier = view["auth_index"]
         cached = AUTH_FILE_QUOTAS.get(item["auth_index"])
         status = "disabled" if item["disabled"] else "unavailable" if item["unavailable"] else "ready" if cached else "not_loaded"
-        account = dict(id=identifier, name=item["category"].title() + " account " + identifier[:8], provider=item["category"],
+        account = dict(id=identifier, name=view["name"], provider=item["category"], cache_revision=item["cache_revision"],
                        plan=(cached or {}).get("plan", ""), status=status, stale=False, quota=[])
         if cached:
             account.update(fetched_at=iso(NOW), quota=cached["quota"] if status == "ready" else [])
+            if allow_reset and item["category"] == "codex":
+                account.update(rate_limit_reset_credits_available_count=cached.get("rate_limit_reset_credits_available_count"),
+                               rate_limit_reset_credits=cached.get("rate_limit_reset_credits", []))
         accounts.append(account)
     if scenario == "states":
         for status in ("stale", "not_loaded", "disabled", "unsupported", "failed"):
@@ -956,19 +991,22 @@ def refresh_route_counts():
         )
 
 
-def request_error(event_index, message, status=0, error_type="", code=""):
+# transport=True is a bare executor error: the body is the message itself
+# rather than an upstream payload.
+def request_error(event_index, message, status=0, error_type="", code="", transport=False):
     event = REQUEST_EVENTS[event_index]
     event["failed"] = True
-    error = {"message": message}
-    if error_type:
-        error["type"] = error_type
-    if code:
-        error["code"] = code
-    if 400 <= status <= 599:
-        error["status"] = status
-    reason = (f"HTTP {status}：" if status else "") + message
-    if error_type:
-        reason += f"（{error_type}）"
+    body = message
+    if not transport:
+        error = {"message": message}
+        if error_type:
+            error["type"] = error_type
+        if code:
+            error["code"] = code
+        if 400 <= status <= 599:
+            error["status"] = status
+        body = json.dumps({"error": error}, ensure_ascii=False, separators=(",", ":"))
+    event["error_body"] = body
     return {
         "id": event["id"],
         "at": event["at"],
@@ -984,8 +1022,7 @@ def request_error(event_index, message, status=0, error_type="", code=""):
         "ttft_ms": event["ttft_ms"],
         "status_code": status,
         "error_type": code or error_type,
-        "reason": reason,
-        "body": json.dumps({"error": error}, ensure_ascii=False, separators=(",", ":")),
+        "body": body,
     }
 
 
@@ -1005,6 +1042,18 @@ ERRORS = [
         status=504,
         error_type="timeout_error",
         code="upstream_timeout",
+    ),
+    request_error(
+        24,
+        "websocket: close 1006 (abnormal closure): unexpected EOF",
+        code="websocket_abnormal_closure",
+        transport=True,
+    ),
+    request_error(
+        23,
+        'Post "https://api.deepseek.com/anthropic/v1/messages?beta=true": context canceled',
+        code="context_canceled",
+        transport=True,
     ),
 ]
 
@@ -1068,12 +1117,16 @@ def error_view(query, scope=""):
     selected = {
         "api_key": "" if scope else query.get("api_key", [""])[0],
         "model": query.get("model", [""])[0],
-        "source": query.get("source", [""])[0],
+        "source": "" if scope else query.get("source", [""])[0],
         "provider": query.get("provider", [""])[0],
         "executor": query.get("executor", [""])[0],
         "status_code": query.get("status_code", [""])[0],
         "error_type": query.get("error_type", [""])[0],
     }
+    source_values = sorted({entry["source"] for entry in rows})
+    if selected["source"]:
+        selected["source"] = next((source for source in source_values
+                                   if source_filter_token(scope, source) == selected["source"]), "\0")
     filtered = []
     counts = {}
     empty_type = query.get("error_type_empty", [""])[0] == "true"
@@ -1103,16 +1156,17 @@ def error_view(query, scope=""):
     page = filtered[offset:offset + limit] if limit else filtered[offset:]
     if scope:
         page = [{key: value for key, value in entry.items()
-                 if key not in {"scope", "preview", "label", "auth_index"}} for entry in page]
-    result = {"entries": page, "total": len(filtered), "snapshot_id": str(snapshot), "error_type_counts": counts}
+                 if key not in {"scope", "preview", "label", "auth_index", "source", "body", "error_type"}} for entry in page]
+    result = {"entries": page, "total": len(filtered), "snapshot_id": str(snapshot),
+              "error_type_counts": {"": len(filtered)} if scope else counts}
     if offset == 0:
         result["filter_options"] = {
             "models": sorted({entry["billing_model"] for entry in rows}),
-            "sources": sorted({entry["source"] for entry in rows}),
+            "source_options": [] if scope else source_filter_options(scope, source_values),
             "providers": sorted({entry["provider"] for entry in rows}),
             "executors": sorted({entry["executor_type"] for entry in rows}),
             "status_codes": sorted({entry["status_code"] for entry in rows if entry["status_code"]}),
-            "error_types": sorted({entry["error_type"] for entry in rows if entry["error_type"]}),
+            "error_types": [] if scope else sorted({entry["error_type"] for entry in rows if entry["error_type"]}),
         }
     return result
 
@@ -1244,7 +1298,7 @@ def analysis_view(query, scope=""):
         "usage_distribution": {
             "api_keys": [] if scope or selected else distribution("scope", "label"),
             "models": distribution("billing_model", unknown="未知模型"),
-            "sources": distribution("source", unknown="未知来源"),
+            "sources": [] if scope else distribution("source", unknown="未知来源"),
         },
     }
 
@@ -1349,8 +1403,6 @@ def payload_for(path, query):
                    and (not before or entry["id"] < before)]
         return {"entries": entries[:limit], "level_counts": counts,
                 "next_before_id": entries[limit - 1]["id"] if len(entries) > limit else 0}
-    if path == "/v0/management/auth-files":
-        return {"files": [{**item, "type": item["category"], "id_token": {"chatgpt_account_id": "dummy-" + item["auth_index"]}} for item in AUTH_FILES]}
     if path == f"{API_BASE}/auth-files":
         return {"files": AUTH_FILES}
     if path == f"{API_BASE}/auth-files/quota":
@@ -1388,6 +1440,7 @@ def payload_for(path, query):
 class Handler(BaseHTTPRequestHandler):
     host_mode = "standalone"
     initial_theme = "auto"
+    allow_api_key_quota_reset = False
 
     def send_response(self, code, message=None):
         time.sleep(random.uniform(0.4, 0.6))
@@ -1497,6 +1550,7 @@ class Handler(BaseHTTPRequestHandler):
             f"{RESOURCE_BASE}/analysis",
             f"{RESOURCE_BASE}/auth-files",
             f"{RESOURCE_BASE}/auth-files/quota",
+            f"{RESOURCE_BASE}/auth-files/quota/reset",
         }
         if parsed.path in resource_paths:
             api_key = authorization[7:] if authorization.startswith("Bearer ") else ""
@@ -1510,10 +1564,11 @@ class Handler(BaseHTTPRequestHandler):
             index = api_keys.index(api_key)
             if parsed.path.endswith("/quota-summary"):
                 scenario = parse_qs(parsed.query).get("scenario", [""])[0]
-                self.send_json(200, quota_summary(index, scenario))
+                self.send_json(200, quota_summary(index, scenario, self.allow_api_key_quota_reset))
             elif parsed.path.endswith("/profile"):
                 key = LIVE_KEYS[index]
-                self.send_json(200, {**BILLING_POLICY, "tracked": True, "identity": {"preview": key["preview"], "label": key["label"]}})
+                self.send_json(200, {**BILLING_POLICY, "tracked": True, "identity": {"preview": key["preview"], "label": key["label"]},
+                                     "can_reset_auth_quota": self.allow_api_key_quota_reset})
             elif parsed.path.endswith("/subscription"):
                 key = LIVE_KEYS[index]
                 refresh_key_quota(key)
@@ -1530,15 +1585,24 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, {"files": account_auth_files(index)})
             elif parsed.path.endswith("/auth-files/quota"):
                 query = parse_qs(parsed.query)
-                allowed = {
-                    item["auth_index"] for item in account_auth_files(index)
-                }
                 auth_index = query.get("auth_index", [""])[0]
-                payload = auth_file_quota(query) if auth_index in allowed else None
+                views = account_auth_files(index)
+                raw = account_auth_files_raw(index)
+                raw_index = next((item["auth_index"] for item, view in zip(raw, views)
+                                  if view["auth_index"] == auth_index), None)
+                payload = auth_file_quota({"auth_index": [raw_index]}) if raw_index else None
                 if payload is None:
                     self.send_json(404, {"error": {"message": "认证文件不存在或不支持限额查询"}})
                 else:
-                    self.send_json(200, payload)
+                    self.send_json(200, {"plan": payload.get("plan", ""), "status": "ready", "stale": False,
+                                         "fetched_at": payload["fetched_at"], "quota": payload["quota"],
+                                         "rate_limit_reset_credits_available_count": payload.get("rate_limit_reset_credits_available_count"),
+                                         "rate_limit_reset_credits": payload.get("rate_limit_reset_credits", [])})
+            elif parsed.path.endswith("/auth-files/quota/reset"):
+                if not self.allow_api_key_quota_reset:
+                    self.send_json(403, {"error": {"message": "Quota resets are disabled for API key users"}})
+                else:
+                    self.reset_auth_quota(parsed, account_auth_files(index), index)
             elif parsed.path.endswith("/events"):
                 self.send_json(200, request_event_view(parse_qs(parsed.query), LIVE_KEYS[index]["scope"]))
             return
@@ -1550,6 +1614,35 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.handle_mutation()
+
+    def reset_auth_quota(self, parsed, files, account_index=None):
+        query = parse_qs(parsed.query, keep_blank_values=True)
+        auth_index = query.get("auth_index", [""])[0]
+        auth_file = next((item for item in files if item["auth_index"] == auth_index), None)
+        raw_index = auth_index
+        if account_index is not None:
+            raw = account_auth_files_raw(account_index)
+            views = account_auth_files(account_index)
+            raw_index = next((item["auth_index"] for item, view in zip(raw, views)
+                              if view["auth_index"] == auth_index), None)
+        quota = AUTH_FILE_QUOTAS.get(raw_index)
+        if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", self.headers.get("X-Quota-Reset-ID", "")):
+            self.send_json(400, {"error": {"message": "Invalid quota reset request ID"}})
+        elif auth_file is None or quota is None:
+            self.send_json(404, {"error": {"message": "Auth file does not exist"}})
+        elif auth_file["category"] != "codex" or auth_file.get("disabled"):
+            self.send_json(422, {"error": {"message": "This auth file cannot reset quotas"}})
+        elif query.get("auth_revision") != [auth_file["cache_revision"]] or query.get("auth_name") != [auth_file["name"]]:
+            self.send_json(409, {"error": {"message": "Auth file changed; refresh the auth file list and try again"}})
+        elif quota.get("rate_limit_reset_credits_available_count", 0) <= 0:
+            self.send_json(502, {"error": {"message": "No reset credits available"}})
+        else:
+            quota["rate_limit_reset_credits_available_count"] -= 1
+            if quota.get("rate_limit_reset_credits"):
+                quota["rate_limit_reset_credits"].pop(0)
+            for row in quota["quota"]:
+                row["remaining_percent"] = 100
+            self.send_json(200, {"reset": True})
 
     def do_PATCH(self):
         self.handle_mutation()
@@ -1571,22 +1664,8 @@ class Handler(BaseHTTPRequestHandler):
             self.mutation_view = json.loads(request_body or b"{}")
             request_body = json.dumps(self.mutation_view.get("data") or {}).encode()
         route = self.command, parsed.path
-        if route == ("POST", "/v0/management/api-call"):
-            body = json.loads(request_body or b"{}")
-            auth_index = body.get("auth_index", "")
-            auth_file = next((item for item in AUTH_FILES if item["auth_index"] == auth_index), None)
-            quota = AUTH_FILE_QUOTAS.get(auth_index)
-            if body.get("method") != "POST" or body.get("url") != "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits/consume":
-                self.send_json(400, {"error": {"message": "dummy backend: unsupported api-call"}})
-            elif auth_file is None or quota is None or auth_file["category"] != "codex":
-                self.send_json(404, {"error": {"message": "Codex 认证文件不存在"}})
-            elif quota.get("rate_limit_reset_credits_available_count", 0) <= 0:
-                self.send_json(200, {"status_code": 409, "body": '{"error":{"message":"No reset credits available"}}'})
-            else:
-                quota["rate_limit_reset_credits_available_count"] -= 1
-                for row in quota["quota"]:
-                    row["remaining_percent"] = 100
-                self.send_json(200, {"status_code": 204, "body": ""})
+        if route == ("POST", f"{API_BASE}/auth-files/quota/reset"):
+            self.reset_auth_quota(parsed, AUTH_FILES)
         elif route == ("DELETE", f"{API_BASE}/plugin-logs"):
             cleared = len(PLUGIN_LOGS)
             PLUGIN_LOGS.clear()
@@ -1789,10 +1868,16 @@ def main():
         default="auto",
         help="Initial host theme; the preview shell can switch themes after startup.",
     )
+    parser.add_argument(
+        "--allow-api-key-quota-reset",
+        action="store_true",
+        help="Allow API key users to reset Codex auth file quotas.",
+    )
     args = parser.parse_args()
     seed_paginated_history()
     Handler.host_mode = args.host
     Handler.initial_theme = args.theme
+    Handler.allow_api_key_quota_reset = args.allow_api_key_quota_reset
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     entry_path = "/ui" if args.host == "standalone" else "/"
     print(

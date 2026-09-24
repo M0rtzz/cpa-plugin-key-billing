@@ -6,22 +6,24 @@ import (
 )
 
 type UsageEvent struct {
-	Scope           string
-	KeyPreview      string
-	AuthIndex       string
-	Provider        string
-	ExecutorType    string
-	AuthType        string
-	Account         string
-	ReasoningEffort string
-	ServiceTier     string
-	UpstreamModel   string
-	RouteModel      string
-	RequestedAt     time.Time
-	Latency         time.Duration
-	TTFT            time.Duration
-	Breakdown       TokenBreakdown
-	At              time.Time
+	Scope               string
+	KeyPreview          string
+	AuthIndex           string
+	Provider            string
+	ExecutorType        string
+	AuthType            string
+	Account             string
+	ReasoningEffort     string
+	ServiceTier         string
+	ResponseServiceTier string
+	UpstreamModel       string
+	ResponseModel       string
+	RouteModel          string
+	RequestedAt         time.Time
+	Latency             time.Duration
+	TTFT                time.Duration
+	Breakdown           TokenBreakdown
+	At                  time.Time
 }
 
 func (s *Store) RecordUsage(event UsageEvent) {
@@ -81,23 +83,25 @@ func (s *Store) recordUsage(event UsageEvent, failure *RequestError) {
 			entryAt = at
 		}
 		entry := RequestEvent{
-			At:                entryAt,
-			Scope:             scope,
-			AuthIndex:         event.AuthIndex,
-			Provider:          provider,
-			Account:           account,
-			ExecutorType:      event.ExecutorType,
-			ReasoningEffort:   event.ReasoningEffort,
-			ServiceTier:       event.ServiceTier,
-			UpstreamModel:     upstreamModel,
-			BillingModel:      billingModel,
-			Failed:            failed,
-			LatencyMS:         event.Latency.Milliseconds(),
-			TTFTMS:            event.TTFT.Milliseconds(),
-			AccountingQuality: event.Breakdown.Quality,
-			PriceSource:       price.Source,
-			Cost:              cost,
-			ReasoningTokens:   event.Breakdown.Output.ReasoningTokens,
+			At:                  entryAt,
+			Scope:               scope,
+			AuthIndex:           event.AuthIndex,
+			Provider:            provider,
+			Account:             account,
+			ExecutorType:        event.ExecutorType,
+			ReasoningEffort:     event.ReasoningEffort,
+			ServiceTier:         event.ServiceTier,
+			ResponseServiceTier: strings.TrimSpace(event.ResponseServiceTier),
+			UpstreamModel:       upstreamModel,
+			ResponseModel:       strings.TrimSpace(event.ResponseModel),
+			BillingModel:        billingModel,
+			Failed:              failed,
+			LatencyMS:           event.Latency.Milliseconds(),
+			TTFTMS:              event.TTFT.Milliseconds(),
+			AccountingQuality:   event.Breakdown.Quality,
+			PriceSource:         price.Source,
+			Cost:                cost,
+			ReasoningTokens:     event.Breakdown.Output.ReasoningTokens,
 		}
 		var changedKeys []string
 		if key := state.ensureKey(scope, event.KeyPreview); key != nil {

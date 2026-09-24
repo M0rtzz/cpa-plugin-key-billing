@@ -11,23 +11,7 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
-// Version 15 records the billing factors explicitly. Existing monetary values
-// remain immutable here; historical rebilling is a separate offline operation.
-func migrateToV15(tx *sql.Tx) error {
-	_, err := tx.Exec(`
-		ALTER TABLE request_events ADD COLUMN billing_multiplier REAL NOT NULL DEFAULT 1;
-		ALTER TABLE request_events ADD COLUMN service_tier_multiplier REAL NOT NULL DEFAULT 1;
-		UPDATE request_events SET service_tier_multiplier = 2.5,
-			price_source = substr(price_source, 1, length(price_source) - 5)
-		WHERE price_source IN ('custom:x2.5', 'builtin:x2.5', 'reference:x2.5');
-	` + billingAdjustmentSchema)
-	if err != nil {
-		return fmt.Errorf("Migrate billing multiplier metadata: %w", err)
-	}
-	return nil
-}
-
-func migrateToV14(tx *sql.Tx, version int) error {
+func migrateToV17(tx *sql.Tx, version int) error {
 	var steps []func(*sql.Tx) error
 	switch version {
 	case 10:
@@ -38,11 +22,110 @@ func migrateToV14(tx *sql.Tx, version int) error {
 	if version <= 12 {
 		steps = append(steps, migrateModelPricing, migrateQuotaWindows)
 	}
-	steps = append(steps, migrateCredentials)
+	if version <= 13 {
+		steps = append(steps, migrateCredentials)
+	}
+	// The feature branch also shipped schema 15 without this column.
+	hasHeaders, err := tableHasColumn(tx, "request_events", "response_headers_json")
+	if err != nil {
+		return err
+	}
+	if version <= 14 || !hasHeaders {
+		steps = append(steps, migrateResponseHeaders)
+	}
+	if version <= 15 {
+		steps = append(steps, migrateRequestErrorReason)
+	}
+	steps = append(steps, migrateUpstreamResponseReports)
 	for _, step := range steps {
 		if err := step(tx); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// Version 18 joins the mainline response report columns with the feature
+// branch's billing factors. Existing amounts stay unchanged; rebilling is
+// an explicit offline operation.
+func migrateToV18(tx *sql.Tx) error {
+	hasGlobal, err := tableHasColumn(tx, "request_events", "billing_multiplier")
+	if err != nil {
+		return err
+	}
+	hasService, err := tableHasColumn(tx, "request_events", "service_tier_multiplier")
+	if err != nil {
+		return err
+	}
+	if hasGlobal != hasService {
+		return fmt.Errorf("Request event billing factor columns are incompatible")
+	}
+	if !hasGlobal {
+		if _, err := tx.Exec(`
+			ALTER TABLE request_events ADD COLUMN billing_multiplier REAL NOT NULL DEFAULT 1;
+			ALTER TABLE request_events ADD COLUMN service_tier_multiplier REAL NOT NULL DEFAULT 1;
+			UPDATE request_events SET service_tier_multiplier = 2.5,
+				price_source = substr(price_source, 1, length(price_source) - 5)
+			WHERE price_source IN ('custom:x2.5', 'builtin:x2.5', 'reference:x2.5');`); err != nil {
+			return fmt.Errorf("Migrate billing multiplier metadata: %w", err)
+		}
+	}
+	var tableExists bool
+	if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='billing_adjustments')").Scan(&tableExists); err != nil {
+		return fmt.Errorf("Check billing adjustment table: %w", err)
+	}
+	if tableExists {
+		var compatible bool
+		if err := tx.QueryRow(`SELECT count(*) = 4 AND sum(
+			(name = 'operation_id' AND upper(type) = 'TEXT' AND pk = 1) OR
+			(name = 'multiplier' AND upper(type) = 'REAL' AND pk = 0) OR
+			(name = 'completed_at' AND upper(type) = 'INTEGER' AND pk = 0) OR
+			(name = 'result_json' AND upper(type) = 'TEXT' AND pk = 0)) = 4
+			FROM pragma_table_xinfo('billing_adjustments') WHERE hidden = 0`).Scan(&compatible); err != nil {
+			return fmt.Errorf("Check billing adjustment schema: %w", err)
+		}
+		if !compatible {
+			return fmt.Errorf("Billing adjustment table schema is incompatible")
+		}
+		return nil
+	}
+	if _, err := tx.Exec(billingAdjustmentSchema); err != nil {
+		return fmt.Errorf("Create billing adjustment table: %w", err)
+	}
+	return nil
+}
+
+func tableHasColumn(tx *sql.Tx, table, column string) (bool, error) {
+	var exists bool
+	if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM pragma_table_info(?) WHERE name = ?)", table, column).Scan(&exists); err != nil {
+		return false, fmt.Errorf("Check %s.%s: %w", table, column, err)
+	}
+	return exists, nil
+}
+
+// Rows recorded before schema 17 carry no upstream response report.
+func migrateUpstreamResponseReports(tx *sql.Tx) error {
+	if _, err := tx.Exec(`
+		ALTER TABLE request_events ADD COLUMN response_service_tier TEXT NOT NULL DEFAULT '';
+		ALTER TABLE request_events ADD COLUMN response_model TEXT NOT NULL DEFAULT '';`); err != nil {
+		return fmt.Errorf("Add request event upstream response reports: %w", err)
+	}
+	return nil
+}
+
+func migrateRequestErrorReason(tx *sql.Tx) error {
+	if _, err := tx.Exec("ALTER TABLE request_errors DROP COLUMN reason"); err != nil {
+		return fmt.Errorf("Drop request error reason: %w", err)
+	}
+	return nil
+}
+
+// Schema 15 shipped this column before the plugin stopped recording response
+// headers. Keep adding it so upgraded databases still match a fresh schema.
+func migrateResponseHeaders(tx *sql.Tx) error {
+	if _, err := tx.Exec(
+		"ALTER TABLE request_events ADD COLUMN response_headers_json TEXT NOT NULL DEFAULT '{}'"); err != nil {
+		return fmt.Errorf("Add request event response headers: %w", err)
 	}
 	return nil
 }
