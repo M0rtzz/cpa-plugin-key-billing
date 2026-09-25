@@ -194,7 +194,10 @@
   .timing .label { color: var(--muted); }
   .timing .value { color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
   .pager { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; flex-wrap: wrap; }
-  .pager .buttons { display: flex; gap: 8px; }
+  .pager .buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .page-picker { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  .page-picker select { min-width: 105px; }
+  .table-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .tabs { display: flex; gap: 7px; }
   .tabs button[aria-selected="true"] { background: var(--soft); border-color: var(--accent); color: var(--accent); }
   .account-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -215,6 +218,22 @@
   .record-filters select { min-width: 135px; }
   .record-filters .model-filter { flex: 1 1 240px; max-width: 360px; }
   .model-picker { position: relative; }
+  .model-picker input { width: 100%; padding-right: 42px; }
+  .model-picker .model-toggle {
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    bottom: 4px;
+    width: 32px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+  }
+  .model-toggle:hover { color: var(--accent); background: var(--soft); }
+  .model-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
   .model-options {
     position: absolute;
     z-index: 20;
@@ -327,6 +346,8 @@
     .filters input { width: 100%; }
     .filters button { width: 100%; }
     .section-head { flex-wrap: wrap; }
+    .pager .buttons { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .page-picker { grid-column: 1 / -1; justify-content: center; }
     .chart { height: 190px; }
   }
 </style>
@@ -344,11 +365,11 @@
 <p class="scope-note">下方统计与趋势按所选日期范围展示；明细筛选仅影响请求表格。</p>
 <div id="stats" class="grid stats" data-private></div>
 <div class="grid two"><section class="panel"><div class="section-head"><h2>用量趋势</h2><select id="trend-metric" aria-label="趋势指标"><option value="requests">请求数</option><option value="total_tokens">Token 数</option><option value="total_cost">费用（USD）</option></select></div><div id="trend" data-private></div></section><section class="panel"><div class="section-head"><h2>模型分布</h2><span class="muted">按 Token 占比</span></div><div id="models" data-private></div></section></div>
-<section class="panel"><div class="section-head"><h2>请求明细</h2><div class="tabs" role="tablist" aria-label="记录类型"><button id="events-tab" type="button" role="tab" aria-selected="true">全部请求</button><button id="errors-tab" type="button" role="tab" aria-selected="false">错误记录</button></div></div><div class="filters record-filters" aria-label="明细筛选">
-<div class="model-filter"><label for="model-filter">模型</label><div class="model-picker"><input id="model-filter" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="model-options" autocomplete="off" placeholder="全部模型 · 搜索并选择"><div id="model-options" class="model-options" role="listbox" aria-label="模型选项" hidden></div></div></div>
+<section class="panel"><div class="section-head"><h2>请求明细</h2><div class="table-actions"><div class="tabs" role="tablist" aria-label="记录类型"><button id="events-tab" type="button" role="tab" aria-selected="true">全部请求</button><button id="errors-tab" type="button" role="tab" aria-selected="false">错误记录</button></div><button id="refresh-records" type="button">刷新表格</button></div></div><div class="filters record-filters" aria-label="明细筛选">
+<div class="model-filter"><label for="model-filter">模型</label><div class="model-picker"><input id="model-filter" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="model-options" autocomplete="off" placeholder="全部模型 · 搜索并选择"><button id="model-toggle" class="model-toggle" type="button" aria-label="展开模型选项" aria-haspopup="listbox" aria-expanded="false" aria-controls="model-options"><svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div id="model-options" class="model-options" role="listbox" aria-label="模型选项" hidden></div></div></div>
 <label id="type-filter-label" for="type-filter">类型<select id="type-filter"><option value="">全部类型</option><option value="ws">WS</option><option value="stream">流式</option><option value="sync">同步</option><option value="unknown">未知</option></select></label>
 <button id="clear-record-filters" type="button">清除筛选</button>
-</div><div id="records" class="table-scroll" data-private></div><div class="pager"><span id="page-label" class="muted" data-private></span><div class="buttons"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button></div></div></section>
+</div><div id="records" class="table-scroll" data-private></div><div class="pager"><span id="page-label" class="muted" data-private aria-live="polite"></span><nav class="buttons" aria-label="请求明细分页"><button id="first-page" type="button">首页</button><button id="previous" type="button">上一页</button><label class="page-picker" for="page-select">页码<select id="page-select" data-private disabled><option value="1">第 1 页</option></select></label><button id="next" type="button">下一页</button><button id="last-page" type="button">末页</button></nav></div></section>
 </div>
 
 <footer class="footer">CPA Key Billing · 账户自助查询 · API Key 不写入浏览器存储</footer>
@@ -717,6 +738,7 @@
       modelOptions = [];
       offset = 0;
       snapshot = "";
+      total = 0;
       tab = "events";
       $("model-filter").value = "";
       $("type-filter").value = "";
@@ -933,11 +955,21 @@
         table.append(body);
         parent.append(table);
       }
-      $("page-label").textContent =
-        "共 " + integer(total) + " 条 · 第 " + (Math.floor(offset / PAGE_SIZE) + 1) + " / " + Math.max(1, Math.ceil(total / PAGE_SIZE)) + " 页";
-      $("previous").disabled = offset === 0;
-      $("next").disabled = offset + PAGE_SIZE >= total;
+      const pages = pageCount(), current = Math.floor(offset / PAGE_SIZE) + 1, select = clear("page-select");
+      $("page-label").textContent = "共 " + integer(total) + " 条 · 第 " + current + " / " + pages + " 页";
+      const options = document.createDocumentFragment();
+      for (let page = 1; page <= pages; page++) {
+        const option = node("option", "第 " + integer(page) + " 页");
+        option.value = String(page);
+        options.append(option);
+      }
+      select.append(options);
+      select.value = String(current);
+      select.disabled = pages <= 1;
+      $("first-page").disabled = $("previous").disabled = offset === 0;
+      $("last-page").disabled = $("next").disabled = offset + PAGE_SIZE >= total;
     }
+    function pageCount() { return Math.max(1, Math.ceil(total / PAGE_SIZE)); }
     function recordState() { return { range, tab, offset, snapshot, model, requestType }; }
     async function fetchRecords(state) {
       const params = new URLSearchParams(state.range);
@@ -956,13 +988,23 @@
       for (const name of ["events", "errors"]) $(name + "-tab").setAttribute("aria-selected", String(name === tab));
       renderRecords(value);
     }
-    async function loadRecords(state = recordState()) { commitRecords(state, await fetchRecords(state)); }
+    async function loadRecords(state = recordState()) {
+      let value = await fetchRecords(state);
+      const lastOffset = Math.max(0, Math.ceil((Number(value.total) || 0) / PAGE_SIZE) - 1) * PAGE_SIZE;
+      if (state.offset > lastOffset) {
+        state = { ...state, offset: lastOffset, snapshot: String(value.snapshot_id ?? state.snapshot) };
+        value = await fetchRecords(state);
+      }
+      commitRecords(state, value);
+    }
     function closeModelOptions() {
       $("model-options").hidden = true;
       $("model-filter").setAttribute("aria-expanded", "false");
+      $("model-toggle").setAttribute("aria-expanded", "false");
+      $("model-toggle").setAttribute("aria-label", "展开模型选项");
     }
-    function showModelOptions() {
-      const parent = clear("model-options"), needle = $("model-filter").value.toLowerCase();
+    function showModelOptions(showAll = false) {
+      const parent = clear("model-options"), needle = showAll === true ? "" : $("model-filter").value.toLowerCase();
       const options = ["", ...modelOptions.filter((value) => value.toLowerCase().includes(needle))];
       for (const value of options) {
         const option = node("button", value || "全部模型");
@@ -977,7 +1019,17 @@
       }
       parent.hidden = false;
       $("model-filter").setAttribute("aria-expanded", "true");
+      $("model-toggle").setAttribute("aria-expanded", "true");
+      $("model-toggle").setAttribute("aria-label", "收起模型选项");
     }
+    $("model-toggle").onclick = () => { if ($("model-options").hidden) showModelOptions(true); else closeModelOptions(); };
+    $("model-toggle").onkeydown = (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        showModelOptions(true);
+        $("model-options").querySelector("button")?.focus();
+      }
+    };
     $("model-filter").oninput = showModelOptions;
     $("model-filter").onfocus = showModelOptions;
     $("model-filter").onkeydown = (event) => {
@@ -1014,6 +1066,13 @@
         $("model-filter").value = model;
       }
     });
+    $("model-filter").closest(".model-picker").addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeModelOptions();
+        $("model-filter").value = model;
+        $("model-toggle").focus();
+      }
+    });
     $("type-filter").onchange = () => {
       const nextType = $("type-filter").value;
       void operation(() => loadRecords({ ...recordState(), requestType: nextType, offset: 0, snapshot: "" }));
@@ -1048,6 +1107,7 @@
         $("dashboard").setAttribute("aria-busy", "false");
         $("model-filter").value = model;
         $("type-filter").value = requestType;
+        $("page-select").value = String(Math.floor(offset / PAGE_SIZE) + 1);
       }
     }
     async function loadDashboard() {
@@ -1084,12 +1144,21 @@
       void operation(() => reloadDashboard(selectedRange()));
     };
     $("refresh").onclick = () => operation(() => reloadDashboard(range));
+    $("refresh-records").onclick = () => operation(() => loadRecords({ ...recordState(), offset: 0, snapshot: "" }));
     $("trend-metric").onchange = renderTrend;
     for (const value of ["events", "errors"])
       $(value + "-tab").onclick = () => operation(() => loadRecords({ ...recordState(), tab: value, offset: 0, snapshot: "" }));
-    $("previous").onclick = () => operation(() => loadRecords({ ...recordState(), offset: Math.max(0, offset - PAGE_SIZE) }));
-    $("next").onclick = () =>
-      operation(async () => { if (offset + PAGE_SIZE < total) await loadRecords({ ...recordState(), offset: offset + PAGE_SIZE }); });
+    function goToPage(page) {
+      return operation(async () => {
+        if (Number.isInteger(page) && page >= 1 && page <= pageCount() && (page - 1) * PAGE_SIZE !== offset)
+          await loadRecords({ ...recordState(), offset: (page - 1) * PAGE_SIZE });
+      });
+    }
+    $("first-page").onclick = () => goToPage(1);
+    $("previous").onclick = () => goToPage(Math.floor(offset / PAGE_SIZE));
+    $("next").onclick = () => goToPage(Math.floor(offset / PAGE_SIZE) + 2);
+    $("last-page").onclick = () => goToPage(pageCount());
+    $("page-select").onchange = () => goToPage(Number($("page-select").value));
     operation(loadDashboard, true);
   })();
 </script>
