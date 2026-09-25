@@ -105,6 +105,8 @@ func (s *Store) recordUsage(event UsageEvent, failure *RequestError) {
 			entryAt = at
 		}
 		entry := RequestEvent{
+			RequestedModel:      strings.TrimSpace(event.RouteModel),
+			ReportedModel:       strings.TrimSpace(event.UpstreamModel),
 			At:                  entryAt,
 			Scope:               scope,
 			AuthIndex:           event.AuthIndex,

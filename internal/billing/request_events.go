@@ -8,6 +8,8 @@ import (
 // RequestEvent is one persisted request record and never stores a plaintext API key.
 // Account contains only an OAuth identity or masked API key.
 type RequestEvent struct {
+	RequestedModel      string          `json:"requested_model,omitempty"`
+	ReportedModel       string          `json:"reported_model,omitempty"`
 	At                  time.Time       `json:"at"`
 	Scope               string          `json:"scope"`
 	AuthIndex           string          `json:"auth_index,omitempty"`
@@ -78,6 +80,7 @@ type RequestEventQuery struct {
 	From           time.Time
 	To             time.Time
 	Timezone       *time.Location
+	Granularity    string
 	IncludeFilters bool
 	SnapshotID     *int64
 	Offset         int

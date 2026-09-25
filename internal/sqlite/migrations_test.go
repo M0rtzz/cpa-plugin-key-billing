@@ -24,7 +24,7 @@ func TestFeatureBranchV15MigrationPreservesBillingHistory(t *testing.T) {
 		ALTER TABLE request_events DROP COLUMN response_model;
 		ALTER TABLE request_events DROP COLUMN response_headers_json;
 		ALTER TABLE request_errors ADD COLUMN reason TEXT NOT NULL DEFAULT '';
-		ALTER TABLE request_events DROP COLUMN stream;
+		ALTER TABLE request_events DROP COLUMN requested_model; ALTER TABLE request_events DROP COLUMN reported_model; ALTER TABLE request_events DROP COLUMN stream;
 		ALTER TABLE request_events DROP COLUMN token_usage_json;
 		PRAGMA user_version=15;
 		INSERT INTO request_events(id,at,scope,failed,price_source,billing_multiplier,service_tier_multiplier,total_usd)

@@ -14,7 +14,7 @@ func TestV20UsageMigrationPreservesHistoryAndRollsBack(t *testing.T) {
 		t.Run(map[bool]string{false: "success", true: "rollback"}[conflict], func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "history.db")
 			db := openDatabase(t, path)
-			ddl := `ALTER TABLE request_events DROP COLUMN stream;`
+			ddl := `ALTER TABLE request_events DROP COLUMN requested_model; ALTER TABLE request_events DROP COLUMN reported_model; ALTER TABLE request_events DROP COLUMN stream;`
 			if !conflict {
 				ddl += `ALTER TABLE request_events DROP COLUMN token_usage_json;`
 			}

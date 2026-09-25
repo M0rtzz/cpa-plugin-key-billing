@@ -158,6 +158,7 @@ func TestUsageHandleUsesClientKeyModelAliasAndCredential(t *testing.T) {
 		entry.ReasoningEffort != "high" || entry.ServiceTier != "priority" ||
 		entry.ResponseServiceTier != "default" || entry.ResponseModel != "gpt-5.6-luna" ||
 		entry.UpstreamModel != flowModel || entry.BillingModel != "route/gpt-5.5" || entry.Failed ||
+		entry.RequestedModel != "route/gpt-5.5" || entry.ReportedModel != flowModel ||
 		entry.Source != "codex · billing@example.com" || entry.AccountingQuality != billing.TokenAccountingComplete ||
 		entry.LatencyMS != 1500 || entry.TTFTMS != 250 {
 		t.Fatalf("entry = %+v", entry)

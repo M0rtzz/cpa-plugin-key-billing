@@ -260,7 +260,7 @@ func (a *App) analysis(req ManagementRequest, access viewAccess) ManagementRespo
 			},
 		})
 	}
-	query := billing.RequestEventQuery{Scope: access.Scope}
+	query := billing.RequestEventQuery{Scope: access.Scope, Granularity: strings.TrimSpace(req.Query.Get("granularity"))}
 	if !access.APIKey {
 		query.KeyScope = strings.TrimSpace(req.Query.Get("api_key"))
 	}

@@ -17,7 +17,7 @@ func TestV19ServiceTierMigrationPreservesHistoryAndRollsBack(t *testing.T) {
    INSERT INTO request_events(id,at,scope,failed,total_usd,billing_multiplier,service_tier_multiplier) VALUES(1,1,'dummy',0,.123,.2,2.5),(2,2,'dummy',1,0,1,1),(3,3,'deleted',0,0,1,1);
    INSERT INTO request_errors(request_event_id,status_code,body) VALUES(2,502,'dummy failure');
    ALTER TABLE prices DROP COLUMN service_tiers_json;
-   ALTER TABLE request_events DROP COLUMN stream;
+   ALTER TABLE request_events DROP COLUMN requested_model; ALTER TABLE request_events DROP COLUMN reported_model; ALTER TABLE request_events DROP COLUMN stream;
    ALTER TABLE request_events DROP COLUMN token_usage_json;
    PRAGMA user_version=18;`); err != nil {
 				t.Fatal(err)

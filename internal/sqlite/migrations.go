@@ -568,3 +568,13 @@ func migrateToV19(tx *sql.Tx) error {
 	}
 	return nil
 }
+
+// Preserve unknown historical model identities instead of reconstructing routing.
+func migrateToV21(tx *sql.Tx) error {
+	_, err := tx.Exec(`ALTER TABLE request_events ADD COLUMN requested_model TEXT;
+ ALTER TABLE request_events ADD COLUMN reported_model TEXT;`)
+	if err != nil {
+		return fmt.Errorf("Migrate reported model identities: %w", err)
+	}
+	return nil
+}

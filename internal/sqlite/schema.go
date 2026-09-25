@@ -138,7 +138,9 @@ CREATE TABLE request_events (
 	response_headers_json       TEXT    NOT NULL DEFAULT '{}',
 	pricing_json TEXT NOT NULL DEFAULT '{}',
 	stream INTEGER CHECK(stream IS NULL OR stream IN (0, 1)),
-	token_usage_json TEXT
+	token_usage_json TEXT,
+ requested_model TEXT,
+ reported_model TEXT
 );
 
 CREATE TABLE request_errors (

@@ -56,7 +56,36 @@ type AnalysisSummary struct {
 	Cost             AnalysisCostSummary `json:"cost"`
 }
 
+type AnalysisModelGroup struct {
+	RequestedModel  string  `json:"requested_model"`
+	ReportedModel   string  `json:"reported_model"`
+	Key             string  `json:"key"`
+	Label           string  `json:"label"`
+	Preview         string  `json:"preview,omitempty"`
+	Requests        int64   `json:"requests"`
+	TotalTokens     int64   `json:"total_tokens"`
+	CostUSD         float64 `json:"cost_usd"`
+	BeforeGlobalUSD float64 `json:"before_global_usd"`
+	Unconvertible   int64   `json:"unconvertible"`
+	MissingUsage    int64   `json:"missing_usage"`
+}
+
+type AnalysisKeyTrend struct {
+	Key     string               `json:"key"`
+	Label   string               `json:"label"`
+	Preview string               `json:"preview,omitempty"`
+	Points  []AnalysisTrendPoint `json:"points"`
+}
+
 type AnalysisView struct {
+	SnapshotID   int64                `json:"snapshot_id,string"`
+	Granularity  string               `json:"granularity"`
+	From         time.Time            `json:"from"`
+	To           time.Time            `json:"to"`
+	ModelGroups  []AnalysisModelGroup `json:"model_groups,omitempty"`
+	KeyTrends    []AnalysisKeyTrend   `json:"key_trends,omitempty"`
+	MissingUsage int64                `json:"missing_usage"`
+
 	Summary           AnalysisSummary   `json:"summary"`
 	Trends            AnalysisTrends    `json:"trends"`
 	UsageDistribution UsageDistribution `json:"usage_distribution"`
@@ -69,6 +98,14 @@ func (s *Store) Analysis(query RequestEventQuery) (AnalysisView, error) {
 		return AnalysisView{}, invalidf("The analysis range is outside the retained request history")
 	}
 	query.From, query.To = from, to
+	switch query.Granularity {
+	case "", "auto", "hour", "day":
+	default:
+		return AnalysisView{}, invalidf("Granularity must be auto, hour or day")
+	}
+	if query.Granularity == "hour" && AnalysisHourlyBuckets(query) > 1000 {
+		return AnalysisView{}, invalidf("At most 1000 time buckets are supported; select daily granularity")
+	}
 	view, err := withRepository(s, func(repo Repository) (AnalysisView, error) {
 		return repo.Analysis(query, now.Add(-RequestEventRetention))
 	})
@@ -98,4 +135,19 @@ func effectiveAnalysisRange(query RequestEventQuery, now time.Time) (time.Time, 
 		from = cutoff
 	}
 	return from, to
+}
+
+// AnalysisHourlyBuckets includes the partial first hour in the selected timezone.
+func AnalysisHourlyBuckets(query RequestEventQuery) int {
+	location := query.Timezone
+	if location == nil {
+		location = time.UTC
+	}
+	local := query.From.In(location)
+	start := local.Add(-time.Duration(local.Minute())*time.Minute - time.Duration(local.Second())*time.Second - time.Duration(local.Nanosecond()))
+	duration := query.To.Sub(start)
+	if duration <= 0 {
+		return 0
+	}
+	return int((duration + time.Hour - 1) / time.Hour)
 }
