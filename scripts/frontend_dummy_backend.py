@@ -1315,7 +1315,8 @@ def analysis_view(query, scope=""):
         entry_scope = entry.get("scope", "")
         total = sum(c.get(k, 0) for k in ("uncached_input_tokens", "cache_read_tokens", "cache_write_tokens", "billed_output_tokens"))
         multiplier = c.get("billing_multiplier", 1)
-        model_groups.append({"requested_model": entry.get("billing_model", ""), "reported_model": entry.get("upstream_model", ""),
+        model_groups.append({"billing_model": entry.get("billing_model", ""),
+            "requested_model": entry.get("requested_model", ""), "reported_model": entry.get("reported_model", ""),
             "key": entry_scope, "label": entry.get("label", ""), "preview": entry.get("preview", ""), "requests": 1, "total_tokens": total,
             "cost_usd": c.get("total_usd", 0), "before_global_usd": c.get("total_usd", 0) / multiplier if multiplier else 0,
             "unconvertible": 0 if multiplier else 1})

@@ -66,13 +66,13 @@ func (d *DB) Analysis(query billing.RequestEventQuery, since time.Time) (billing
 			var index int
 			var scope, model, source string
 			var part billing.AnalysisSummary
-			var requested, reported string
+			var requested, reported, billingModel string
 			var before float64
 			var missing, unconvertible int64
 			if err := rows.Scan(&index, &scope, &model, &source,
 				&part.Requests, &part.Failed, &part.InputTokens, &part.OutputTokens,
 				&part.CacheReadTokens, &part.CacheWriteTokens, &part.Cost.TotalUSD,
-				&part.Cost.InputUSD, &part.Cost.CacheReadUSD, &part.Cost.CacheWriteUSD, &part.Cost.OutputUSD, &requested, &reported, &before, &unconvertible, &missing); err != nil {
+				&part.Cost.InputUSD, &part.Cost.CacheReadUSD, &part.Cost.CacheWriteUSD, &part.Cost.OutputUSD, &requested, &reported, &before, &unconvertible, &missing, &billingModel); err != nil {
 				rows.Close()
 				return billing.AnalysisView{}, fmt.Errorf("Read analysis data: %w", err)
 			}
@@ -108,11 +108,11 @@ func (d *DB) Analysis(query billing.RequestEventQuery, since time.Time) (billing
 					}
 				}
 				keyPoints[scope][index].Value += float64(part.TotalTokens)
-				encoded, _ := json.Marshal([]string{requested, reported, scope})
+				encoded, _ := json.Marshal([]string{billingModel, requested, reported, scope})
 				id := string(encoded)
 				group := modelGroups[id]
 				if group == nil {
-					group = &billing.AnalysisModelGroup{RequestedModel: requested, ReportedModel: reported, Key: scope}
+					group = &billing.AnalysisModelGroup{BillingModel: billingModel, RequestedModel: requested, ReportedModel: reported, Key: scope}
 					modelGroups[id] = group
 				}
 				group.Requests += part.Requests
@@ -172,6 +172,9 @@ func (d *DB) Analysis(query billing.RequestEventQuery, since time.Time) (billing
 		}
 		sort.Slice(view.ModelGroups, func(i, j int) bool {
 			a, b := view.ModelGroups[i], view.ModelGroups[j]
+			if a.BillingModel != b.BillingModel {
+				return a.BillingModel < b.BillingModel
+			}
 			if a.RequestedModel != b.RequestedModel {
 				return a.RequestedModel < b.RequestedModel
 			}
@@ -296,8 +299,8 @@ func analysisSQL(query billing.RequestEventQuery, since time.Time, boundaries []
 			sum(r.cache_write_usd), sum(r.output_usd), coalesce(r.requested_model,''), coalesce(r.reported_model,''),
  coalesce(sum(CASE WHEN r.billing_multiplier > 0 THEN r.total_usd/r.billing_multiplier ELSE 0 END),0),
  sum(CASE WHEN r.billing_multiplier > 0 THEN 0 ELSE 1 END),
- sum(CASE WHEN r.accounting_quality IN ('complete','unclassified') THEN 0 ELSE 1 END) ` + where + `
-			AND r.at >= ? AND r.at < ? GROUP BY 2, 3, 4, 16, 17`)
+ sum(CASE WHEN r.accounting_quality IN ('complete','unclassified') THEN 0 ELSE 1 END), coalesce(r.billing_model,'') ` + where + `
+			AND r.at >= ? AND r.at < ? GROUP BY 2, 3, 4, 16, 17, 21`)
 		queryArgs = append(queryArgs, args...)
 		queryArgs = append(queryArgs, nanos(boundary.Time), nanos(end))
 	}

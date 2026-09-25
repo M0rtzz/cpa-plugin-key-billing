@@ -4,11 +4,73 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
 	"cpa-key-billing/internal/billing"
 )
+
+func TestDashboardBillingModelsPreserveMixedHistory(t *testing.T) {
+	db := openTestDB(t)
+	state := billing.NewState()
+	var normal []billing.RequestEvent
+	for i, fixture := range []struct{ scope, billed, upstream, requested, reported string }{
+		{"a", "model-a", "model-a", "", ""},
+		{"a", "model-b", "model-b", "", ""},
+		{"b", "model-a", "model-a", "", ""},
+		{"a", "model-a", "execution-model", "alias", "execution-model"},
+		{"a", "model-b", "execution-model", "alias", "execution-model"},
+		{"a", "", "model-a", "", ""},
+		{"a", "", "", "", ""},
+	} {
+		event := requestEvent(fixture.scope, eventStart)
+		event.BillingModel, event.UpstreamModel = fixture.billed, fixture.upstream
+		event.RequestedModel, event.ReportedModel = fixture.requested, fixture.reported
+		event.Cost.TotalUSD = float64(i+1) / 10
+		event.Cost.BillingMultiplier = .2
+		normal = append(normal, event)
+	}
+	zero := requestEvent("a", eventStart)
+	zero.BillingModel, zero.UpstreamModel = "model-c", "model-c"
+	zero.Cost = billing.Cost{BillingMultiplier: .2}
+	normal = append(normal, zero)
+	failed := zero
+	failed.BillingModel, failed.UpstreamModel = "model-b", "model-b"
+	mustSave(t, db, state, billing.Changes{NormalRequestEvents: normal, RequestErrorEvents: []billing.RequestErrorEvent{{Event: failed}}})
+	before := mustQueryRequestEvents(t, db, billing.RequestEventQuery{})
+	view, err := db.Analysis(billing.RequestEventQuery{From: eventStart.Add(-time.Hour), To: eventStart.Add(time.Hour)}, eventStart.Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.Summary.Requests != 9 || view.Summary.Failed != 1 || len(view.ModelGroups) != 7 {
+		t.Fatalf("Lost historical, failed, or empty rows: %+v", view)
+	}
+	counts := map[string]int64{}
+	var tokens, mapped int64
+	var cost, beforeGlobal float64
+	for _, group := range view.ModelGroups {
+		counts[group.BillingModel] += group.Requests
+		tokens += group.TotalTokens
+		cost += group.CostUSD
+		beforeGlobal += group.BeforeGlobalUSD
+		if group.RequestedModel != "" || group.ReportedModel != "" {
+			if group.RequestedModel != "alias" || group.ReportedModel != "execution-model" {
+				t.Fatalf("Invented model mapping: %+v", group)
+			}
+			mapped += group.Requests
+		}
+	}
+	if !reflect.DeepEqual(counts, map[string]int64{"model-a": 3, "model-b": 3, "model-c": 1, "": 2}) || mapped != 2 {
+		t.Fatal("Billing models merged or inferred from legacy upstream fields", counts, mapped)
+	}
+	if tokens != 7000 || math.Abs(cost-2.8) > 1e-9 || math.Abs(beforeGlobal-14) > 1e-9 {
+		t.Fatal("Aggregate amounts changed", tokens, cost, beforeGlobal)
+	}
+	if !reflect.DeepEqual(before, mustQueryRequestEvents(t, db, billing.RequestEventQuery{})) {
+		t.Fatal("Analysis modified stored bills")
+	}
+}
 
 func TestDashboardModelMappingCostsTop10AndScope(t *testing.T) {
 	db := openTestDB(t)

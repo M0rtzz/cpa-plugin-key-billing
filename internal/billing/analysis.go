@@ -57,6 +57,7 @@ type AnalysisSummary struct {
 }
 
 type AnalysisModelGroup struct {
+	BillingModel    string  `json:"billing_model"`
 	RequestedModel  string  `json:"requested_model"`
 	ReportedModel   string  `json:"reported_model"`
 	Key             string  `json:"key"`

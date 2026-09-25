@@ -14,7 +14,7 @@ const analysisDashboard = (() => {
     snapshot: "",
     view: null,
     rankSort: "cost_usd",
-    dimension: "request",
+    dimension: "billing",
     metric: "total_tokens",
     granularity: "auto",
     revision: 0,
@@ -217,22 +217,22 @@ const analysisDashboard = (() => {
       void loadRecords();
     } else renderRecords();
   }
+  function modelFields() {
+    return state.dimension === "billing"
+      ? ["billing_model"]
+      : state.dimension === "request"
+        ? ["requested_model"]
+        : state.dimension === "upstream"
+          ? ["reported_model"]
+          : ["requested_model", "reported_model"];
+  }
   function groupedModels() {
     const groups = new Map();
+    const fields = modelFields(),
+      missing = { billing_model: "billing_unknown", requested_model: "request_unknown", reported_model: "upstream_unknown" };
     for (const row of data.model_groups || []) {
-      const name =
-        state.dimension === "request"
-          ? row.requested_model || label("request_unknown")
-          : state.dimension === "upstream"
-            ? row.reported_model || label("upstream_unknown")
-            : (row.requested_model || label("request_unknown")) + " → " + (row.reported_model || label("upstream_unknown"));
-      const id = JSON.stringify(
-        state.dimension === "request"
-          ? [row.requested_model]
-          : state.dimension === "upstream"
-            ? [row.reported_model]
-            : [row.requested_model, row.reported_model],
-      );
+      const name = fields.map((field) => row[field] || label(missing[field])).join(" → "),
+        id = JSON.stringify(fields.map((field) => row[field] || ""));
       if (!groups.has(id))
         groups.set(id, { name, requests: 0, total_tokens: 0, cost_usd: 0, before_global_usd: 0, unconvertible: 0, keys: new Map() });
       const group = groups.get(id);
@@ -291,6 +291,7 @@ const analysisDashboard = (() => {
       select(
         "dimension",
         [
+          ["billing", text("billing")],
           ["request", text("request")],
           ["upstream", text("upstream")],
           ["mapping", text("mapping")],
@@ -315,7 +316,16 @@ const analysisDashboard = (() => {
       ),
     );
     const groups = groupedModels();
-    card.append(controls, element("p", text("model_note"), "muted dashboard-note"));
+    const fields = modelFields(),
+      rows = data.model_groups || [],
+      total = rows.reduce((sum, row) => sum + row.requests, 0),
+      complete = rows.reduce((sum, row) => sum + (fields.every((field) => row[field]) ? row.requests : 0), 0);
+    card.append(
+      controls,
+      element("p", text("model_note"), "muted dashboard-note"),
+      element("p", text("model_coverage", { complete: count(complete), total: count(total) }), "muted dashboard-model-coverage"),
+    );
+    if (state.dimension !== "billing" && complete < total) card.append(element("p", text("model_missing_note"), "muted dashboard-note"));
     if (!groups.length) card.append(element("p", text("empty"), "empty"));
     else {
       const plot = chartBox(label("model_distribution"), "dashboard-model-chart");
