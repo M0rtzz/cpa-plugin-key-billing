@@ -42,8 +42,10 @@
 .dashboard-detail-row:first-child { margin-top: 0; }
 .dashboard-detail-row > span { color: var(--text-secondary); }
 .dashboard-detail-row > strong { color: var(--text-primary); text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dashboard-detail-request-tier > strong { color: var(--dashboard-gold); }
 .dashboard-detail-total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color); }
-.dashboard-detail-total > strong { color: var(--primary-color); font-weight: 750; }
+.dashboard-detail-total > strong { color: var(--dashboard-gold); font-weight: 750; }
+.dashboard-detail-section + .dashboard-detail-section .dashboard-detail-total { margin-top: 0; padding-top: 0; border-top: 0; }
 .dashboard-error-body { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 600px; max-height: 260px; overflow: auto; }
 #dashboard-pagination { margin-top: 14px; }
 #dashboard-pagination > span:first-child { margin-right: auto; }

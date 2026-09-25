@@ -833,11 +833,11 @@ const analysisDashboard = (() => {
       popup.append(element("small", note, "dashboard-detail-note"));
     for (const section of sections) {
       const group = el("div", { class: "dashboard-detail-section" });
-      for (const [key, value] of section.rows || [])
+      for (const [key, value, className = ""] of section.rows || [])
         group.append(
           el(
             "div",
-            { class: "dashboard-detail-row" },
+            { class: "dashboard-detail-row" + (className ? " " + className : "") },
             element("span", key),
             element("strong", value),
           ),
@@ -1112,7 +1112,7 @@ const analysisDashboard = (() => {
           },
           {
             rows: [
-              [label("request_tier"), tierLabel(entry.service_tier)],
+              [label("request_tier"), tierLabel(entry.service_tier), "dashboard-detail-request-tier"],
               [label("response_tier"), tierLabel(entry.response_service_tier)],
               [label("billing_tier"), tierLabel(p.service_tier)],
               [label("tier_source"), tierSource(p.tier_source)],
