@@ -29,6 +29,8 @@ func billingMaintenanceFixture(t *testing.T) string {
 		ALTER TABLE request_events DROP COLUMN billing_multiplier;
 		ALTER TABLE request_events DROP COLUMN service_tier_multiplier;
 		DROP TABLE billing_adjustments;
+		ALTER TABLE request_events DROP COLUMN stream;
+		ALTER TABLE request_events DROP COLUMN token_usage_json;
 		PRAGMA user_version=17;
 		INSERT INTO request_events(id,at,scope,price_source,total_usd,uncached_input_usd,cache_read_usd,cache_write_usd,output_usd,
 			applied_input_per_1m,applied_output_per_1m,applied_cache_read_per_1m,applied_cache_write_per_1m,

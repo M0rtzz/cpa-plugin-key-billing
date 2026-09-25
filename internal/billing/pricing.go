@@ -13,25 +13,25 @@ const (
 )
 
 type TokenInputBreakdown struct {
-	TotalTokens      int64
-	UncachedTokens   int64
-	CacheReadTokens  int64
-	CacheWriteTokens int64
+	TotalTokens      int64 `json:"total_tokens"`
+	UncachedTokens   int64 `json:"uncached_tokens"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
 }
 
 type TokenOutputBreakdown struct {
-	TotalTokens        int64
-	NonReasoningTokens int64
-	ReasoningTokens    int64
+	TotalTokens        int64 `json:"total_tokens"`
+	NonReasoningTokens int64 `json:"non_reasoning_tokens"`
+	ReasoningTokens    int64 `json:"reasoning_tokens"`
 }
 
 // Provider usage is normalized into these non-overlapping buckets before pricing.
 type TokenBreakdown struct {
-	Quality            TokenAccountingQuality
-	TotalTokens        int64
-	Input              TokenInputBreakdown
-	Output             TokenOutputBreakdown
-	UnclassifiedTokens int64
+	Quality            TokenAccountingQuality `json:"quality"`
+	TotalTokens        int64                  `json:"total_tokens"`
+	Input              TokenInputBreakdown    `json:"input"`
+	Output             TokenOutputBreakdown   `json:"output"`
+	UnclassifiedTokens int64                  `json:"unclassified_tokens"`
 }
 
 func (b TokenBreakdown) Valid() bool {

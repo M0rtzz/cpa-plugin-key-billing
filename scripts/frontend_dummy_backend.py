@@ -727,6 +727,7 @@ def event_sample(
     multiplier=1,
     billing_multiplier=0.2,
     pricing=None,
+    stream=None,
 ):
     uncached, cache_read, cache_write, output = tokens
     if failed:
@@ -736,6 +737,14 @@ def event_sample(
         "source": source,
         "provider": provider,
         "executor_type": executor,
+        "stream": stream,
+        "request_type": "ws" if executor == "CodexWebsocketsExecutor" else "unknown" if stream is None else "stream" if stream else "sync",
+        "token_usage": None if stream is None or failed else {
+            "quality": "complete", "total_tokens": uncached + cache_read + cache_write + output,
+            "input": {"total_tokens": uncached + cache_read + cache_write, "uncached_tokens": uncached, "cache_read_tokens": cache_read, "cache_write_tokens": cache_write},
+            "output": {"total_tokens": output, "non_reasoning_tokens": output - reasoning_tokens, "reasoning_tokens": reasoning_tokens},
+            "unclassified_tokens": 0,
+        },
         "reasoning_effort": effort,
         "service_tier": tier,
         "response_service_tier": response_tier,
@@ -765,10 +774,18 @@ def event_sample(
 # Numeric usage and timing values are sampled from a real export. All identities
 # below are synthetic and intentionally unrelated to the source records.
 SUCCESS_EVENT_SAMPLES = [
+    event_sample(0, "codex · image-demo@example.com", "codex", "gpt-image-2", "CodexExecutor", "", "auto", 15000, 1000, 0, (281, 0, 0, 1158), (5, 1.25, 5, 30), stream=False),
+    event_sample(0, "codex · fast-policy@example.com", "codex", "gpt-6-sol", "CodexExecutor", "medium", "priority", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), multiplier=2, response_tier="default", pricing={"service_tier":"priority","tier_source":"request_policy","method":"oauth_multiplier","rule_version":"codex-oauth-family-v3"}, stream=True),
+    event_sample(0, "codex · downgrade-demo@example.com", "codex", "gpt-6", "CodexExecutor", "medium", "priority", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), multiplier=1, response_tier="standard", pricing={"service_tier":"default","tier_source":"response","method":"oauth_multiplier","rule_version":"codex-oauth-family-v7"}, stream=True),
+    event_sample(0, "codex · downgrade-demo@example.com", "codex", "gpt-5.6", "CodexExecutor", "medium", "priority", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), multiplier=0.5, response_tier="flex", pricing={"service_tier":"flex","tier_source":"response","method":"oauth_multiplier","rule_version":"codex-oauth-family-v7"}, stream=True),
+    event_sample(0, "codex · flex-policy@example.com", "codex", "gpt-6-luna", "CodexExecutor", "medium", "flex", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), multiplier=1, response_tier="auto", pricing={"service_tier":"default","tier_source":"response","method":"oauth_multiplier","rule_version":"codex-oauth-family-v7","tier_fallback":"unknown_response_tier"}, stream=True),
+    event_sample(0, "codex · flex-policy@example.com", "codex", "gpt-5.6-luna", "CodexExecutor", "medium", "flex", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), multiplier=1, response_tier="", pricing={"service_tier":"default","tier_source":"default","method":"oauth_multiplier","rule_version":"codex-oauth-family-v7","tier_fallback":"unconfirmed_flex_tier"}, stream=True),
+    event_sample(0, "codex · fast-policy@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "medium", "fast", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), multiplier=2, response_tier="auto", pricing={"service_tier":"priority","tier_source":"request_policy","method":"oauth_multiplier","rule_version":"codex-oauth-family-v3"}, stream=True),
     event_sample(0, "openai · sk-dum…0001", "openai", "gpt-6-sol", "OpenAICompatExecutor", "medium", "auto", 1200, 300, 50, (1000, 400, 0, 200), (4, 0.4, 5, 20), response_tier="priority", pricing={"service_tier":"priority","tier_source":"response","method":"model_ratio","rule_version":"openai-2026-09-25"}),
     event_sample(0, "openai · sk-dum…0001", "openai", "gpt-6-sol", "OpenAICompatExecutor", "medium", "flex", 1200, 300, 50, (1000, 400, 0, 200), (1, 0.1, 1.25, 5), response_tier="flex", pricing={"service_tier":"flex","tier_source":"response","method":"model_ratio","rule_version":"flex-0.5-v1"}),
     event_sample(0, "openai · sk-dum…0001", "openai", "gpt-6-sol", "OpenAICompatExecutor", "medium", "priority", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), response_tier="default", pricing={"service_tier":"default","tier_source":"response","method":"base"}),
     event_sample(0, "openai · sk-dum…0001", "openai", "demo-unknown", "OpenAICompatExecutor", "medium", "priority", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), pricing={"service_tier":"priority","tier_source":"request","method":"base_fallback","tier_fallback":"missing_response_tier","price_fallback":"missing_priority_price"}),
+    event_sample(0, "codex · flex-history@example.com", "codex", "historical-flex-demo", "CodexExecutor", "medium", "flex", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), multiplier=0.5, response_tier="auto", pricing={"service_tier":"flex","tier_source":"request_policy","method":"oauth_multiplier","rule_version":"codex-oauth-family-v5"}, stream=True),
     event_sample(0, "codex · flex-demo@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "medium", "flex", 12000, 3000, 20, (600, 400, 100, 100), (4, 0.4, 5, 20), multiplier=0.5, response_tier="flex", pricing={"service_tier":"flex","tier_source":"response","method":"oauth_multiplier","rule_version":"codex-oauth-family-v1"}),
     event_sample(0, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "high", "priority", 11513, 8209, 266, (712, 91648, 4096, 425), (4, 0.4, 5, 20), multiplier=2, response_tier="priority", pricing={"service_tier":"priority","tier_source":"response","method":"oauth_multiplier","rule_version":"codex-oauth-family-v1"}),
     event_sample(0, "codex · unknown-tier@example.com", "codex", "gpt-6-astra", "CodexExecutor", "medium", "fast", 1200, 300, 50, (1000, 400, 0, 200), (10, 1, 12.5, 50), multiplier=2, response_tier="future", pricing={"service_tier":"priority","tier_source":"request","method":"oauth_multiplier","rule_version":"codex-oauth-family-v2","tier_fallback":"unknown_response_tier_request_fallback"}),
@@ -829,6 +846,7 @@ def request_event_view(query, scope=""):
     selected_provider = query.get("provider", [""])[0]
     selected_executor = query.get("executor", [""])[0]
     selected_failed = query.get("failed", [""])[0]
+    selected_type = query.get("request_type", [""])[0]
     offset = max(0, int(query.get("offset", ["0"])[0] or 0))
     limit = max(0, int(query.get("limit", ["0"])[0] or 0))
     time_matched = filter_event_time([entry for entry in REQUEST_EVENTS
@@ -857,6 +875,8 @@ def request_event_view(query, scope=""):
         if selected_provider and entry.get("provider") != selected_provider:
             continue
         if selected_executor and entry.get("executor_type") != selected_executor:
+            continue
+        if selected_type and entry.get("request_type", "unknown") != selected_type:
             continue
         failed = bool(entry.get("failed"))
         counts["all"] += 1

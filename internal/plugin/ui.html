@@ -2661,7 +2661,7 @@
         <label class="field"> <span data-i18n="ui.long_context_cache_read_1m_tokens">Long-context cache read&thinsp;/&thinsp;1M tokens</span> <input id="price-tier-cr" type="number" step="any" min="0" /> </label>
         <label class="field"> <span data-i18n="ui.long_context_cache_write_1m_tokens">Long-context cache write&thinsp;/&thinsp;1M tokens</span> <input id="price-tier-cw" type="number" step="any" min="0" /> </label>
       </div>
-      <p class="muted small" data-i18n="ui.service_price_default_note">API keys use the response tier when available. Without an override, Priority uses verified per-model rate ratios, falling back to estimated base prices; Flex defaults to 0.5×. Selected rates receive the global multiplier once. Empty cache rates inherit this tier’s input price.</p>
+      <p class="muted small" data-i18n="ui.service_price_default_note">API keys use the response tier when available. Without an override, Priority uses verified per-model rate ratios, falling back to estimated base prices; Flex defaults to 0.5×. Codex Flex requests with a missing response tier use a standard-tier estimate. Selected rates receive the global multiplier once. Empty cache rates inherit this tier’s input price.</p>
       <section class="tier-fields">
         <h3 data-i18n="ui.priority_fast">Priority / Fast</h3>
         <p class="muted small" id="price-service-priority-preview"></p>
@@ -7303,6 +7303,8 @@
             el("strong", {}, m("ui.current_global_billing_multiplier"), ": ", multiplierText(value.billing_multiplier)),
             el("span", { class: "tag plain" }, m(fast ? "ui.codex_fast_billing_enabled" : "ui.codex_fast_billing_disabled"))
           ),
+          el("p", { class: "muted small" }, m("ui.codex_fast_request_policy_note")),
+          el("p", { class: "muted small" }, m("ui.codex_flex_response_note")),
           el("p", { class: "muted small" }, m("ui.billing_policy_history_note")),
           administrator ? el("p", { class: "muted small" }, m("ui.billing_multiplier_settings_location")) : null
         );

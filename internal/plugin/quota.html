@@ -278,6 +278,12 @@
           "Codex OAuth Priority：" + (value.codex_fast_mode_billing === true ? "GPT-5.6 / GPT-6 系列 2×，其他模型 2.5×" : "倍率加价已关闭"),
           "muted"
         ),
+        node(
+          "p",
+          "GPT-5.6 / GPT-6 系列启用 Fast 加价时，请求 Priority/Fast 默认计 2×（包括响应 auto/default、未知或缺失）；响应明确为 standard 时计 1×，为 flex 时计 0.5×。",
+          "muted"
+        ),
+        node("small", "Codex OAuth 仅在响应明确为 Flex 时计 0.5×；仅请求 Flex 不触发折扣，响应缺失或未知按标准档估算。Codex API Key 同样需要响应确认后才选用 Flex 单价。"),
         node("small", "API Key 按响应档位选择单价，缺失信息会标记估算。Flex 默认 0.5×，可配置专用单价。费用已包含所选单价与全局倍率；历史账单保留入账金额，金额额度按同一费用扣减。")
       );
     }

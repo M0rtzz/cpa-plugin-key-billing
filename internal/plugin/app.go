@@ -157,7 +157,7 @@ func registration() Registration {
 				{
 					Name:        "codex_fast_mode_billing",
 					Type:        "boolean",
-					Description: "Bill Codex OAuth Priority/Fast at 2x for GPT-5.6 and GPT-6 families, otherwise 2.5x; prefer the response tier (default true)",
+					Description: "Bill Codex OAuth Priority/Fast at 2x for GPT-5.6 and GPT-6 families, retaining requested Fast for auto/default, unknown or missing responses while honoring standard/flex downgrades; other models retain response-first 2.5x billing (default true)",
 				},
 				{
 					Name:        "mask_api_key_view_emails",

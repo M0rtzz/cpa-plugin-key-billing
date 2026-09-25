@@ -105,8 +105,14 @@ func (a *App) listRequestEvents(req ManagementRequest, access viewAccess) Manage
 	query := billing.RequestEventQuery{
 		Scope: access.Scope, Model: strings.TrimSpace(req.Query.Get("model")),
 		Source: strings.TrimSpace(req.Query.Get("source")), Executor: strings.TrimSpace(req.Query.Get("executor")),
-		Provider: strings.TrimSpace(req.Query.Get("provider")),
-		Limit:    defaultEventPageSize,
+		Provider:    strings.TrimSpace(req.Query.Get("provider")),
+		RequestType: strings.TrimSpace(req.Query.Get("request_type")),
+		Limit:       defaultEventPageSize,
+	}
+	switch query.RequestType {
+	case "", "ws", "stream", "sync", "unknown":
+	default:
+		return viewJSONError(access, http.StatusBadRequest, "invalid", "Invalid request_type; expected ws, stream, sync or unknown")
 	}
 	if !access.APIKey {
 		query.KeyScope = strings.TrimSpace(req.Query.Get("api_key"))

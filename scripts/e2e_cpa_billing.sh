@@ -444,7 +444,8 @@ wait_for_event_count() {
       echo "读取请求事件失败。" >&2
       return 1
     fi
-    actual_count="$(jq -er '.entries | length' "$request_events_file")"
+    # The suite can exceed one page; total counts all persisted records.
+    actual_count="$(jq -er '.total' "$request_events_file")"
     if [[ "$actual_count" == "$expected_count" ]]; then
       return
     fi
@@ -1218,7 +1219,7 @@ assert_global_billing_multiplier() {
 }
 
 assert_api_service_tier_prices() {
-  local port="$1" runtime_dir="$2" count client stream scenario requested response tier method reason expected body path source reported_response
+  local port="$1" runtime_dir="$2" count client stream scenario requested response tier method reason expected body path source reported_response prompt
   local response_tier_available="${CPA_E2E_RESPONSE_TIER_AVAILABLE:-0}"
   local events="$runtime_dir/service-tier-events.json"
   management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=1000" >"$events"
@@ -1229,7 +1230,7 @@ assert_api_service_tier_prices() {
     path="/v1/chat/completions"
     if [[ "$client" == responses ]]; then path="/v1/responses"; fi
     for stream in false true; do
-      for scenario in standard priority fast flex downgrade flex-downgrade auto-priority missing unknown; do
+      for scenario in standard priority fast flex downgrade flex-downgrade flex-standard flex-auto flex-unknown flex-missing auto-priority missing unknown; do
         requested=priority response=priority tier=priority method=model_ratio reason="" expected=0.00017184
         case "$scenario" in
           standard) requested=auto response=default tier=default method=base expected=0.00008592 ;;
@@ -1237,23 +1238,32 @@ assert_api_service_tier_prices() {
           flex) requested=flex response=flex tier=flex expected=0.00004296 ;;
           downgrade) response=default tier=default method=base expected=0.00008592 ;;
           flex-downgrade) requested=flex response=default tier=default method=base expected=0.00008592 ;;
+          flex-standard) requested=flex response=standard tier=default method=base expected=0.00008592 ;;
+          flex-auto) requested=flex response=auto tier=default method=base reason=unknown_response_tier expected=0.00008592 ;;
+          flex-unknown) requested=flex response=future tier=default method=base reason=unknown_response_tier expected=0.00008592 ;;
+          flex-missing) requested=flex response=omitted tier=default method=base reason=unconfirmed_flex_tier expected=0.00008592 ;;
           auto-priority) requested=auto ;;
           missing) response=omitted reason=missing_response_tier ;;
           unknown) response=future tier=default method=base reason=unknown_response_tier expected=0.00008592 ;;
         esac
         reported_response="$response" source=response
         if [[ "$response" == omitted ]]; then source=request; fi
+        if [[ "$scenario" == flex-missing ]]; then source=default; fi
         if [[ "$response_tier_available" != 1 ]]; then
           # Assert the documented host limitation, including undetectable
           # upstream downgrades; never infer it from the response body.
           reported_response=omitted reason=missing_response_tier source=request
           case "$requested" in
             auto) tier=default method=base expected=0.00008592 source=default ;;
-            flex) tier=flex method=model_ratio expected=0.00004296 ;;
+            # The Codex converter strips Flex; the saved request is not proof
+            # of an upstream discount when the host cannot report its tier.
+            flex) tier=default method=base expected=0.00008592 source=default reason=unconfirmed_flex_tier ;;
             *) tier=priority method=model_ratio expected=0.00017184 ;;
           esac
         fi
-        body="$(request_body "$client" codex/gpt-5.6-sol "$stream" "Reply OK. CPA_E2E_RESPONSE_TIER=$response" | jq --arg tier "$requested" '. + {service_tier:$tier}')"
+        prompt="Reply OK. CPA_E2E_RESPONSE_TIER=$response"
+        if [[ "$scenario" == flex-missing ]]; then prompt+=" CPA_E2E_REQUIRE_TIER_ABSENT"; fi
+        body="$(request_body "$client" codex/gpt-5.6-sol "$stream" "$prompt" | jq --arg tier "$requested" '. + {service_tier:$tier}')"
         api_call "$port" "API 档位 $client/$stream/$scenario" "$path" "$body" "$client" "$runtime_dir/responses/tier-$client-$stream-$scenario.json"
         count=$((count + 1))
         wait_for_event_count "$port" "$count" "$events"
@@ -1297,9 +1307,9 @@ assert_api_service_tier_prices() {
   jq -e '.entries[0].cost | .pricing.method == "base_fallback" and .pricing.price_fallback == "missing_priority_price" and
     ((.total_usd - 0.00004176) | fabs) < 0.000000000001' "$events" >/dev/null
   if [[ "$response_tier_available" == 1 ]]; then
-    log_step "API 档位已验证：41 个请求，Chat/Responses × 流式/非流式、降级、缺失与未知档位、自定义单价和缺价回退"
+    log_step "API 档位已验证：57 个请求，Chat/Responses × 流式/非流式、降级、缺失与未知档位、Codex 移除 Flex 后按标准价、自定义单价和缺价回退"
   else
-    log_step "API 档位已验证：41 个请求，Chat/Responses × 流式/非流式、请求档位估算、自定义单价和缺价回退；宿主未传递响应档位，无法识别实际降级"
+    log_step "API 档位已验证：57 个请求，Chat/Responses × 流式/非流式、请求档位估算、Codex 未确认 Flex 按标准价、自定义单价和缺价回退；宿主未传递响应档位，无法识别实际降级"
   fi
 }
 
@@ -1687,7 +1697,7 @@ run_target() {
   kill "$active_pid" >/dev/null 2>&1 || true
   wait "$active_pid" >/dev/null 2>&1 || true
   active_pid=""
-  log_ok "${host_label}：96 个上游请求（含 4 个参考价、2 个全局倍率、2 个 Flex 及 41 个 API 档位请求），1 次并发拦截，6 次模型拦截，4 次凭证路由，2 次凭证拦截，12 次额度拦截"
+  log_ok "${host_label}：112 个上游请求（含 4 个参考价、2 个全局倍率、2 个 Flex 及 57 个 API 档位请求），1 次并发拦截，6 次模型拦截，4 次凭证路由，2 次凭证拦截，12 次额度拦截"
 }
 
 log_stage "启动 dummy provider"

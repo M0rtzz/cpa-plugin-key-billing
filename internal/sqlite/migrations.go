@@ -11,6 +11,17 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
+// The host did not previously persist these fields. Leave historical values
+// NULL, preserving unknown separately from explicitly non-streaming usage.
+func migrateToV20(tx *sql.Tx) error {
+	_, err := tx.Exec(`ALTER TABLE request_events ADD COLUMN stream INTEGER CHECK(stream IS NULL OR stream IN (0, 1));
+		ALTER TABLE request_events ADD COLUMN token_usage_json TEXT;`)
+	if err != nil {
+		return fmt.Errorf("Migrate request usage details: %w", err)
+	}
+	return nil
+}
+
 func migrateToV17(tx *sql.Tx, version int) error {
 	var steps []func(*sql.Tx) error
 	switch version {

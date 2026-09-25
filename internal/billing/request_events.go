@@ -1,25 +1,30 @@
 package billing
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // RequestEvent is one persisted request record and never stores a plaintext API key.
 // Account contains only an OAuth identity or masked API key.
 type RequestEvent struct {
-	At                  time.Time `json:"at"`
-	Scope               string    `json:"scope"`
-	AuthIndex           string    `json:"auth_index,omitempty"`
-	Provider            string    `json:"provider,omitempty"`
-	Account             string    `json:"account,omitempty"`
-	ExecutorType        string    `json:"executor_type,omitempty"`
-	ReasoningEffort     string    `json:"reasoning_effort,omitempty"`
-	ServiceTier         string    `json:"service_tier,omitempty"`
-	ResponseServiceTier string    `json:"response_service_tier,omitempty"`
-	UpstreamModel       string    `json:"upstream_model,omitempty"`
-	ResponseModel       string    `json:"response_model,omitempty"`
-	BillingModel        string    `json:"billing_model,omitempty"`
-	Failed              bool      `json:"failed"`
-	LatencyMS           int64     `json:"latency_ms,omitempty"`
-	TTFTMS              int64     `json:"ttft_ms,omitempty"`
+	At                  time.Time       `json:"at"`
+	Scope               string          `json:"scope"`
+	AuthIndex           string          `json:"auth_index,omitempty"`
+	Provider            string          `json:"provider,omitempty"`
+	Account             string          `json:"account,omitempty"`
+	ExecutorType        string          `json:"executor_type,omitempty"`
+	Stream              *bool           `json:"stream,omitempty"`
+	TokenUsage          *TokenBreakdown `json:"token_usage,omitempty"`
+	ReasoningEffort     string          `json:"reasoning_effort,omitempty"`
+	ServiceTier         string          `json:"service_tier,omitempty"`
+	ResponseServiceTier string          `json:"response_service_tier,omitempty"`
+	UpstreamModel       string          `json:"upstream_model,omitempty"`
+	ResponseModel       string          `json:"response_model,omitempty"`
+	BillingModel        string          `json:"billing_model,omitempty"`
+	Failed              bool            `json:"failed"`
+	LatencyMS           int64           `json:"latency_ms,omitempty"`
+	TTFTMS              int64           `json:"ttft_ms,omitempty"`
 	// AccountingQuality is empty when the host reported no token detail.
 	AccountingQuality TokenAccountingQuality `json:"accounting_quality,omitempty"`
 	// PriceSource says where the numbers came from. "none" means no rule
@@ -32,15 +37,30 @@ type RequestEvent struct {
 
 const RequestEventRetention = 365 * 24 * time.Hour
 
+// ExecutionType describes host execution, not an inferred client transport.
+func (e RequestEvent) ExecutionType() string {
+	if strings.EqualFold(strings.TrimSpace(e.ExecutorType), "CodexWebsocketsExecutor") {
+		return "ws"
+	}
+	if e.Stream == nil {
+		return "unknown"
+	}
+	if *e.Stream {
+		return "stream"
+	}
+	return "sync"
+}
+
 // Source uses the event's account snapshot; key labels use their current values.
 type RequestEventRow struct {
 	RequestEvent
 	// Encode the database identity as a string to preserve all 64 bits in browsers.
-	ID        int64  `json:"id,string"`
-	Preview   string `json:"preview,omitempty"`
-	Label     string `json:"label,omitempty"`
-	Source    string `json:"source,omitempty"`
-	ErrorBody string `json:"error_body,omitempty"`
+	ID          int64  `json:"id,string"`
+	Preview     string `json:"preview,omitempty"`
+	Label       string `json:"label,omitempty"`
+	Source      string `json:"source,omitempty"`
+	ErrorBody   string `json:"error_body,omitempty"`
+	RequestType string `json:"request_type"`
 }
 
 // RequestEventQuery selects one filtered page of request events.
@@ -53,6 +73,7 @@ type RequestEventQuery struct {
 	Source         string
 	Executor       string
 	Provider       string
+	RequestType    string
 	Failed         *bool
 	From           time.Time
 	To             time.Time

@@ -136,7 +136,9 @@ CREATE TABLE request_events (
 	applied_cache_read_per_1m   REAL    NOT NULL DEFAULT 0,
 	applied_cache_write_per_1m  REAL    NOT NULL DEFAULT 0,
 	response_headers_json       TEXT    NOT NULL DEFAULT '{}',
-	pricing_json TEXT NOT NULL DEFAULT '{}'
+	pricing_json TEXT NOT NULL DEFAULT '{}',
+	stream INTEGER CHECK(stream IS NULL OR stream IN (0, 1)),
+	token_usage_json TEXT
 );
 
 CREATE TABLE request_errors (

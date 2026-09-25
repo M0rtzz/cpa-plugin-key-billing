@@ -27,6 +27,14 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("Encode billing pricing: %w", err)
 	}
+	var tokenUsage any
+	if entry.TokenUsage != nil {
+		encoded, err := json.Marshal(entry.TokenUsage)
+		if err != nil {
+			return 0, fmt.Errorf("Encode token usage: %w", err)
+		}
+		tokenUsage = string(encoded)
+	}
 	result, errInsert := tx.Exec(`
 		INSERT INTO request_events (
 			at, scope, auth_index, provider, account, executor_type, reasoning_effort, service_tier,
@@ -36,8 +44,8 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 			uncached_input_tokens, cache_read_tokens, cache_write_tokens, billed_output_tokens,
 			tiered, long_context, threshold_input_tokens,
 			applied_input_per_1m, applied_output_per_1m,
-			applied_cache_read_per_1m, applied_cache_write_per_1m, pricing_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			applied_cache_read_per_1m, applied_cache_write_per_1m, pricing_json, stream, token_usage_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		nanos(entry.At), entry.Scope, entry.AuthIndex, entry.Provider, entry.Account, entry.ExecutorType, entry.ReasoningEffort, entry.ServiceTier,
 		entry.ResponseServiceTier, entry.UpstreamModel, entry.ResponseModel, entry.BillingModel, entry.Failed,
 		entry.LatencyMS, entry.TTFTMS,
@@ -48,7 +56,7 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 		entry.Cost.CacheWriteTokens, entry.Cost.BilledOutputTokens,
 		entry.Cost.Tiered, entry.Cost.LongContext, entry.Cost.ThresholdInputTokens,
 		entry.Cost.AppliedInputPer1M, entry.Cost.AppliedOutputPer1M,
-		entry.Cost.AppliedCacheReadPer1M, entry.Cost.AppliedCacheWritePer1M, string(pricing))
+		entry.Cost.AppliedCacheReadPer1M, entry.Cost.AppliedCacheWritePer1M, string(pricing), entry.Stream, tokenUsage)
 	if errInsert != nil {
 		return 0, fmt.Errorf("Write request event: %w", errInsert)
 	}
@@ -79,6 +87,11 @@ func pruneRequestEvents(exec execer, cutoff time.Time) error {
 
 // Model filters and their expression index must use the same expression.
 const eventModelSQL = "coalesce(NULLIF(billing_model, ''), upstream_model)"
+
+// Keep aligned with RequestEvent.ExecutionType; the query filters all rows
+// before paging, using only metadata persisted from usage.handle.
+const eventRequestTypeSQL = `CASE WHEN lower(trim(r.executor_type)) = 'codexwebsocketsexecutor' THEN 'ws'
+	WHEN r.stream = 1 THEN 'stream' WHEN r.stream = 0 THEN 'sync' ELSE 'unknown' END`
 
 const requestEventProviderName = `CASE WHEN substr(r.provider, 1, 18) = 'openai-compatible-'
 	THEN substr(r.provider, 19) ELSE r.provider END`
@@ -146,7 +159,7 @@ func (d *DB) RequestEvents(query billing.RequestEventQuery, since time.Time) (bi
 			r.uncached_input_tokens, r.cache_read_tokens, r.cache_write_tokens, r.billed_output_tokens,
 			r.tiered, r.long_context, r.threshold_input_tokens,
 			r.applied_input_per_1m, r.applied_output_per_1m,
-			r.applied_cache_read_per_1m, r.applied_cache_write_per_1m, r.pricing_json,
+			r.applied_cache_read_per_1m, r.applied_cache_write_per_1m, r.pricing_json, r.stream, r.token_usage_json,
 			coalesce(k.preview, ''), coalesce(k.label, ''), `+requestEventSourceName+`,
 			coalesce(e.body, '')
 		FROM page JOIN request_events r ON r.id = page.id
@@ -183,6 +196,7 @@ func eventFilter(source string, query billing.RequestEventQuery, since time.Time
 		{"(" + requestEventSourceName + ")", query.Source},
 		{"r.executor_type", query.Executor},
 		{"r.provider", query.Provider},
+		{"(" + eventRequestTypeSQL + ")", query.RequestType},
 	} {
 		if value := strings.TrimSpace(filter.value); value != "" {
 			where += " AND " + filter.expression + " = ?"
@@ -254,6 +268,8 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 		row                           billing.RequestEventRow
 		at, failed                    int64
 		quality, priceSource, pricing string
+		stream                        sql.NullBool
+		tokenUsage                    sql.NullString
 	)
 	if errScan := rows.Scan(&row.ID, &at, &row.Scope, &row.AuthIndex, &row.Provider, &row.Account,
 		&row.ExecutorType, &row.ReasoningEffort, &row.ServiceTier, &row.ResponseServiceTier,
@@ -267,12 +283,22 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 		&row.Cost.Tiered, &row.Cost.LongContext, &row.Cost.ThresholdInputTokens,
 		&row.Cost.AppliedInputPer1M, &row.Cost.AppliedOutputPer1M,
 		&row.Cost.AppliedCacheReadPer1M, &row.Cost.AppliedCacheWritePer1M, &pricing,
+		&stream, &tokenUsage,
 		&row.Preview, &row.Label, &row.Source, &row.ErrorBody); errScan != nil {
 		return billing.RequestEventRow{}, fmt.Errorf("Read request events: %w", errScan)
 	}
 	if err := json.Unmarshal([]byte(pricing), &row.Cost.Pricing); err != nil {
 		return billing.RequestEventRow{}, fmt.Errorf("Read billing pricing: %w", err)
 	}
+	if stream.Valid {
+		row.Stream = &stream.Bool
+	}
+	if tokenUsage.Valid {
+		if err := json.Unmarshal([]byte(tokenUsage.String), &row.TokenUsage); err != nil {
+			return billing.RequestEventRow{}, fmt.Errorf("Read token usage: %w", err)
+		}
+	}
+	row.RequestType = row.ExecutionType()
 	row.At = timeAt(at)
 	row.Failed = failed != 0
 	row.AccountingQuality = billing.TokenAccountingQuality(quality)

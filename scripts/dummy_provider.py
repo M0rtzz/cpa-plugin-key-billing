@@ -128,6 +128,10 @@ class DummyProviderHandler(BaseHTTPRequestHandler):
             self.send_error_body(400, "request body is not JSON")
             return
 
+        if "CPA_E2E_REQUIRE_TIER_ABSENT" in json.dumps(body) and "service_tier" in body:
+            self.send_error_body(400, "expected the Codex converter to remove the requested tier")
+            return
+
         if gemini:
             model = unquote(gemini["model"])
             stream = gemini["action"] == "streamGenerateContent"

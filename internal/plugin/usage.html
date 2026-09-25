@@ -211,6 +211,94 @@
   .metric-list { margin-top: 10px; }
   .scope-note { margin: 10px 0 18px; color: var(--muted); font-size: 12px; }
   .busy { opacity: 0.6; pointer-events: none; }
+  .record-filters { margin-bottom: 14px; }
+  .record-filters select { min-width: 135px; }
+  .record-filters .model-filter { flex: 1 1 240px; max-width: 360px; }
+  .model-picker { position: relative; }
+  .model-options {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    max-height: 260px;
+    overflow: auto;
+    padding: 5px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+  }
+  .model-options button {
+    display: block;
+    width: 100%;
+    border: 0;
+    text-align: left;
+    padding: 7px 9px;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+  .model-options button[aria-selected="true"] { background: var(--soft); color: var(--accent); }
+  .metric-cell { display: flex; align-items: center; gap: 9px; }
+  .token-lines { display: grid; gap: 3px; min-width: 95px; }
+  .token-line { display: flex; align-items: center; gap: 12px; }
+  .token-part { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+  .glyph { width: 15px; height: 15px; flex: none; vertical-align: middle; }
+  .token-input, .billed-amount { color: var(--ok); }
+  .token-output { color: #8662db; }
+  .token-cache { color: #0983b5; }
+  .token-image { color: #c9488e; }
+  :root[data-theme="dark"] .token-output { color: #bc9aff; }
+  :root[data-theme="dark"] .token-cache { color: #54cbf4; }
+  :root[data-theme="dark"] .token-image { color: #ff8fcc; }
+  .info-button {
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    border-radius: 50%;
+    background: var(--soft);
+    color: var(--muted);
+  }
+  .info-button:hover, .info-button[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+  .multiplier-badge {
+    display: inline-block;
+    border: 1px solid #bf8c3859;
+    border-radius: 4px;
+    padding: 1px 4px;
+    font-size: 10px;
+    font-weight: 750;
+    line-height: 1.2;
+    background: #dda82c24;
+    color: var(--warn);
+  }
+  .context-badge { display: inline-block; font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .detail-popover {
+    position: fixed;
+    z-index: 100;
+    width: max-content;
+    min-width: 260px;
+    max-width: min(350px, calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    overflow: auto;
+    padding: 13px 15px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--ink);
+    box-shadow: 0 8px 35px #0003;
+    font-size: 12px;
+  }
+  .detail-popover h3 { margin-bottom: 9px; }
+  .detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 18px; margin: 4px 0; }
+  .detail-row > span { color: var(--muted); }
+  .detail-row > strong { text-align: right; font-weight: 550; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .detail-total { padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--line); }
+  .detail-total strong { color: var(--accent); font-weight: 750; }
+  .detail-note { display: block; margin-top: 8px; max-width: 310px; white-space: normal; overflow-wrap: anywhere; }
+  .type-badge { font-size: 11px; padding: 2px 7px; }
   @media (max-width: 850px) {
     .two { grid-template-columns: 1fr; }
     .account-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -252,10 +340,15 @@
 <section id="auth" class="panel auth"><h2>查看自己的用量</h2><p class="muted">输入服务管理员提供的 API Key，查看对应的使用记录。</p><form id="login"><label for="key">API Key</label><div class="auth-row"><input id="key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="8192"><button class="primary" type="submit">查看用量</button></div><small>Key 不写入浏览器存储；登录会话保存在服务器内存中，最长保留 7 天。</small></form></section>
 <div id="dashboard" hidden>
 <section id="billing-policy" class="panel" data-private aria-label="计费倍率"></section>
-<section class="panel"><form id="filter" class="filters"><label for="from">开始日期<input id="from" type="date" required></label><label for="to">结束日期<input id="to" type="date" required></label><button class="primary" type="submit">查询</button><small>按本地时区统计，结束日期包含当天。</small></form></section>
+<section class="panel"><form id="filter" class="filters"><label for="from">开始日期<input id="from" type="date" required></label><label for="to">结束日期<input id="to" type="date" required></label><button class="primary" type="submit">查询</button><button id="refresh" type="button">刷新</button><small>按本地时区统计，结束日期包含当天。</small></form></section>
+<p class="scope-note">下方统计与趋势按所选日期范围展示；明细筛选仅影响请求表格。</p>
 <div id="stats" class="grid stats" data-private></div>
 <div class="grid two"><section class="panel"><div class="section-head"><h2>用量趋势</h2><select id="trend-metric" aria-label="趋势指标"><option value="requests">请求数</option><option value="total_tokens">Token 数</option><option value="total_cost">费用（USD）</option></select></div><div id="trend" data-private></div></section><section class="panel"><div class="section-head"><h2>模型分布</h2><span class="muted">按 Token 占比</span></div><div id="models" data-private></div></section></div>
-<section class="panel"><div class="section-head"><h2>请求明细</h2><div class="tabs" role="tablist" aria-label="记录类型"><button id="events-tab" type="button" role="tab" aria-selected="true">全部请求</button><button id="errors-tab" type="button" role="tab" aria-selected="false">错误记录</button></div></div><div id="records" class="table-scroll" data-private></div><div class="pager"><span id="page-label" class="muted" data-private></span><div class="buttons"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button></div></div></section>
+<section class="panel"><div class="section-head"><h2>请求明细</h2><div class="tabs" role="tablist" aria-label="记录类型"><button id="events-tab" type="button" role="tab" aria-selected="true">全部请求</button><button id="errors-tab" type="button" role="tab" aria-selected="false">错误记录</button></div></div><div class="filters record-filters" aria-label="明细筛选">
+<div class="model-filter"><label for="model-filter">模型</label><div class="model-picker"><input id="model-filter" type="search" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="model-options" autocomplete="off" placeholder="全部模型 · 搜索并选择"><div id="model-options" class="model-options" role="listbox" aria-label="模型选项" hidden></div></div></div>
+<label id="type-filter-label" for="type-filter">类型<select id="type-filter"><option value="">全部类型</option><option value="ws">WS</option><option value="stream">流式</option><option value="sync">同步</option><option value="unknown">未知</option></select></label>
+<button id="clear-record-filters" type="button">清除筛选</button>
+</div><div id="records" class="table-scroll" data-private></div><div class="pager"><span id="page-label" class="muted" data-private></span><div class="buttons"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button></div></div></section>
 </div>
 
 <footer class="footer">CPA Key Billing · 账户自助查询 · API Key 不写入浏览器存储</footer>
@@ -281,13 +374,107 @@
     };
     const factor = (value, fallback = 1) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback);
     const factorText = (value) => factor(value).toLocaleString("zh-CN", { maximumSignificantDigits: 12 }) + "×";
-    function recordedPricing(cost) {
-      const pricing = cost.pricing;
-      if (!pricing?.service_tier)
-        return typeof cost.billing_multiplier === "number"
-          ? "全局 " + factorText(cost.billing_multiplier) + " · 档位 " + factorText(cost.service_tier_multiplier) + " = " +
-              factorText(factor(cost.multiplier, factor(cost.billing_multiplier) * factor(cost.service_tier_multiplier)))
-          : "最终 " + factorText(cost.multiplier);
+    function glyph(name) {
+      const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg"), path = document.createElementNS(ns, "path");
+      const paths = {
+        input: "M12 3v18m-7-7 7 7 7-7",
+        output: "M12 21V3m-7 7 7-7 7 7",
+        cache: "M4 8h16v12H4zM3 4h18v4H3zM9 12h6",
+        write: "M4 8h16v12H4zM3 4h18v4H3zM9 14h6m-3-3v6",
+        image: "M3 3h18v18H3zM3 16l5-5 5 5 3-3 5 5M15 7h.01",
+        info: "M12 11v6m0-10h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0"
+      };
+      for (const [key, value] of Object.entries({
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        "stroke-width": "1.6",
+        "aria-hidden": "true",
+        class: "glyph"
+      }))
+        svg.setAttribute(key, value);
+      path.setAttribute("d", paths[name]);
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.append(path);
+      return svg;
+    }
+    const count = (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+    const compact = (v) =>
+      v == null ? "—" : v >= 1000 ? new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(v) : integer(v);
+    const tierLabels = { priority: "Priority / Fast", fast: "Fast", flex: "Flex", default: "Default", standard: "Standard", auto: "Auto" };
+    const tierLabel = (v) => tierLabels[v] || v || "未上报";
+    function tokenData(entry) {
+      const usage = entry.token_usage, cost = entry.cost || {};
+      if (usage)
+        return {
+          quality: usage.quality,
+          total: count(usage.total_tokens),
+          input: count(usage.input?.uncached_tokens),
+          output: count(usage.output?.total_tokens),
+          read: count(usage.input?.cache_read_tokens),
+          write: count(usage.input?.cache_write_tokens),
+          reasoning: count(usage.output?.reasoning_tokens),
+          unclassified: count(usage.unclassified_tokens)
+        };
+      const parts = [cost.uncached_input_tokens, cost.billed_output_tokens, cost.cache_read_tokens, cost.cache_write_tokens].map(count);
+      const total = parts.every((v) => v != null) ? parts.reduce((a, b) => a + b, 0) : null;
+      if (entry.accounting_quality === "complete" || (!entry.accounting_quality && total > 0))
+        return {
+          quality: "complete",
+          total,
+          input: parts[0],
+          output: parts[1],
+          read: parts[2],
+          write: parts[3],
+          reasoning: count(entry.reasoning_tokens),
+          historical: true
+        };
+      return { quality: entry.accounting_quality || "", total: null };
+    }
+    function isImageModel(entry) {
+      const model = (entry.response_model || entry.upstream_model || entry.billing_model || "").toLowerCase().split("/").pop()
+        .replace(/\([^)]*\)$/, "");
+      return /^(gpt-image-|dall-e-)/.test(model);
+    }
+    function detailRow(parent, label, value, cls = "") {
+      const row = node("div", null, "detail-row " + cls);
+      row.append(node("span", label), node("strong", value));
+      parent.append(row);
+    }
+    function tokenDetail(entry) {
+      const data = tokenData(entry), box = node("div");
+      box.append(node("h3", "Token 明细"));
+      if (data.quality !== "inconsistent") {
+        for (const [key, label] of [["input", "输入 Token（不含缓存）"], ["output", "输出 Token"], ["read", "缓存读取 Token"], ["write", "缓存写入 Token"]]) {
+          if (data[key] != null && (data.quality === "complete" || data[key] > 0)) detailRow(box, label, integer(data[key]));
+        }
+        if (data.reasoning > 0) detailRow(box, "推理 Token（已包含在输出中）", integer(data.reasoning));
+        if (data.unclassified > 0) detailRow(box, "未分类 Token", integer(data.unclassified));
+      }
+      detailRow(box, "总 Token", data.total == null ? "未记录" : integer(data.total), "detail-total");
+      if (data.quality !== "complete")
+        box.append(node("small", data.quality === "inconsistent" ? "宿主用量不一致，无法提供可靠分项。" : "用量明细未完整上报；缺失分项不计作零。", "detail-note"));
+      if (isImageModel(entry)) box.append(node("small", "生图模型：图片 Token 细分未上报；以上输出为总输出，不另计图片 Token。", "detail-note"));
+      if (data.historical) box.append(node("small", "历史记录：使用已保存的计费 Token 分项。", "detail-note"));
+      return box;
+    }
+    function costDetail(entry) {
+      const cost = entry.cost || {}, pricing = cost.pricing || {}, box = node("div");
+      box.append(node("h3", "费用明细"), node("small", "以下分项费用与实际单价已含倍率", "detail-note"));
+      for (const [label, amount, rate] of [
+        ["输入", "uncached_input_usd", "applied_input_per_1m"],
+        ["输出", "output_usd", "applied_output_per_1m"],
+        ["缓存读取", "cache_read_usd", "applied_cache_read_per_1m"],
+        ["缓存写入", "cache_write_usd", "applied_cache_write_per_1m"]
+      ]) {
+        detailRow(box, label + "费用", money(cost[amount]));
+        detailRow(box, label + "实际单价", count(cost[rate]) == null ? "未记录" : money(cost[rate]) + " / 1M Token");
+      }
+      detailRow(box, "请求档位", tierLabel(entry.service_tier), "detail-total");
+      detailRow(box, "响应档位", tierLabel(entry.response_service_tier));
+      detailRow(box, "计费档位", tierLabel(pricing.service_tier === "default" ? "standard" : pricing.service_tier));
+      const sources = { response: "上游响应", request: "请求档位（估算）", request_policy: "请求档位（本站计费规则）", default: "默认档位（估算）" };
       const methods = {
         base: "基础价格",
         explicit_tier: "自定义档位价格",
@@ -295,29 +482,149 @@
         base_fallback: "基础价回退（估算）",
         oauth_multiplier: "Codex OAuth 模型倍率"
       };
-      const sources = { response: "上游响应", request: "请求档位（估算）", default: "默认档位（估算）" };
+      detailRow(box, "计费依据", sources[pricing.tier_source] || "历史记录未提供");
+      if (pricing.method) detailRow(box, "定价方式", methods[pricing.method] || pricing.method);
+      detailRow(box, "全局倍率", factorText(cost.billing_multiplier));
+      detailRow(box, "服务档位倍率", factorText(cost.service_tier_multiplier));
+      detailRow(box, "最终倍率", factorText(factor(cost.multiplier, factor(cost.billing_multiplier) * factor(cost.service_tier_multiplier))));
+      if (count(cost.billing_multiplier) > 0) detailRow(box, "全局倍率前金额（换算）", money(cost.total_usd / cost.billing_multiplier));
+      detailRow(box, "实际扣费", money(cost.total_usd), "detail-total");
+      if (cost.long_context) box.append(node("small", "长上下文：已采用该账单记录的长上下文单价，不能统一视作 2×。", "detail-note"));
+      if (isImageModel(entry)) box.append(node("small", "图片专用 Token 与费用细分未上报，以上为已记录的费用。", "detail-note"));
       const reasons = {
-        missing_response_tier: "未上报响应档位",
-        unknown_response_tier: "未知响应档位",
+        unconfirmed_flex_tier: "未确认 Flex 响应，按标准档估算",
+        missing_response_tier: "未上报响应档位，按请求估算",
+        unknown_response_tier: "未知响应档位，按标准档估算",
         unknown_response_tier_request_fallback: "未知响应档位，按请求的 Priority 档位估算",
-        unknown_request_tier: "未知请求档位",
-        missing_priority_price: "缺少适用 Priority 单价",
-        missing_base_price: "缺少基础价格，金额未计费"
+        unknown_request_tier: "未知请求档位，按标准档估算",
+        missing_priority_price: "缺少适用 Priority 单价，按基础价估算",
+        missing_base_price: "缺少基础价格，保留用量，金额未计费"
       };
-      const result = node("div");
-      result.append(
-        node("div", pricing.service_tier + " · " + (sources[pricing.tier_source] || "未提供")),
-        node("div", (methods[pricing.method] || "未提供") + " · 全局 " + factorText(cost.billing_multiplier))
-      );
-      if (pricing.method === "oauth_multiplier")
-        result.append(node("div", "档位 " + factorText(cost.service_tier_multiplier) + " · 最终 " + factorText(cost.multiplier)));
-      result.append(node("small", "实际单价 / 1M：输入 " + money(cost.applied_input_per_1m) + " · 输出 " + money(cost.applied_output_per_1m)));
-      result.append(
-        node("div", "缓存读取 " + money(cost.applied_cache_read_per_1m) + " · 缓存写入 " + money(cost.applied_cache_write_per_1m), "muted")
-      );
-      const reason = [pricing.tier_fallback, pricing.price_fallback].filter(Boolean).map((value) => reasons[value] || "计费信息不完整").join("；");
-      if (reason) result.append(node("div", reason + "（估算）", "muted"));
-      return result;
+      for (const reason of [pricing.tier_fallback, pricing.price_fallback].filter(Boolean))
+        box.append(node("small", reasons[reason] || "计费信息不完整", "detail-note"));
+      return box;
+    }
+    const popover = node("div", null, "detail-popover");
+    popover.id = "usage-detail-popover";
+    popover.hidden = true;
+    popover.setAttribute("role", "tooltip");
+    document.body.append(popover);
+    let detailTrigger = null, detailAnchor = null, closeTimer = null;
+    function closeDetail() {
+      clearTimeout(closeTimer);
+      detailTrigger?.setAttribute("aria-expanded", "false");
+      detailTrigger = null;
+      detailAnchor = null;
+      popover.hidden = true;
+      popover.replaceChildren();
+    }
+    function showDetail(button, content) {
+      closeDetail();
+      detailTrigger = button;
+      button.setAttribute("aria-expanded", "true");
+      popover.replaceChildren(content());
+      popover.hidden = false;
+      const anchor = button.getBoundingClientRect(), rect = popover.getBoundingClientRect();
+      detailAnchor = anchor;
+      let left = anchor.right + 9;
+      if (left + rect.width > innerWidth - 12) left = anchor.left - rect.width - 9;
+      popover.style.left = Math.max(12, Math.min(left, innerWidth - rect.width - 12)) + "px";
+      popover.style.top = Math.max(12, Math.min(anchor.top + anchor.height / 2 - rect.height / 2, innerHeight - rect.height - 12)) + "px";
+    }
+    function deferClose() {
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(closeDetail, 160);
+    }
+    popover.onmouseenter = () => clearTimeout(closeTimer);
+    popover.onmouseleave = deferClose;
+    function infoButton(label, content) {
+      const button = node("button", null, "info-button");
+      button.type = "button";
+      button.setAttribute("aria-label", label);
+      button.setAttribute("aria-describedby", popover.id);
+      button.setAttribute("aria-expanded", "false");
+      button.append(glyph("info"));
+      button.onmouseenter = () => showDetail(button, content);
+      button.onmouseleave = deferClose;
+      button.onfocus = () => showDetail(button, content);
+      button.onblur = deferClose;
+      button.onclick = () => showDetail(button, content);
+      return button;
+    }
+    document.addEventListener("pointerdown", (event) => {
+      if (!popover.contains(event.target) && !detailTrigger?.contains(event.target)) closeDetail();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        closeDetail();
+        closeModelOptions();
+      }
+    });
+    window.addEventListener(
+      "scroll",
+      (event) => {
+        if (!detailTrigger || popover.contains(event.target)) return;
+        const anchor = detailTrigger.getBoundingClientRect();
+        // A queued scroll event may arrive after hover/focus has already positioned the detail.
+        if (anchor.left !== detailAnchor.left || anchor.top !== detailAnchor.top) closeDetail();
+      },
+      true
+    );
+    window.addEventListener("resize", closeDetail);
+    function tokenCell(entry) {
+      const data = tokenData(entry),
+        cell = node("div", null, "metric-cell"),
+        lines = node("div", null, "token-lines"),
+        primary = node("div", null, "token-line");
+      function part(kind, value, label, color) {
+        const span = node("span", null, "token-part " + color);
+        span.title = label;
+        span.append(glyph(kind), node("span", compact(value)));
+        return span;
+      }
+      if (data.quality === "complete") {
+        primary.append(
+          part("input", data.input, "输入 Token（不含缓存）", "token-input"),
+          part("output", data.output, "输出 Token（含推理）", "token-output")
+        );
+        lines.append(primary);
+        const cache = node("div", null, "token-line");
+        if (data.read > 0) cache.append(part("cache", data.read, "缓存读取 Token", "token-cache"));
+        if (data.write > 0) cache.append(part("write", data.write, "缓存写入 Token", "token-cache"));
+        if (cache.childNodes.length) lines.append(cache);
+      } else lines.append(node("span", data.total == null ? "未记录" : "总 " + compact(data.total), "muted"));
+      if (isImageModel(entry)) {
+        const image = node("span", null, "token-part token-image");
+        image.append(glyph("image"), node("small", "图片细分未上报"));
+        lines.append(image);
+      }
+      cell.append(lines, infoButton("查看 Token 明细", () => tokenDetail(entry)));
+      return cell;
+    }
+    function costCell(entry) {
+      const cost = entry.cost || {},
+        cell = node("div"),
+        line = node("div", null, "metric-cell"),
+        multiplier = factor(cost.service_tier_multiplier);
+      line.append(node("strong", money(cost.total_usd), "billed-amount"));
+      if (multiplier !== 1) {
+        const badge = node("span", "×" + multiplier.toLocaleString("zh-CN", { maximumSignificantDigits: 12 }), "multiplier-badge");
+        badge.title = "服务档位倍率：" + tierLabel(cost.pricing?.service_tier) + " · " + factorText(multiplier);
+        badge.tabIndex = 0;
+        badge.setAttribute("aria-label", badge.title);
+        line.append(badge);
+      }
+      line.append(infoButton("查看费用明细", () => costDetail(entry)));
+      cell.append(line);
+      if (cost.long_context) cell.append(node("span", "长上下文", "context-badge"));
+      return cell;
+    }
+    const requestTypeLabels = { ws: "WS", stream: "流式", sync: "同步", unknown: "未知" };
+    function typeCell(entry) {
+      const type = requestTypeLabels[entry.request_type] ? entry.request_type : "unknown",
+        badge = node("span", requestTypeLabels[type], "badge type-badge");
+      badge.title = type === "ws" ? "宿主 WebSocket 执行类型" : type === "unknown" ? "宿主未上报流式状态，历史记录不作推测" : "宿主上报的执行类型";
+      return badge;
     }
     function billingPolicy(value) {
       const parent = clear("billing-policy");
@@ -328,6 +635,12 @@
           "Codex OAuth Priority：" + (value.codex_fast_mode_billing === true ? "GPT-5.6 / GPT-6 系列 2×，其他模型 2.5×" : "倍率加价已关闭"),
           "muted"
         ),
+        node(
+          "p",
+          "GPT-5.6 / GPT-6 系列启用 Fast 加价时，请求 Priority/Fast 默认计 2×（包括响应 auto/default、未知或缺失）；响应明确为 standard 时计 1×，为 flex 时计 0.5×。",
+          "muted"
+        ),
+        node("small", "Codex OAuth 仅在响应明确为 Flex 时计 0.5×；仅请求 Flex 不触发折扣，响应缺失或未知按标准档估算。Codex API Key 同样需要响应确认后才选用 Flex 单价。"),
         node("small", "API Key 按响应档位选择单价，缺失信息会标记估算。Flex 默认 0.5×，可配置专用单价。费用已包含所选单价与全局倍率；历史账单保留入账金额，金额额度按同一费用扣减。")
       );
     }
@@ -399,6 +712,19 @@
     }
     function resetView() {
       stopRequests();
+      closeDetail();
+      closeModelOptions();
+      model = "";
+      requestType = "";
+      modelOptions = [];
+      offset = 0;
+      snapshot = "";
+      tab = "events";
+      $("model-filter").value = "";
+      $("type-filter").value = "";
+      $("type-filter-label").hidden = false;
+      $("model-options").replaceChildren();
+      for (const name of ["events", "errors"]) $(name + "-tab").setAttribute("aria-selected", String(name === tab));
       $("key").value = "";
       $("dashboard").hidden = true;
       $("dashboard").querySelectorAll("[data-private]").forEach((item) => item.replaceChildren());
@@ -467,6 +793,7 @@
     });
 
     let analysis = null, range = "", tab = "events", offset = 0, snapshot = "", total = 0, busy = false;
+    let model = "", requestType = "", modelOptions = [];
     const PAGE_SIZE = 20;
     function dateValue(date) {
       return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
@@ -564,24 +891,21 @@
     function renderRecords(value) {
       total = Number(value.total) || 0;
       snapshot = String(value.snapshot_id || snapshot);
+      closeDetail();
+      if (value.filter_options?.models) modelOptions = value.filter_options.models;
       const parent = clear("records"), entries = value.entries || [];
       if (!entries.length) empty(parent, tab === "errors" ? "所选范围内暂无错误记录" : "所选范围内暂无请求记录");
       else {
         const table = node("table"), head = node("thead"), row = node("tr");
         for (const label of tab === "errors"
           ? ["时间", "模型", "HTTP 状态", "错误类型", "错误说明"]
-          : ["时间", "模型", "状态", "推理强度", "Token", "费用（USD）", "计费倍率", "耗时"])
+          : ["时间", "模型", "类型", "状态", "推理强度", "Token", "费用（USD）", "耗时"])
           row.append(node("th", label));
         head.append(row);
         table.append(head);
         const body = node("tbody");
         for (const entry of entries) {
-          const tr = node("tr"),
-            cost = entry.cost || {},
-            tokens = [cost.uncached_input_tokens, cost.cache_read_tokens, cost.cache_write_tokens, cost.billed_output_tokens].reduce(
-              (sum, item) => sum + (Number(item) || 0),
-              0
-            );
+          const tr = node("tr");
           const values =
             tab === "errors"
               ? [
@@ -594,11 +918,11 @@
               : [
                   when(entry.at),
                   entry.billing_model || entry.upstream_model || "—",
+                  typeCell(entry),
                   entry.failed ? "失败" : "成功",
                   entry.reasoning_effort || "—",
-                  integer(tokens),
-                  money(cost.total_usd),
-                  recordedPricing(cost),
+                  tokenCell(entry),
+                  costCell(entry),
                   timing(entry)
                 ];
           values.forEach((value, index) => {
@@ -616,20 +940,100 @@
       $("previous").disabled = offset === 0;
       $("next").disabled = offset + PAGE_SIZE >= total;
     }
-    async function loadRecords() {
-      const params = new URLSearchParams(range);
-      params.set("offset", offset);
+    function recordState() { return { range, tab, offset, snapshot, model, requestType }; }
+    async function fetchRecords(state) {
+      const params = new URLSearchParams(state.range);
+      params.set("offset", state.offset);
       params.set("limit", PAGE_SIZE);
-      if (snapshot) params.set("snapshot_id", snapshot);
-      renderRecords(await api("/" + tab + "?" + params));
+      if (state.snapshot) params.set("snapshot_id", state.snapshot);
+      if (state.model) params.set("model", state.model);
+      if (state.tab === "events" && state.requestType) params.set("request_type", state.requestType);
+      return api("/" + state.tab + "?" + params);
     }
+    function commitRecords(state, value) {
+      ({ range, tab, offset, snapshot, model, requestType } = state);
+      $("model-filter").value = model;
+      $("type-filter").value = requestType;
+      $("type-filter-label").hidden = tab === "errors";
+      for (const name of ["events", "errors"]) $(name + "-tab").setAttribute("aria-selected", String(name === tab));
+      renderRecords(value);
+    }
+    async function loadRecords(state = recordState()) { commitRecords(state, await fetchRecords(state)); }
+    function closeModelOptions() {
+      $("model-options").hidden = true;
+      $("model-filter").setAttribute("aria-expanded", "false");
+    }
+    function showModelOptions() {
+      const parent = clear("model-options"), needle = $("model-filter").value.toLowerCase();
+      const options = ["", ...modelOptions.filter((value) => value.toLowerCase().includes(needle))];
+      for (const value of options) {
+        const option = node("button", value || "全部模型");
+        option.type = "button";
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", String(value === model));
+        option.onclick = () => {
+          closeModelOptions();
+          void operation(() => loadRecords({ ...recordState(), model: value, offset: 0, snapshot: "" }));
+        };
+        parent.append(option);
+      }
+      parent.hidden = false;
+      $("model-filter").setAttribute("aria-expanded", "true");
+    }
+    $("model-filter").oninput = showModelOptions;
+    $("model-filter").onfocus = showModelOptions;
+    $("model-filter").onkeydown = (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        showModelOptions();
+        $("model-options").querySelector("button")?.focus();
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const exact = modelOptions.find((value) => value === $("model-filter").value);
+        if (exact || !$("model-filter").value) {
+          closeModelOptions();
+          void operation(() => loadRecords({ ...recordState(), model: exact || "", offset: 0, snapshot: "" }));
+        } else showModelOptions();
+      }
+    };
+    $("model-options").onkeydown = (event) => {
+      if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+        event.preventDefault();
+        const options = [...$("model-options").querySelectorAll("button")], index = options.indexOf(document.activeElement);
+        options[(index + (event.key === "ArrowDown" ? 1 : options.length - 1)) % options.length]?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", (event) => {
+      if (!event.target.closest(".model-picker")) {
+        closeModelOptions();
+        $("model-filter").value = model;
+      }
+    });
+    $("model-filter").closest(".model-picker").addEventListener("focusout", (event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) {
+        closeModelOptions();
+        $("model-filter").value = model;
+      }
+    });
+    $("type-filter").onchange = () => {
+      const nextType = $("type-filter").value;
+      void operation(() => loadRecords({ ...recordState(), requestType: nextType, offset: 0, snapshot: "" }));
+    };
+    $("clear-record-filters").onclick = () =>
+      operation(() => loadRecords({ ...recordState(), model: "", requestType: "", offset: 0, snapshot: "" }));
     async function operation(callback, silentUnauthorized = false) {
       if (busy) return;
       busy = true;
+      closeDetail();
+      closeModelOptions();
       const version = generation;
       const loginButton = $("login").querySelector("button");
       loginButton.disabled = true;
+      $("key").disabled = true;
       $("dashboard").classList.add("busy");
+      $("dashboard").inert = true;
+      $("dashboard").setAttribute("aria-busy", "true");
       message("正在加载…");
       try {
         await callback();
@@ -640,7 +1044,12 @@
       } finally {
         busy = false;
         loginButton.disabled = false;
+        $("key").disabled = false;
         $("dashboard").classList.remove("busy");
+        $("dashboard").inert = false;
+        $("dashboard").setAttribute("aria-busy", "false");
+        $("model-filter").value = model;
+        $("type-filter").value = requestType;
       }
     }
     async function loadDashboard() {
@@ -651,11 +1060,7 @@
         throw new Error("该 API Key 暂无可用账单，请联系管理员");
       }
       $("identity").textContent = profile.identity?.label || profile.identity?.preview || "当前 API Key";
-      range = selectedRange();
-      offset = 0;
-      snapshot = "";
-      renderAnalysis(await api("/analysis?" + range));
-      await loadRecords();
+      await reloadDashboard(selectedRange());
       showDashboard();
     }
     $("login").onsubmit = (event) => {
@@ -670,39 +1075,23 @@
         await loadDashboard();
       });
     };
+    async function reloadDashboard(nextRange) {
+      const state = { ...recordState(), range: nextRange, offset: 0, snapshot: "" };
+      const [summary, records] = await Promise.all([api("/analysis?" + nextRange), fetchRecords(state)]);
+      renderAnalysis(summary);
+      commitRecords(state, records);
+    }
     $("filter").onsubmit = (event) => {
       event.preventDefault();
-      operation(async () => {
-        range = selectedRange();
-        offset = 0;
-        snapshot = "";
-        clear("records");
-        clear("page-label");
-        renderAnalysis(await api("/analysis?" + range));
-        await loadRecords();
-      });
+      void operation(() => reloadDashboard(selectedRange()));
     };
+    $("refresh").onclick = () => operation(() => reloadDashboard(range));
     $("trend-metric").onchange = renderTrend;
     for (const value of ["events", "errors"])
-      $(value + "-tab").onclick = () =>
-        operation(async () => {
-          tab = value;
-          offset = 0;
-          snapshot = "";
-          for (const name of ["events", "errors"]) $(name + "-tab").setAttribute("aria-selected", String(name === tab));
-          clear("records");
-          await loadRecords();
-        });
-    $("previous").onclick = () =>
-      operation(async () => {
-        offset = Math.max(0, offset - PAGE_SIZE);
-        await loadRecords();
-      });
+      $(value + "-tab").onclick = () => operation(() => loadRecords({ ...recordState(), tab: value, offset: 0, snapshot: "" }));
+    $("previous").onclick = () => operation(() => loadRecords({ ...recordState(), offset: Math.max(0, offset - PAGE_SIZE) }));
     $("next").onclick = () =>
-      operation(async () => {
-        if (offset + PAGE_SIZE < total) offset += PAGE_SIZE;
-        await loadRecords();
-      });
+      operation(async () => { if (offset + PAGE_SIZE < total) await loadRecords({ ...recordState(), offset: offset + PAGE_SIZE }); });
     operation(loadDashboard, true);
   })();
 </script>

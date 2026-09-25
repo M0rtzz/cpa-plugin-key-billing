@@ -17,11 +17,11 @@ func TestUsageBillingMultiplierAndServiceTierEligibility(t *testing.T) {
 		{"explicit opt out", "codex", "oauth", "priority", true, 1},
 		{"codex API key", "codex", "apikey", "priority", false, 1},
 		{"other provider", "claude", "oauth", "priority", false, 1},
-		{"flex Codex OAuth", "codex", "oauth", "flex", false, 0.5},
+		{"flex Codex OAuth", "codex", "oauth", "flex", false, 1},
 		{"flex OpenAI API key", "openai", "apikey", "flex", false, 0.5},
 		{"flex compatible provider", "openai-compatible-test", "apikey", "flex", false, 0.5},
-		{"flex case normalization", "CoDeX", "OAUTH", " Flex ", false, 0.5},
-		{"flex with fast billing disabled", "codex", "oauth", "flex", true, 0.5},
+		{"flex case normalization", "CoDeX", "OAUTH", " Flex ", false, 1},
+		{"flex with fast billing disabled", "codex", "oauth", "flex", true, 1},
 		{"unknown tier", "codex", "oauth", "unknown", false, 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -41,6 +41,9 @@ func TestUsageBillingMultiplierAndServiceTierEligibility(t *testing.T) {
 			})
 			event := admittedEvent(store, "scope-a", now)
 			event.Provider, event.AuthType, event.ServiceTier = test.provider, test.authType, test.tier
+			if test.provider == "openai" || test.provider == "openai-compatible-test" {
+				event.ExecutorType = "OpenAICompatExecutor"
+			}
 			store.RecordUsage(event)
 			entries := mustRequestEvents(t, store, RequestEventQuery{}).Entries
 			if len(entries) != 1 {
@@ -147,8 +150,8 @@ func TestUsageMultiplierKeepsFailedAndUnbillableRecords(t *testing.T) {
 		{"unclassified usage", "priority", TokenBreakdown{Quality: TokenAccountingUnclassified, TotalTokens: 10, UnclassifiedTokens: 10}, false, 0, 1},
 		{"invalid usage", "priority", TokenBreakdown{Quality: TokenAccountingComplete, TotalTokens: -1}, false, 0, 1},
 		{"missing price", "priority", completeBreakdown(500, 400, 100, 500, 200), true, 0, 1},
-		{"flex reported usage on failure", "flex", completeBreakdown(500, 400, 100, 500, 200), false, wantSubsetCost * 0.1, 0.5},
-		{"flex zero usage", "flex", completeBreakdown(0, 0, 0, 0, 0), false, 0, 0.5},
+		{"unconfirmed flex reported usage on failure", "flex", completeBreakdown(500, 400, 100, 500, 200), false, wantSubsetCost * 0.2, 1},
+		{"unconfirmed flex zero usage", "flex", completeBreakdown(0, 0, 0, 0, 0), false, 0, 1},
 		{"flex unclassified usage", "flex", TokenBreakdown{Quality: TokenAccountingUnclassified, TotalTokens: 10, UnclassifiedTokens: 10}, false, 0, 1},
 		{"flex invalid usage", "flex", TokenBreakdown{Quality: TokenAccountingComplete, TotalTokens: -1}, false, 0, 1},
 		{"flex missing price", "flex", completeBreakdown(500, 400, 100, 500, 200), true, 0, 1},

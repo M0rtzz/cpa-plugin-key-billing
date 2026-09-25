@@ -193,6 +193,7 @@ func (a *App) handleUsage(raw []byte) ([]byte, error) {
 		AuthIndex:           record.AuthIndex,
 		Provider:            record.Provider,
 		ExecutorType:        record.ExecutorType,
+		Stream:              record.Stream,
 		AuthType:            record.AuthType,
 		Account:             record.Source,
 		ReasoningEffort:     record.ReasoningEffort,

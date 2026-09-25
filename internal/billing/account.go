@@ -11,6 +11,7 @@ type UsageEvent struct {
 	AuthIndex           string
 	Provider            string
 	ExecutorType        string
+	Stream              *bool
 	AuthType            string
 	Account             string
 	ReasoningEffort     string
@@ -110,6 +111,7 @@ func (s *Store) recordUsage(event UsageEvent, failure *RequestError) {
 			Provider:            provider,
 			Account:             account,
 			ExecutorType:        event.ExecutorType,
+			Stream:              event.Stream,
 			ReasoningEffort:     event.ReasoningEffort,
 			ServiceTier:         event.ServiceTier,
 			ResponseServiceTier: strings.TrimSpace(event.ResponseServiceTier),
@@ -123,6 +125,10 @@ func (s *Store) recordUsage(event UsageEvent, failure *RequestError) {
 			PriceSource:         price.Source,
 			Cost:                cost,
 			ReasoningTokens:     event.Breakdown.Output.ReasoningTokens,
+		}
+		if event.Breakdown.Quality != "" {
+			breakdown := event.Breakdown
+			entry.TokenUsage = &breakdown
 		}
 		var changedKeys []string
 		if key := state.ensureKey(scope, event.KeyPreview); key != nil {

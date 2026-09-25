@@ -36,12 +36,16 @@ func TestUsageHandleAPIServiceTierMatrix(t *testing.T) {
 				{"flex", "flex", "flex", "response", "", .000408},
 				{"priority", "default", "default", "response", "", .000816},
 				{"flex", "default", "default", "response", "", .000816},
+				{"flex", "", "flex", "request", "missing_response_tier", .000408},
 				{"auto", "priority", "priority", "response", "", .001632},
 				{"priority", "", "priority", "request", "missing_response_tier", .001632},
 				{"auto", "", "default", "default", "missing_response_tier", .000816},
 				{"priority", "future", "default", "response", "unknown_response_tier", .000816},
 				{"future", "", "default", "request", "unknown_request_tier", .000816},
 			} {
+				if upstream.provider == "codex" && test.request == "flex" && test.response == "" {
+					test.tier, test.source, test.fallback, test.amount = "default", "default", "unconfirmed_flex_tier", .000816
+				}
 				publishUsageRecord(t, app, UsageRecord{
 					Provider: upstream.provider, ExecutorType: upstream.executor, AuthType: "apikey",
 					APIKey: testAPIKey, Model: "gpt-6-sol", Alias: "gpt-6-sol", Generate: true,
@@ -91,15 +95,29 @@ func TestUsageHandleOAuthTiersPersistWithoutRepricing(t *testing.T) {
 		model, request, response, source, fallback string
 		factor                                     float64
 	}{
-		{"gpt-5.6-sol", "priority", "priority", "response", "", 2},
+		{"gpt-5.6-sol", "priority", "priority", "request_policy", "", 2},
 		{"gpt-6-astra", "auto", "fast", "response", "", 2},
-		{"gpt-6-luna", "priority", "default", "response", "", 1},
+		{"gpt-6-luna", "priority", "default", "request_policy", "", 2},
+		{"gpt-6-sol", "fast", "auto", "request_policy", "", 2},
+		{"gpt-5.6-sol", "fast", "default", "request_policy", "", 2},
+		{"gpt-5.6-terra", "priority", "auto", "request_policy", "", 2},
 		{"gpt-6-sol", "priority", "flex", "response", "", .5},
+		{"gpt-5.6-sol", "fast", "standard", "response", "", 1},
+		{"gpt-6-sol", "priority", "standard", "response", "", 1},
+		{"gpt-6-sol", "flex", "flex", "response", "", .5},
+		{"gpt-6-sol", "flex", "auto", "response", "unknown_response_tier", 1},
+		{"gpt-5.6-sol", "flex", "future", "response", "unknown_response_tier", 1},
+		{"gpt-6-sol", "flex", "priority", "response", "", 2},
+		{"gpt-5.6-sol", "flex", "", "default", "unconfirmed_flex_tier", 1},
+		{"gpt-6-sol", "flex", "default", "response", "", 1},
+		{"gpt-5.6-sol", "flex", "standard", "response", "", 1},
+		{"gpt-5.5", "flex", "default", "response", "", 1},
+		{"gpt-6-sol", "auto", "default", "response", "", 1},
 		{"gpt-5.5", "priority", "priority", "response", "", 2.5},
-		{"gpt-6-sol", "priority", "", "request", "missing_response_tier", 2},
+		{"gpt-6-sol", "priority", "", "request_policy", "", 2},
 		{"gpt-6-sol", "auto", "", "default", "missing_response_tier", 1},
-		{"gpt-6-sol", "priority", "future", "request", "unknown_response_tier_request_fallback", 2},
-		{"gpt-5.6-sol", "fast", "future", "request", "unknown_response_tier_request_fallback", 2},
+		{"gpt-6-sol", "priority", "future", "request_policy", "", 2},
+		{"gpt-5.6-sol", "fast", "future", "request_policy", "", 2},
 		{"gpt-5.5", "priority", "future", "response", "unknown_response_tier", 1},
 	} {
 		publishUsageRecord(t, app, UsageRecord{
@@ -112,8 +130,11 @@ func TestUsageHandleOAuthTiersPersistWithoutRepricing(t *testing.T) {
 		entry := requestEventEntries(t, app)[0]
 		assertCostClose(t, entry.Cost.TotalUSD, .001665*.2*tt.factor)
 		if entry.Cost.ServiceTierMultiplier != tt.factor || entry.Cost.Pricing.Method != "oauth_multiplier" ||
-			entry.Cost.Pricing.RuleVersion != "codex-oauth-family-v2" || entry.Cost.Pricing.TierSource != tt.source || entry.Cost.Pricing.TierFallback != tt.fallback {
+			entry.Cost.Pricing.RuleVersion != "codex-oauth-family-v7" || entry.Cost.Pricing.TierSource != tt.source || entry.Cost.Pricing.TierFallback != tt.fallback {
 			t.Fatal(entry.Cost)
+		}
+		if entry.ServiceTier != tt.request || entry.ResponseServiceTier != tt.response {
+			t.Fatal("request policy changed the recorded host tiers", entry)
 		}
 		snapshots = append(snapshots, entry.Cost)
 	}

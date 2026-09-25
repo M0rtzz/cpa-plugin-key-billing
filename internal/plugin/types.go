@@ -158,6 +158,7 @@ type UsageRecord struct {
 	ResponseServiceTier string        `json:"ResponseServiceTier"`
 	ResponseModel       string        `json:"ResponseModel"`
 	Generate            bool          `json:"Generate"`
+	Stream              *bool         `json:"Stream,omitempty"`
 	RequestedAt         time.Time     `json:"RequestedAt"`
 	Latency             time.Duration `json:"Latency"`
 	TTFT                time.Duration `json:"TTFT"`

@@ -77,6 +77,35 @@ func TestExplicitTierPricesAndIndependentRatios(t *testing.T) {
 	}
 }
 
+func TestCodexFlexRequiresResponseConfirmation(t *testing.T) {
+	rates := PriceRates{InputPer1M: 2, OutputPer1M: 10, ServiceTiers: map[string]TierPriceRates{
+		"flex": {InputPer1M: float64Ptr(.1), OutputPer1M: float64Ptr(.2)},
+	}}
+	usage := completeBreakdown(1000, 0, 0, 200, 0)
+	for _, upstream := range []struct{ provider, executor string }{
+		{" CoDeX ", ""}, {"codex", "CodexExecutor"}, {"codex", "CodexWebsocketsExecutor"},
+		{"custom", "CodexExecutor"}, {"custom", "CodexWebsocketsExecutor"},
+	} {
+		for _, response := range []string{"", " ", "auto", "future", "default", "standard", " FLEX "} {
+			t.Run(upstream.provider+"/"+upstream.executor+"/"+response, func(t *testing.T) {
+				event := UsageEvent{Provider: upstream.provider, ExecutorType: upstream.executor, AuthType: "apikey", ServiceTier: " FLEX ", ResponseServiceTier: response, Breakdown: usage}
+				price, meta := resolveAPIServicePrice(rates.resolve(PriceSourceCustom), "gpt-6-sol", event)
+				want, tier, method := .004, "default", "base"
+				if response == " FLEX " {
+					want, tier, method = .00014, "flex", "explicit_tier"
+				}
+				assertClose(t, "Flex price requires confirmation", ComputeCost(price, usage).TotalUSD, want)
+				if meta.ServiceTier != tier || meta.Method != method {
+					t.Fatal(meta)
+				}
+				if (response == "" || response == " ") && (meta.TierSource != "default" || meta.TierFallback != "unconfirmed_flex_tier") {
+					t.Fatal("missing confirmation must explain the standard estimate", meta)
+				}
+			})
+		}
+	}
+}
+
 func TestServiceTierLongContextBoundaries(t *testing.T) {
 	rates := PriceRates{InputPer1M: 2, OutputPer1M: 10, LongContext: &LongContextPrice{ThresholdInputTokens: 1000, InputPer1M: 4, OutputPer1M: 15}}
 	for _, tokens := range []int64{999, 1000, 1001} {

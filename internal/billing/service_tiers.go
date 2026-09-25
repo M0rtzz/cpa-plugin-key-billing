@@ -101,6 +101,14 @@ func effectiveServiceTier(event UsageEvent) PricingMetadata {
 		}
 	}
 	meta.ServiceTier = normalizedServiceTier(tier)
+	// CPA's Codex request converter removes Flex, for both OAuth and API keys.
+	// The original request tier is still reported in usage.handle, so it cannot
+	// establish a Flex discount without an explicit upstream response tier.
+	if meta.ServiceTier == "flex" && meta.TierSource == "request" &&
+		(strings.EqualFold(strings.TrimSpace(event.Provider), "codex") ||
+			event.ExecutorType == "CodexExecutor" || event.ExecutorType == "CodexWebsocketsExecutor") {
+		meta.ServiceTier, meta.TierSource, meta.TierFallback = "default", "default", "unconfirmed_flex_tier"
+	}
 	if meta.ServiceTier == "" {
 		meta.ServiceTier = "default"
 		if meta.TierSource == "response" {
@@ -112,20 +120,25 @@ func effectiveServiceTier(event UsageEvent) PricingMetadata {
 	return meta
 }
 
-const codexOAuthRuleVersion = "codex-oauth-family-v2"
+const codexOAuthRuleVersion = "codex-oauth-family-v7"
 
 func effectiveOAuthServiceTier(event UsageEvent, billingModel string) PricingMetadata {
-	meta := effectiveServiceTier(event)
-	// For the two model families billed at 2x, retain an explicitly requested
-	// Priority tier when the response tier is unrecognized. This remains an
-	// estimate based on the request, not a confirmed upstream service tier.
-	if meta.TierFallback == "unknown_response_tier" &&
-		normalizedServiceTier(event.ServiceTier) == "priority" &&
+	// Codex OAuth's terminal tier does not reliably reflect Fast routing:
+	// https://github.com/openai/codex/issues/14204#issuecomment-4033184620
+	// Bill explicit Fast requests for these families under the operator's 2x
+	// policy. Keep the raw response tier on the event for independent inspection.
+	if normalizedServiceTier(event.ServiceTier) == "priority" &&
 		codexPriorityMultiplier(event, billingModel) == 2 {
-		meta.ServiceTier, meta.TierSource = "priority", "request"
-		meta.TierFallback = "unknown_response_tier_request_fallback"
+		// Only these explicit response values confirm a cheaper tier under the
+		// operator's policy. Keep default distinct from standard: Codex can echo
+		// default even for Fast turns. Auto/unknown/missing retain the request.
+		switch strings.ToLower(strings.TrimSpace(event.ResponseServiceTier)) {
+		case "standard", "flex":
+			return effectiveServiceTier(event)
+		}
+		return PricingMetadata{ServiceTier: "priority", TierSource: "request_policy", Method: "base"}
 	}
-	return meta
+	return effectiveServiceTier(event)
 }
 
 // This is the operator's downstream OAuth billing policy, separate from API
