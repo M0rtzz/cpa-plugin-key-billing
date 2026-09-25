@@ -32,6 +32,34 @@ const analysisDashboard = (() => {
   function element(tag, value, cls = "") {
     return el(tag, { class: cls, text: value });
   }
+  function glyph(name) {
+    const paths = {
+      input: "M12 3v18m-7-7 7 7 7-7",
+      output: "M12 21V3m-7 7 7-7 7 7",
+      cache: "M4 8h16v12H4zM3 4h18v4H3zM9 12h6",
+      write: "M4 8h16v12H4zM3 4h18v4H3zM9 14h6m-3-3v6",
+      image: "M3 3h18v18H3zM3 16l5-5 5 5 3-3 5 5M15 7h.01",
+      info: "M12 11v6m0-10h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
+      lightning: "M13 2 3 14h8l-1 8 11-12h-8l1-8Z",
+    };
+    const ns = "http://www.w3.org/2000/svg",
+      svg = document.createElementNS(ns, "svg"),
+      path = document.createElementNS(ns, "path");
+    for (const [key, value] of Object.entries({
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": "1.6",
+      "aria-hidden": "true",
+      class: "dashboard-glyph",
+    }))
+      svg.setAttribute(key, value);
+    path.setAttribute("d", paths[name]);
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    svg.append(path);
+    return svg;
+  }
   function button(name, run) {
     return el("button", { type: "button", onclick: run, text: text(name) });
   }
@@ -115,11 +143,6 @@ const analysisDashboard = (() => {
       "#eab308",
     ][index % 12];
   }
-  function stableColor(key) {
-    let hash = 0;
-    for (const char of key) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-    return `hsl(${hash % 360} 68% 54%)`;
-  }
   function render(value) {
     if (!value || currentRole !== "admin") return;
     const key = $("analysis-key").value;
@@ -199,10 +222,10 @@ const analysisDashboard = (() => {
     for (const row of data.model_groups || []) {
       const name =
         state.dimension === "request"
-          ? row.requested_model || label("unknown")
+          ? row.requested_model || label("request_unknown")
           : state.dimension === "upstream"
-            ? row.reported_model || label("unknown")
-            : (row.requested_model || label("unknown")) + " → " + (row.reported_model || label("unknown"));
+            ? row.reported_model || label("upstream_unknown")
+            : (row.requested_model || label("request_unknown")) + " → " + (row.reported_model || label("upstream_unknown"));
       const id = JSON.stringify(
         state.dimension === "request"
           ? [row.requested_model]
@@ -405,6 +428,17 @@ const analysisDashboard = (() => {
       return;
     }
     card.append(plot.box);
+    // Assign distinct styles within the displayed roster, independent of order
+    // and labels. Hashing individual keys can give adjacent or identical hues.
+    const palette = ["#0072b2", "#e69f00", "#009e73", "#cc79a7", "#d55e00", "#56b4e9", "#b59f00", "#9b6ef3", "#24a6a6", "#878787"],
+      styles = new Map(
+        [...series]
+          .sort((a, b) => a.key.localeCompare(b.key))
+          .map((s, i) => [
+            s.key,
+            { borderColor: palette[i % palette.length], backgroundColor: palette[i % palette.length], borderDash: i < 5 ? [] : [6, 3] },
+          ]),
+      );
     chart(
       plot.canvas,
       "line",
@@ -412,8 +446,7 @@ const analysisDashboard = (() => {
       series.map((s) => ({
         label: identity(s),
         data: s.points.map((p) => p.value),
-        borderColor: stableColor(s.key),
-        backgroundColor: stableColor(s.key),
+        ...styles.get(s.key),
         borderWidth: 2,
         pointRadius: 1,
         tension: 0.15,
@@ -620,7 +653,7 @@ const analysisDashboard = (() => {
       ...lines.map(([key, value]) => el("div", { class: "dashboard-detail-row" }, element("span", key), element("span", value))),
     );
     popup.hidden = true;
-    const trigger = el("button", { type: "button", class: "dashboard-info", "aria-label": title, "aria-expanded": "false", text: "ⓘ" });
+    const trigger = el("button", { type: "button", class: "dashboard-info", "aria-label": title, "aria-expanded": "false" }, glyph("info"));
     const wrap = el("span", { class: "dashboard-detail-wrap" }, trigger, popup);
     const show = () => {
       popup.hidden = false;
@@ -646,11 +679,33 @@ const analysisDashboard = (() => {
     return wrap;
   }
   function tokensCell(entry) {
-    const v = tokenValues(entry);
+    const v = tokenValues(entry),
+      lines = el("div", { class: "dashboard-token-lines" });
+    function part(kind, value, name, cls) {
+      return el("span", { class: "dashboard-token-part " + cls, title: label(name) }, glyph(kind), element("span", count(value)));
+    }
+    if (v.input != null || v.output != null)
+      lines.append(
+        el(
+          "div",
+          { class: "dashboard-token-line" },
+          part("input", v.input, "input_tokens", "dashboard-token-input"),
+          part("output", v.output, "output_tokens", "dashboard-token-output"),
+        ),
+      );
+    const cache = el("div", { class: "dashboard-token-line" });
+    if (v.read > 0) cache.append(part("cache", v.read, "cache_read_tokens", "dashboard-token-cache"));
+    if (v.write > 0) cache.append(part("write", v.write, "cache_write_tokens", "dashboard-token-cache"));
+    if (cache.childNodes.length) lines.append(cache);
+    lines.append(element("small", label("total") + " " + count(v.total), "muted"));
+    if (/^(gpt-image-|dall-e-)/i.test((entry.response_model || entry.upstream_model || entry.billing_model || "").split("/").pop()))
+      lines.append(
+        el("span", { class: "dashboard-token-part dashboard-token-image" }, glyph("image"), element("small", text("image_note"))),
+      );
     const node = el(
       "div",
       { class: "dashboard-metric" },
-      element("span", `↓ ${count(v.input)}  ↑ ${count(v.output)}  · ${label("total")} ${count(v.total)}`),
+      lines,
       info(label("token_detail"), [
         [label("input_tokens"), count(v.input)],
         [label("output_tokens"), count(v.output)],
@@ -660,16 +715,21 @@ const analysisDashboard = (() => {
         [label("total"), count(v.total)],
       ]),
     );
-    if (/^(gpt-image-|dall-e-)/i.test((entry.response_model || entry.upstream_model || entry.billing_model || "").split("/").pop()))
-      node.append(element("small", text("image_note"), "muted"));
     return node;
   }
   function costCell(entry) {
     const c = entry.cost || {},
       p = c.pricing || {},
-      node = el("div", { class: "dashboard-metric" }, element("strong", usdExact(c.total_usd)));
+      node = el("div", { class: "dashboard-metric" }, element("strong", usdExact(c.total_usd), "dashboard-billed-amount"));
     if (Number.isFinite(c.service_tier_multiplier) && c.service_tier_multiplier !== 1)
-      node.append(element("span", "ϟ ×" + c.service_tier_multiplier, "dashboard-multiplier"));
+      node.append(
+        el(
+          "span",
+          { class: "dashboard-multiplier", title: label("tier_multiplier") + ": ×" + count(c.service_tier_multiplier) },
+          glyph("lightning"),
+          element("span", "×" + count(c.service_tier_multiplier)),
+        ),
+      );
     if (c.long_context) node.append(element("small", text("long_context"), "muted"));
     node.append(
       info(label("cost_detail"), [
