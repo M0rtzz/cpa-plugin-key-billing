@@ -411,8 +411,8 @@
       };
       for (const [key, value] of Object.entries({
         viewBox: "0 0 24 24",
-        fill: "none",
-        stroke: "currentColor",
+        fill: name === "lightning" ? "currentColor" : "none",
+        stroke: name === "lightning" ? "none" : "currentColor",
         "stroke-width": "1.6",
         "aria-hidden": "true",
         class: "glyph"

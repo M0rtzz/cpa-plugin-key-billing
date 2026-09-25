@@ -47,8 +47,8 @@ const analysisDashboard = (() => {
       path = document.createElementNS(ns, "path");
     for (const [key, value] of Object.entries({
       viewBox: "0 0 24 24",
-      fill: "none",
-      stroke: "currentColor",
+      fill: name === "lightning" ? "currentColor" : "none",
+      stroke: name === "lightning" ? "none" : "currentColor",
       "stroke-width": "1.6",
       "aria-hidden": "true",
       class: "dashboard-glyph",
@@ -74,6 +74,13 @@ const analysisDashboard = (() => {
   }
   const usdExact = (value) => (value == null ? "—" : "$" + Number(value).toLocaleString(locale(), { maximumFractionDigits: 8 }));
   const count = (value) => (value == null ? "—" : Number(value).toLocaleString(locale()));
+  function chartNumber(value, unit) {
+    if (value == null || !Number.isFinite(Number(value))) return "—";
+    const number = Number(value),
+      scale = unit === "percent" ? 1 : unit === "millions" || Math.abs(number) >= 1e6 ? 1e6 : Math.abs(number) >= 1e3 ? 1e3 : 1,
+      suffix = unit === "percent" ? "%" : scale === 1e6 ? "M" : scale === 1e3 ? "K" : "";
+    return (number / scale).toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + suffix;
+  }
   function identity(row) {
     if (privacyMasked()) return label("masked");
     const key = keyDirectory.resolve(row),
@@ -96,7 +103,7 @@ const analysisDashboard = (() => {
     busy = false;
     Object.assign(state, { view: null, snapshot: "", page: 0, tab: "events", model: "", type: "", failed: "", error: "" });
   }
-  function chart(canvas, type, labels, datasets, percent = false) {
+  function chart(canvas, type, labels, datasets, { percent = false, unit = "" } = {}) {
     if (typeof Chart !== "function") {
       canvas.replaceWith(element("p", label("chart_unavailable"), "muted"));
       return;
@@ -113,12 +120,19 @@ const analysisDashboard = (() => {
         x: { ticks: { color: theme.text, maxTicksLimit: 12 }, grid: { color: theme.grid } },
         y: { beginAtZero: true, ticks: { color: theme.text }, grid: { color: theme.grid } },
       };
+    if (unit) {
+      options.scales.y.ticks.callback = (value) => chartNumber(value, unit);
+      options.plugins.tooltip.callbacks = {
+        label: (context) =>
+          context.dataset.label + ": " + chartNumber(context.parsed.y, context.dataset.yAxisID === "percent" ? "percent" : unit),
+      };
+    }
     if (percent)
       options.scales.percent = {
         position: "right",
         min: 0,
         max: 100,
-        ticks: { color: theme.text, callback: (v) => v + "%" },
+        ticks: { color: theme.text, callback: (value) => chartNumber(value, "percent") },
         grid: { drawOnChartArea: false },
       };
     state.charts.push(new Chart(canvas, { type, data: { labels, datasets }, options }));
@@ -425,7 +439,7 @@ const analysisDashboard = (() => {
         yAxisID: field === "cache_rate" ? "percent" : "y",
         borderDash: field === "cache_rate" ? [5, 5] : [],
       })),
-      true,
+      { percent: true, unit: "tokens" },
     );
   }
   function renderKeyTrend() {
@@ -438,6 +452,11 @@ const analysisDashboard = (() => {
       return;
     }
     card.append(plot.box);
+    const aliases = series.map((row) => {
+      const key = keyDirectory.resolve(row),
+        name = String(key.label || "").trim();
+      return name && name !== key.preview && name !== row.key && !/^sk-/i.test(name) ? name : "";
+    });
     // Assign distinct styles within the displayed roster, independent of order
     // and labels. Hashing individual keys can give adjacent or identical hues.
     const palette = ["#0072b2", "#e69f00", "#009e73", "#cc79a7", "#d55e00", "#56b4e9", "#b59f00", "#9b6ef3", "#24a6a6", "#878787"],
@@ -453,14 +472,19 @@ const analysisDashboard = (() => {
       plot.canvas,
       "line",
       series[0].points.map((p) => new Date(p.time).toLocaleString(locale())),
-      series.map((s) => ({
-        label: identity(s),
+      series.map((s, index) => ({
+        label: privacyMasked()
+          ? label("masked")
+          : aliases[index]
+            ? aliases[index] + (aliases.filter((name) => name === aliases[index]).length > 1 ? " (" + (index + 1) + ")" : "")
+            : label("unnamed") + " " + (index + 1),
         data: s.points.map((p) => p.value),
         ...styles.get(s.key),
         borderWidth: 2,
         pointRadius: 1,
         tension: 0.15,
       })),
+      { unit: "millions" },
     );
   }
   function params(page = state.page, limit = PAGE) {
