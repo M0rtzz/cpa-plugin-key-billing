@@ -17,7 +17,7 @@ git diff --stat
 git diff --cached --stat
 ```
 
-计费行为变更至少运行下列检查。`gofmt -l .` 必须没有输出；如果涉及前端，还需启动 `python3 scripts/frontend_dummy_backend.py --port 18765`，用 Playwright 检查桌面与窄屏布局。`scripts/e2e_cpa_billing.sh v7.2.143` 是仓库要求的计费端到端检查。
+计费行为变更至少运行下列检查。`gofmt -l .` 必须没有输出；如果涉及前端，还需启动 `python3 scripts/frontend_dummy_backend.py --port 18765`，用 Playwright 检查桌面与窄屏布局。`scripts/e2e_cpa_billing.sh v7.2.143` 保留最低版本兼容检查，另对当前服务器 v7.3.17 验收，启用响应档位断言。
 
 ```bash
 gofmt -l .
@@ -31,6 +31,7 @@ node scripts/format_ui.mjs --check internal/plugin/usage.html
 node scripts/format_ui.mjs --check internal/plugin/quota.html
 node scripts/check_user_pages.mjs
 scripts/e2e_cpa_billing.sh v7.2.143
+CPA_E2E_RESPONSE_TIER_AVAILABLE=1 scripts/e2e_cpa_billing.sh v7.3.17
 ```
 
 按仓库的 Conventional Commits 规则提交，然后推送实际部署的分支。以下分支名是当前工作分支；如果将来改用其他分支，后续服务器拉取命令也要同步修改。
@@ -174,7 +175,7 @@ curl -fsS -o /dev/null -w 'quota HTTP %{http_code}\n' http://127.0.0.1:18316/v0/
 
 ## 6. 数据库迁移与回滚
 
-当前计费插件 `1.3.18` 使用 SQLite schema 18；启动时会从支持的旧版本迁移。迁移前必须在 CPA 完全停止后备份数据库，包括存在时的 `-wal` 和 `-shm` 文件。旧计费插件不能直接打开新 schema。
+本次服务档位计费代码使用 SQLite schema 19；启动时会从支持的旧版本迁移。迁移前必须在 CPA 完全停止后备份数据库，包括存在时的 `-wal` 和 `-shm` 文件。旧计费插件不能直接打开新 schema。
 
 如果新服务**尚未产生需要保留的账单**，可停服后把备份的旧计费插件、privacyfilter、`config.yaml`、CPA 二进制和数据库一起恢复，再按原命令启动。若已产生新账单，不能用旧数据库覆盖新增记录；保留当前数据库，修复或升级插件后重新部署。不要通过修改 `PRAGMA user_version` 伪装数据库版本。
 

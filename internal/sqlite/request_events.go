@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -22,6 +23,10 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 			service = billing.CodexFastModeMultiplier
 		}
 	}
+	pricing, err := json.Marshal(entry.Cost.Pricing)
+	if err != nil {
+		return 0, fmt.Errorf("Encode billing pricing: %w", err)
+	}
 	result, errInsert := tx.Exec(`
 		INSERT INTO request_events (
 			at, scope, auth_index, provider, account, executor_type, reasoning_effort, service_tier,
@@ -31,8 +36,8 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 			uncached_input_tokens, cache_read_tokens, cache_write_tokens, billed_output_tokens,
 			tiered, long_context, threshold_input_tokens,
 			applied_input_per_1m, applied_output_per_1m,
-			applied_cache_read_per_1m, applied_cache_write_per_1m
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			applied_cache_read_per_1m, applied_cache_write_per_1m, pricing_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		nanos(entry.At), entry.Scope, entry.AuthIndex, entry.Provider, entry.Account, entry.ExecutorType, entry.ReasoningEffort, entry.ServiceTier,
 		entry.ResponseServiceTier, entry.UpstreamModel, entry.ResponseModel, entry.BillingModel, entry.Failed,
 		entry.LatencyMS, entry.TTFTMS,
@@ -43,7 +48,7 @@ func appendRequestEvent(tx *sql.Tx, entry billing.RequestEvent) (int64, error) {
 		entry.Cost.CacheWriteTokens, entry.Cost.BilledOutputTokens,
 		entry.Cost.Tiered, entry.Cost.LongContext, entry.Cost.ThresholdInputTokens,
 		entry.Cost.AppliedInputPer1M, entry.Cost.AppliedOutputPer1M,
-		entry.Cost.AppliedCacheReadPer1M, entry.Cost.AppliedCacheWritePer1M)
+		entry.Cost.AppliedCacheReadPer1M, entry.Cost.AppliedCacheWritePer1M, string(pricing))
 	if errInsert != nil {
 		return 0, fmt.Errorf("Write request event: %w", errInsert)
 	}
@@ -141,7 +146,7 @@ func (d *DB) RequestEvents(query billing.RequestEventQuery, since time.Time) (bi
 			r.uncached_input_tokens, r.cache_read_tokens, r.cache_write_tokens, r.billed_output_tokens,
 			r.tiered, r.long_context, r.threshold_input_tokens,
 			r.applied_input_per_1m, r.applied_output_per_1m,
-			r.applied_cache_read_per_1m, r.applied_cache_write_per_1m,
+			r.applied_cache_read_per_1m, r.applied_cache_write_per_1m, r.pricing_json,
 			coalesce(k.preview, ''), coalesce(k.label, ''), `+requestEventSourceName+`,
 			coalesce(e.body, '')
 		FROM page JOIN request_events r ON r.id = page.id
@@ -246,9 +251,9 @@ func (d *DB) requestEventFilterValues(query billing.RequestEventQuery, since tim
 
 func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 	var (
-		row                  billing.RequestEventRow
-		at, failed           int64
-		quality, priceSource string
+		row                           billing.RequestEventRow
+		at, failed                    int64
+		quality, priceSource, pricing string
 	)
 	if errScan := rows.Scan(&row.ID, &at, &row.Scope, &row.AuthIndex, &row.Provider, &row.Account,
 		&row.ExecutorType, &row.ReasoningEffort, &row.ServiceTier, &row.ResponseServiceTier,
@@ -261,9 +266,12 @@ func scanRequestEventRow(rows *sql.Rows) (billing.RequestEventRow, error) {
 		&row.Cost.CacheWriteTokens, &row.Cost.BilledOutputTokens,
 		&row.Cost.Tiered, &row.Cost.LongContext, &row.Cost.ThresholdInputTokens,
 		&row.Cost.AppliedInputPer1M, &row.Cost.AppliedOutputPer1M,
-		&row.Cost.AppliedCacheReadPer1M, &row.Cost.AppliedCacheWritePer1M,
+		&row.Cost.AppliedCacheReadPer1M, &row.Cost.AppliedCacheWritePer1M, &pricing,
 		&row.Preview, &row.Label, &row.Source, &row.ErrorBody); errScan != nil {
 		return billing.RequestEventRow{}, fmt.Errorf("Read request events: %w", errScan)
+	}
+	if err := json.Unmarshal([]byte(pricing), &row.Cost.Pricing); err != nil {
+		return billing.RequestEventRow{}, fmt.Errorf("Read billing pricing: %w", err)
 	}
 	row.At = timeAt(at)
 	row.Failed = failed != 0

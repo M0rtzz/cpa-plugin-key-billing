@@ -273,8 +273,12 @@
       const parent = clear("billing-policy");
       parent.append(
         node("strong", "当前全局计费倍率 " + factorText(value.billing_multiplier)),
-        node("p", "Codex priority 快速模式：" + (value.codex_fast_mode_billing === true ? "已启用 2.5×" : "未启用 2.5×"), "muted"),
-        node("small", "费用已包含账单记录的倍率。设置变更适用于新请求，历史账单保留记录倍率；金额额度按同一费用扣减。")
+        node(
+          "p",
+          "Codex OAuth Priority：" + (value.codex_fast_mode_billing === true ? "GPT-5.6 / GPT-6 系列 2×，其他模型 2.5×" : "倍率加价已关闭"),
+          "muted"
+        ),
+        node("small", "API Key 按响应档位选择单价，缺失信息会标记估算。Flex 默认 0.5×，可配置专用单价。费用已包含所选单价与全局倍率；历史账单保留入账金额，金额额度按同一费用扣减。")
       );
     }
     function node(tag, text, cls) {

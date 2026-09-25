@@ -4,6 +4,8 @@ set -euo pipefail
 
 # Usage: e2e_cpa_billing.sh [目标 ...]
 #
+# v7.3.8 (and legacy v7.2.143) omits ResponseServiceTier; v7.3.17 exposes it.
+# Set CPA_E2E_RESPONSE_TIER_AVAILABLE=1 only for hosts that expose that field.
 # Each argument names one CLIProxyAPI to test, and they are tested in turn:
 #
 #	不传参数            GitHub 上的最新发布版
@@ -435,7 +437,10 @@ wait_for_event_count() {
   local attempt=0 actual_count=0
 
   while (( attempt < 50 )); do
-    if ! management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=100" >"$request_events_file"; then
+    # Admission timestamps can arrive out of order after host reconfiguration.
+    # Sequential test requests are identified by insertion ID, not wall clock.
+    if ! management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=100" |
+      jq '.entries |= (sort_by(.id | tonumber) | reverse)' >"$request_events_file"; then
       echo "读取请求事件失败。" >&2
       return 1
     fi
@@ -1151,9 +1156,10 @@ assert_reference_price_billing() {
 }
 
 assert_global_billing_multiplier() {
-  local port="$1" runtime_dir="$2" count factor attempt body
+  local port="$1" runtime_dir="$2" count factor attempt body stream
   local before="$runtime_dir/multiplier-before.json" events="$runtime_dir/multiplier-events.json"
-  management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=1000" >"$before"
+  management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=1000" |
+    jq '.entries |= (sort_by(.id | tonumber) | reverse)' >"$before"
   count="$(jq -er '.total' "$before")"
   management_call PUT "$port" "/v0/management/plugins/cpa-key-billing/prices" \
     -H 'Content-Type: application/json' \
@@ -1185,7 +1191,8 @@ assert_global_billing_multiplier() {
     account_call "$port" /v0/resource/plugins/cpa-key-billing/analysis >"$runtime_dir/multiplier-user-analysis.json"
     jq -e --argjson factor "$factor" '.billing_multiplier == $factor' "$runtime_dir/multiplier-user-analysis.json" >/dev/null
   done
-  management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=1000" >"$events"
+  management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=1000" |
+    jq '.entries |= (sort_by(.id | tonumber) | reverse)' >"$events"
   jq -e --slurpfile old "$before" '
     ($old[0].entries | map(.id | tonumber) | max) as $max |
     [.entries[] | select((.id | tonumber) <= $max)] == $old[0].entries and
@@ -1193,6 +1200,107 @@ assert_global_billing_multiplier() {
     ((.entries[1].cost.total_usd - 0.00002784) | fabs) < 0.000000000001
   ' "$events" >/dev/null
   log_step "全局倍率已验证：0.2→0.3 热更新，用户元数据与费用一致，旧账单不变"
+  for stream in false true; do
+    body="$(request_body chat gpt-4o "$stream" 'Reply with exactly OK.' | jq '. + {service_tier: "flex"}')"
+    api_call "$port" "Flex 倍率（stream=$stream）" /v1/chat/completions "$body" chat "$runtime_dir/responses/multiplier-flex-$stream.json"
+    count=$((count + 1))
+    wait_for_event_count "$port" "$count" "$events"
+    jq -e '
+      .entries[0] | .service_tier == "flex" and
+      (.cost | .billing_multiplier == 0.3 and .service_tier_multiplier == 1 and .multiplier == 0.3 and
+      .pricing.service_tier == "flex" and .pricing.method == "model_ratio" and
+      .pricing.tier_fallback == "missing_response_tier" and
+      .uncached_input_tokens == 80 and .cache_read_tokens == 32 and .cache_write_tokens == 16 and .billed_output_tokens == 8 and
+      ((.total_usd - (139.2 / 1000000 * 0.15)) | fabs) < 0.000000000001)
+    ' "$events" >/dev/null
+  done
+  log_step "Flex 已验证：流式和非流式请求均叠加 0.5 倍档位折扣"
+}
+
+assert_api_service_tier_prices() {
+  local port="$1" runtime_dir="$2" count client stream scenario requested response tier method reason expected body path source reported_response
+  local response_tier_available="${CPA_E2E_RESPONSE_TIER_AVAILABLE:-0}"
+  local events="$runtime_dir/service-tier-events.json"
+  management_call GET "$port" "/v0/management/plugins/cpa-key-billing/events?limit=1000" >"$events"
+  count="$(jq -er '.total' "$events")"
+  management_call PUT "$port" "/v0/management/plugins/cpa-key-billing/prices" \
+    --data '{"model_id":"codex/gpt-5.6-sol","input_per_1m":2,"output_per_1m":10,"cache_read_per_1m":0.2,"cache_write_per_1m":2.5,"service_tiers":{}}' >/dev/null
+  for client in chat responses; do
+    path="/v1/chat/completions"
+    if [[ "$client" == responses ]]; then path="/v1/responses"; fi
+    for stream in false true; do
+      for scenario in standard priority fast flex downgrade flex-downgrade auto-priority missing unknown; do
+        requested=priority response=priority tier=priority method=model_ratio reason="" expected=0.00017184
+        case "$scenario" in
+          standard) requested=auto response=default tier=default method=base expected=0.00008592 ;;
+          fast) requested=fast response=fast ;;
+          flex) requested=flex response=flex tier=flex expected=0.00004296 ;;
+          downgrade) response=default tier=default method=base expected=0.00008592 ;;
+          flex-downgrade) requested=flex response=default tier=default method=base expected=0.00008592 ;;
+          auto-priority) requested=auto ;;
+          missing) response=omitted reason=missing_response_tier ;;
+          unknown) response=future tier=default method=base reason=unknown_response_tier expected=0.00008592 ;;
+        esac
+        reported_response="$response" source=response
+        if [[ "$response" == omitted ]]; then source=request; fi
+        if [[ "$response_tier_available" != 1 ]]; then
+          # Assert the documented host limitation, including undetectable
+          # upstream downgrades; never infer it from the response body.
+          reported_response=omitted reason=missing_response_tier source=request
+          case "$requested" in
+            auto) tier=default method=base expected=0.00008592 source=default ;;
+            flex) tier=flex method=model_ratio expected=0.00004296 ;;
+            *) tier=priority method=model_ratio expected=0.00017184 ;;
+          esac
+        fi
+        body="$(request_body "$client" codex/gpt-5.6-sol "$stream" "Reply OK. CPA_E2E_RESPONSE_TIER=$response" | jq --arg tier "$requested" '. + {service_tier:$tier}')"
+        api_call "$port" "API 档位 $client/$stream/$scenario" "$path" "$body" "$client" "$runtime_dir/responses/tier-$client-$stream-$scenario.json"
+        count=$((count + 1))
+        wait_for_event_count "$port" "$count" "$events"
+        if ! jq -e --arg requested "$requested" --arg response "$reported_response" --arg source "$source" --arg tier "$tier" --arg method "$method" --arg reason "$reason" --argjson expected "$expected" '
+          .entries[0] | .service_tier == $requested and
+          ((.response_service_tier // "") == (if $response == "omitted" then "" else $response end)) and
+          (.cost | .billing_multiplier == 0.3 and .service_tier_multiplier == 1 and .multiplier == 0.3 and
+            .pricing.service_tier == $tier and .pricing.method == $method and
+            .pricing.tier_source == $source and
+            (.pricing.tier_fallback // "") == $reason and
+            .uncached_input_tokens == 80 and .cache_read_tokens == 32 and .cache_write_tokens == 16 and .billed_output_tokens == 8 and
+            ((.total_usd - $expected) | fabs) < 0.000000000001)
+        ' "$events" >/dev/null; then
+          echo "API 档位断言失败: $client/$stream/$scenario" >&2
+          jq '.entries[0] | {service_tier,response_service_tier,billing_model,cost}' "$events" >&2
+          return 1
+        fi
+      done
+    done
+  done
+  management_call PUT "$port" "/v0/management/plugins/cpa-key-billing/prices" \
+    --data '{"model_id":"codex/gpt-5.6-sol","input_per_1m":2,"output_per_1m":10,"cache_read_per_1m":0.2,"cache_write_per_1m":2.5,"service_tiers":{"priority":{"input_per_1m":3,"output_per_1m":40,"cache_read_per_1m":0,"cache_write_per_1m":7}}}' >/dev/null
+  for client in chat responses; do
+    path="/v1/chat/completions"
+    if [[ "$client" == responses ]]; then path="/v1/responses"; fi
+    for stream in false true; do
+      body="$(request_body "$client" codex/gpt-5.6-sol "$stream" 'Reply OK. CPA_E2E_RESPONSE_TIER=priority' | jq '. + {service_tier:"priority"}')"
+      api_call "$port" "API 自定义档位 $client/$stream" "$path" "$body" "$client" "$runtime_dir/responses/tier-explicit-$client-$stream.json"
+      count=$((count + 1))
+      wait_for_event_count "$port" "$count" "$events"
+      jq -e '.entries[0].cost | .pricing.method == "explicit_tier" and .service_tier_multiplier == 1 and
+        (.applied_cache_read_per_1m // 0) == 0 and ((.total_usd - 0.0002016) | fabs) < 0.000000000001' "$events" >/dev/null
+    done
+  done
+  # GPT-4o has no official cache-write price. Retain base prices for this
+  # synthetic usage instead of inventing a Priority rate for that component.
+  body="$(request_body chat gpt-4o false 'Reply OK. CPA_E2E_RESPONSE_TIER=priority' | jq '. + {service_tier:"priority"}')"
+  api_call "$port" "API Priority 缺价回退" /v1/chat/completions "$body" chat "$runtime_dir/responses/tier-fallback.json"
+  count=$((count + 1))
+  wait_for_event_count "$port" "$count" "$events"
+  jq -e '.entries[0].cost | .pricing.method == "base_fallback" and .pricing.price_fallback == "missing_priority_price" and
+    ((.total_usd - 0.00004176) | fabs) < 0.000000000001' "$events" >/dev/null
+  if [[ "$response_tier_available" == 1 ]]; then
+    log_step "API 档位已验证：41 个请求，Chat/Responses × 流式/非流式、降级、缺失与未知档位、自定义单价和缺价回退"
+  else
+    log_step "API 档位已验证：41 个请求，Chat/Responses × 流式/非流式、请求档位估算、自定义单价和缺价回退；宿主未传递响应档位，无法识别实际降级"
+  fi
 }
 
 run_target() {
@@ -1574,11 +1682,12 @@ run_target() {
   log_step "插件启动事件已验证"
   assert_reference_price_billing "$port" "$runtime_dir"
   assert_global_billing_multiplier "$port" "$runtime_dir"
+  assert_api_service_tier_prices "$port" "$runtime_dir"
 
   kill "$active_pid" >/dev/null 2>&1 || true
   wait "$active_pid" >/dev/null 2>&1 || true
   active_pid=""
-  log_ok "${host_label}：53 个上游请求（含 4 个参考价及 2 个倍率请求），1 次并发拦截，6 次模型拦截，4 次凭证路由，2 次凭证拦截，12 次额度拦截"
+  log_ok "${host_label}：96 个上游请求（含 4 个参考价、2 个全局倍率、2 个 Flex 及 41 个 API 档位请求），1 次并发拦截，6 次模型拦截，4 次凭证路由，2 次凭证拦截，12 次额度拦截"
 }
 
 log_stage "启动 dummy provider"

@@ -143,7 +143,7 @@ func registration() Registration {
 			ConfigFields: []ConfigField{
 				{
 					Name: "billing_multiplier", Type: "number",
-					Description: "Global billing multiplier for new usage (default 1; must be positive). Composes with Codex fast billing; historical costs remain recorded values.",
+					Description: "Global billing multiplier for new usage (default 1; must be positive). Applied once after API service-tier pricing or Codex fast billing; historical costs remain recorded values.",
 				},
 				{
 					Name: "account_api_base_url", Type: "string",
@@ -157,7 +157,7 @@ func registration() Registration {
 				{
 					Name:        "codex_fast_mode_billing",
 					Type:        "boolean",
-					Description: "Bill Codex OAuth priority requests at 2.5 times the global-adjusted cost (default true)",
+					Description: "Bill Codex OAuth Priority/Fast at 2x for GPT-5.6 and GPT-6 families, otherwise 2.5x; prefer the response tier (default true)",
 				},
 				{
 					Name:        "mask_api_key_view_emails",

@@ -1,6 +1,8 @@
 package plugin
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -29,6 +31,13 @@ func (a *App) putPrices(req ManagementRequest) ManagementResponse {
 	var price billing.CustomPrice
 	if errDecode := decodeStrict(req.Body, &price); errDecode != nil {
 		return errorResponse(errDecode)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(req.Body, &fields); err != nil {
+		return errorResponse(err)
+	}
+	if bytes.Equal(bytes.TrimSpace(fields["service_tiers"]), []byte("null")) {
+		return JSONError(http.StatusBadRequest, "invalid", "service_tiers must be an object; use {} to clear it")
 	}
 	stored, errUpsert := a.store.UpsertPrice(price)
 	if errUpsert != nil {

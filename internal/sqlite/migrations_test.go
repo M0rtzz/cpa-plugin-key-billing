@@ -18,6 +18,8 @@ func TestFeatureBranchV15MigrationPreservesBillingHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := legacy.db.Exec(`
+		ALTER TABLE prices DROP COLUMN service_tiers_json;
+		ALTER TABLE request_events DROP COLUMN pricing_json;
 		ALTER TABLE request_events DROP COLUMN response_service_tier;
 		ALTER TABLE request_events DROP COLUMN response_model;
 		ALTER TABLE request_events DROP COLUMN response_headers_json;

@@ -281,12 +281,54 @@
     };
     const factor = (value, fallback = 1) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback);
     const factorText = (value) => factor(value).toLocaleString("zh-CN", { maximumSignificantDigits: 12 }) + "×";
+    function recordedPricing(cost) {
+      const pricing = cost.pricing;
+      if (!pricing?.service_tier)
+        return typeof cost.billing_multiplier === "number"
+          ? "全局 " + factorText(cost.billing_multiplier) + " · 档位 " + factorText(cost.service_tier_multiplier) + " = " +
+              factorText(factor(cost.multiplier, factor(cost.billing_multiplier) * factor(cost.service_tier_multiplier)))
+          : "最终 " + factorText(cost.multiplier);
+      const methods = {
+        base: "基础价格",
+        explicit_tier: "自定义档位价格",
+        model_ratio: "模型档位价比",
+        base_fallback: "基础价回退（估算）",
+        oauth_multiplier: "Codex OAuth 模型倍率"
+      };
+      const sources = { response: "上游响应", request: "请求档位（估算）", default: "默认档位（估算）" };
+      const reasons = {
+        missing_response_tier: "未上报响应档位",
+        unknown_response_tier: "未知响应档位",
+        unknown_response_tier_request_fallback: "未知响应档位，按请求的 Priority 档位估算",
+        unknown_request_tier: "未知请求档位",
+        missing_priority_price: "缺少适用 Priority 单价",
+        missing_base_price: "缺少基础价格，金额未计费"
+      };
+      const result = node("div");
+      result.append(
+        node("div", pricing.service_tier + " · " + (sources[pricing.tier_source] || "未提供")),
+        node("div", (methods[pricing.method] || "未提供") + " · 全局 " + factorText(cost.billing_multiplier))
+      );
+      if (pricing.method === "oauth_multiplier")
+        result.append(node("div", "档位 " + factorText(cost.service_tier_multiplier) + " · 最终 " + factorText(cost.multiplier)));
+      result.append(node("small", "实际单价 / 1M：输入 " + money(cost.applied_input_per_1m) + " · 输出 " + money(cost.applied_output_per_1m)));
+      result.append(
+        node("div", "缓存读取 " + money(cost.applied_cache_read_per_1m) + " · 缓存写入 " + money(cost.applied_cache_write_per_1m), "muted")
+      );
+      const reason = [pricing.tier_fallback, pricing.price_fallback].filter(Boolean).map((value) => reasons[value] || "计费信息不完整").join("；");
+      if (reason) result.append(node("div", reason + "（估算）", "muted"));
+      return result;
+    }
     function billingPolicy(value) {
       const parent = clear("billing-policy");
       parent.append(
         node("strong", "当前全局计费倍率 " + factorText(value.billing_multiplier)),
-        node("p", "Codex priority 快速模式：" + (value.codex_fast_mode_billing === true ? "已启用 2.5×" : "未启用 2.5×"), "muted"),
-        node("small", "费用已包含账单记录的倍率。设置变更适用于新请求，历史账单保留记录倍率；金额额度按同一费用扣减。")
+        node(
+          "p",
+          "Codex OAuth Priority：" + (value.codex_fast_mode_billing === true ? "GPT-5.6 / GPT-6 系列 2×，其他模型 2.5×" : "倍率加价已关闭"),
+          "muted"
+        ),
+        node("small", "API Key 按响应档位选择单价，缺失信息会标记估算。Flex 默认 0.5×，可配置专用单价。费用已包含所选单价与全局倍率；历史账单保留入账金额，金额额度按同一费用扣减。")
       );
     }
     function node(tag, text, cls) {
@@ -556,10 +598,7 @@
                   entry.reasoning_effort || "—",
                   integer(tokens),
                   money(cost.total_usd),
-                  typeof cost.billing_multiplier === "number"
-                    ? "全局 " + factorText(cost.billing_multiplier) + " · 快速 " + factorText(cost.service_tier_multiplier) + " = " +
-                      factorText(factor(cost.multiplier, factor(cost.billing_multiplier) * factor(cost.service_tier_multiplier)))
-                    : "最终 " + factorText(cost.multiplier),
+                  recordedPricing(cost),
                   timing(entry)
                 ];
           values.forEach((value, index) => {

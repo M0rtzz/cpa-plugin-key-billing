@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestUsageBillingMultiplierAndFastEligibility(t *testing.T) {
+func TestUsageBillingMultiplierAndServiceTierEligibility(t *testing.T) {
 	for _, test := range []struct {
 		name, provider, authType, tier string
 		fastDisabled                   bool
@@ -17,6 +17,12 @@ func TestUsageBillingMultiplierAndFastEligibility(t *testing.T) {
 		{"explicit opt out", "codex", "oauth", "priority", true, 1},
 		{"codex API key", "codex", "apikey", "priority", false, 1},
 		{"other provider", "claude", "oauth", "priority", false, 1},
+		{"flex Codex OAuth", "codex", "oauth", "flex", false, 0.5},
+		{"flex OpenAI API key", "openai", "apikey", "flex", false, 0.5},
+		{"flex compatible provider", "openai-compatible-test", "apikey", "flex", false, 0.5},
+		{"flex case normalization", "CoDeX", "OAUTH", " Flex ", false, 0.5},
+		{"flex with fast billing disabled", "codex", "oauth", "flex", true, 0.5},
+		{"unknown tier", "codex", "oauth", "unknown", false, 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			now := time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)
@@ -42,7 +48,11 @@ func TestUsageBillingMultiplierAndFastEligibility(t *testing.T) {
 			}
 			cost := entries[0].Cost
 			factor := 0.2 * test.wantService
-			if cost.BillingMultiplier != 0.2 || cost.ServiceTierMultiplier != test.wantService || cost.Multiplier != factor {
+			wantService := test.wantService
+			if apiTierEligible(event) {
+				wantService = 1
+			}
+			if cost.BillingMultiplier != 0.2 || cost.ServiceTierMultiplier != wantService || cost.Multiplier != 0.2*wantService {
 				t.Fatalf("cost multipliers = %+v", cost)
 			}
 			assertClose(t, "total", cost.TotalUSD, wantSubsetCost*factor)
@@ -126,17 +136,22 @@ func TestUsageMultiplierPreservesLongContextTierAndBasePrice(t *testing.T) {
 
 func TestUsageMultiplierKeepsFailedAndUnbillableRecords(t *testing.T) {
 	for _, test := range []struct {
-		name         string
+		name, tier   string
 		breakdown    TokenBreakdown
 		unknownModel bool
 		wantCost     float64
 		wantService  float64
 	}{
-		{"reported usage on failure", completeBreakdown(500, 400, 100, 500, 200), false, wantSubsetCost * 0.5, 2.5},
-		{"zero usage", completeBreakdown(0, 0, 0, 0, 0), false, 0, 2.5},
-		{"unclassified usage", TokenBreakdown{Quality: TokenAccountingUnclassified, TotalTokens: 10, UnclassifiedTokens: 10}, false, 0, 1},
-		{"invalid usage", TokenBreakdown{Quality: TokenAccountingComplete, TotalTokens: -1}, false, 0, 1},
-		{"missing price", completeBreakdown(500, 400, 100, 500, 200), true, 0, 1},
+		{"reported usage on failure", "priority", completeBreakdown(500, 400, 100, 500, 200), false, wantSubsetCost * 0.5, 2.5},
+		{"zero usage", "priority", completeBreakdown(0, 0, 0, 0, 0), false, 0, 2.5},
+		{"unclassified usage", "priority", TokenBreakdown{Quality: TokenAccountingUnclassified, TotalTokens: 10, UnclassifiedTokens: 10}, false, 0, 1},
+		{"invalid usage", "priority", TokenBreakdown{Quality: TokenAccountingComplete, TotalTokens: -1}, false, 0, 1},
+		{"missing price", "priority", completeBreakdown(500, 400, 100, 500, 200), true, 0, 1},
+		{"flex reported usage on failure", "flex", completeBreakdown(500, 400, 100, 500, 200), false, wantSubsetCost * 0.1, 0.5},
+		{"flex zero usage", "flex", completeBreakdown(0, 0, 0, 0, 0), false, 0, 0.5},
+		{"flex unclassified usage", "flex", TokenBreakdown{Quality: TokenAccountingUnclassified, TotalTokens: 10, UnclassifiedTokens: 10}, false, 0, 1},
+		{"flex invalid usage", "flex", TokenBreakdown{Quality: TokenAccountingComplete, TotalTokens: -1}, false, 0, 1},
+		{"flex missing price", "flex", completeBreakdown(500, 400, 100, 500, 200), true, 0, 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			now := time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)
@@ -147,7 +162,7 @@ func TestUsageMultiplierKeepsFailedAndUnbillableRecords(t *testing.T) {
 				t.Fatal(err)
 			}
 			event := subsetEvent("scope-a", now)
-			event.Provider, event.AuthType, event.ServiceTier = "codex", "oauth", "priority"
+			event.Provider, event.AuthType, event.ServiceTier = "codex", "oauth", test.tier
 			event.Breakdown = test.breakdown
 			if test.unknownModel {
 				event.UpstreamModel, event.RouteModel = "unknown-model", "unknown-model"

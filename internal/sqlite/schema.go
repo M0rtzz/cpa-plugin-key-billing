@@ -71,7 +71,8 @@ CREATE TABLE prices (
 	long_context_input_per_1m       REAL,
 	long_context_output_per_1m      REAL,
 	long_context_cache_read_per_1m  REAL,
-	long_context_cache_write_per_1m REAL
+	long_context_cache_write_per_1m REAL,
+	service_tiers_json TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE reference_prices_metadata (
@@ -134,7 +135,8 @@ CREATE TABLE request_events (
 	applied_output_per_1m       REAL    NOT NULL DEFAULT 0,
 	applied_cache_read_per_1m   REAL    NOT NULL DEFAULT 0,
 	applied_cache_write_per_1m  REAL    NOT NULL DEFAULT 0,
-	response_headers_json       TEXT    NOT NULL DEFAULT '{}'
+	response_headers_json       TEXT    NOT NULL DEFAULT '{}',
+	pricing_json TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE request_errors (

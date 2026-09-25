@@ -546,3 +546,14 @@ func migrateQuotaWindows(tx *sql.Tx) error {
         ALTER TABLE api_keys DROP COLUMN cycle_spent_usd;`)
 	return err
 }
+
+// v19 stores optional service-tier cards and the decision made for each bill.
+// Historical prices and monetary values are deliberately untouched.
+func migrateToV19(tx *sql.Tx) error {
+	_, err := tx.Exec(`ALTER TABLE prices ADD COLUMN service_tiers_json TEXT NOT NULL DEFAULT '{}';
+ ALTER TABLE request_events ADD COLUMN pricing_json TEXT NOT NULL DEFAULT '{}';`)
+	if err != nil {
+		return fmt.Errorf("Migrate service-tier pricing: %w", err)
+	}
+	return nil
+}

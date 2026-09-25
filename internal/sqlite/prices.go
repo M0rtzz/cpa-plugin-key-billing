@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"cpa-key-billing/internal/billing"
@@ -10,6 +11,10 @@ import (
 func (d *DB) UpsertPrice(price billing.CustomPrice) error {
 	if err := price.Validate(); err != nil {
 		return err
+	}
+	rawTiers, err := json.Marshal(price.ServiceTiers)
+	if err != nil {
+		return fmt.Errorf("Encode service-tier prices: %w", err)
 	}
 	var (
 		threshold                                  any
@@ -22,12 +27,12 @@ func (d *DB) UpsertPrice(price billing.CustomPrice) error {
 		tierRead = optionalPrice(tier.CacheReadPer1M)
 		tierWrite = optionalPrice(tier.CacheWritePer1M)
 	}
-	_, err := d.db.Exec(`
+	_, err = d.db.Exec(`
         INSERT INTO prices (
             model_id, input_per_1m, output_per_1m, cache_read_per_1m, cache_write_per_1m,
             long_context_threshold, long_context_input_per_1m, long_context_output_per_1m,
-            long_context_cache_read_per_1m, long_context_cache_write_per_1m
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            long_context_cache_read_per_1m, long_context_cache_write_per_1m, service_tiers_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(model_id COLLATE NOCASE) DO UPDATE SET
             input_per_1m = excluded.input_per_1m,
             output_per_1m = excluded.output_per_1m,
@@ -37,10 +42,11 @@ func (d *DB) UpsertPrice(price billing.CustomPrice) error {
             long_context_input_per_1m = excluded.long_context_input_per_1m,
             long_context_output_per_1m = excluded.long_context_output_per_1m,
             long_context_cache_read_per_1m = excluded.long_context_cache_read_per_1m,
-            long_context_cache_write_per_1m = excluded.long_context_cache_write_per_1m
+            long_context_cache_write_per_1m = excluded.long_context_cache_write_per_1m,
+            service_tiers_json = CASE WHEN ? THEN prices.service_tiers_json ELSE excluded.service_tiers_json END
     `, price.ModelID, price.InputPer1M, price.OutputPer1M,
 		optionalPrice(price.CacheReadPer1M), optionalPrice(price.CacheWritePer1M),
-		threshold, tierInput, tierOutput, tierRead, tierWrite)
+		threshold, tierInput, tierOutput, tierRead, tierWrite, string(rawTiers), price.ServiceTiers == nil)
 	if err != nil {
 		return fmt.Errorf("Save pricing for model %s: %w", price.ModelID, err)
 	}
@@ -58,7 +64,7 @@ func (d *DB) loadPrices(state *billing.State) error {
 	rows, errQuery := d.db.Query(`
 		SELECT model_id, input_per_1m, output_per_1m, cache_read_per_1m, cache_write_per_1m,
 			long_context_threshold, long_context_input_per_1m, long_context_output_per_1m,
-			long_context_cache_read_per_1m, long_context_cache_write_per_1m
+			long_context_cache_read_per_1m, long_context_cache_write_per_1m, service_tiers_json
 		FROM prices ORDER BY position`)
 	if errQuery != nil {
 		return fmt.Errorf("Read model pricing: %w", errQuery)
@@ -66,14 +72,18 @@ func (d *DB) loadPrices(state *billing.State) error {
 	defer rows.Close()
 	for rows.Next() {
 		var (
+			rawTiers                                   string
 			price                                      billing.CustomPrice
 			cacheRead, cacheWrite                      sql.NullFloat64
 			threshold                                  sql.NullInt64
 			tierInput, tierOutput, tierRead, tierWrite sql.NullFloat64
 		)
 		if errScan := rows.Scan(&price.ModelID, &price.InputPer1M, &price.OutputPer1M, &cacheRead, &cacheWrite,
-			&threshold, &tierInput, &tierOutput, &tierRead, &tierWrite); errScan != nil {
+			&threshold, &tierInput, &tierOutput, &tierRead, &tierWrite, &rawTiers); errScan != nil {
 			return fmt.Errorf("Read model pricing: %w", errScan)
+		}
+		if err := json.Unmarshal([]byte(rawTiers), &price.ServiceTiers); err != nil {
+			return fmt.Errorf("Read service-tier prices: %w", err)
 		}
 		price.CacheReadPer1M = priceOrNil(cacheRead)
 		price.CacheWritePer1M = priceOrNil(cacheWrite)
@@ -85,6 +95,9 @@ func (d *DB) loadPrices(state *billing.State) error {
 				CacheReadPer1M:       priceOrNil(tierRead),
 				CacheWritePer1M:      priceOrNil(tierWrite),
 			}
+		}
+		if err := price.Validate(); err != nil {
+			return err
 		}
 		state.Prices[billing.NormalizeModelID(price.ModelID)] = price
 	}

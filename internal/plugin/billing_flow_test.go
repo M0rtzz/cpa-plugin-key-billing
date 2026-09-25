@@ -97,6 +97,48 @@ func TestUsageHandleBillsWithoutResponseOrCompletionHooks(t *testing.T) {
 	}
 }
 
+func TestUsageHandlePersistsFlexDiscountWithoutRepricingHistory(t *testing.T) {
+	app, statePath := newAppWithPriceAndState(t, true)
+	cfg := app.store.Config()
+	cfg.BillingMultiplier = 0.2
+	cfg.CodexFastModeBilling = false
+	if err := app.store.Configure(cfg); err != nil {
+		t.Fatal(err)
+	}
+	for _, tier := range []string{"auto", "flex"} {
+		publishUsageRecord(t, app, UsageRecord{
+			Provider: "openai", ExecutorType: "OpenAICompatExecutor", AuthType: "apikey",
+			Model: flowModel, Alias: flowModel, APIKey: testAPIKey,
+			ServiceTier: tier, ResponseServiceTier: "flex", Generate: true, RequestedAt: app.store.Now(),
+			Detail: UsageDetail{InputTokens: 1000, OutputTokens: 500, ReasoningTokens: 200,
+				CacheReadTokens: 400, CacheCreationTokens: 100, TotalTokens: 1500},
+		})
+	}
+	before := requestEventEntries(t, app)
+	cfg.BillingMultiplier = 0.3
+	if err := app.store.Configure(cfg); err != nil {
+		t.Fatal(err)
+	}
+	app.Shutdown()
+
+	database, err := sqlite.Open(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	view, err := database.RequestEvents(billing.RequestEventQuery{Scope: flowScope()}, time.Time{})
+	if err != nil || len(view.Entries) != 2 {
+		t.Fatalf("persisted events = %+v, err = %v", view.Entries, err)
+	}
+	for i, entry := range view.Entries {
+		wantTier := 0.5 // Both requests were actually processed as Flex.
+		if entry.Cost != before[i].Cost || entry.Cost.BillingMultiplier != 0.2 || entry.Cost.ServiceTierMultiplier != 1 || entry.Cost.Pricing.ServiceTier != "flex" || entry.Cost.Pricing.TierSource != "response" {
+			t.Fatalf("recorded billing policy changed: %+v", entry)
+		}
+		assertCostClose(t, entry.Cost.TotalUSD, (0.0005+0.00004+0.000125+0.001)*0.2*wantTier)
+	}
+}
+
 func TestUsageHandleUsesClientKeyModelAliasAndCredential(t *testing.T) {
 	app := newAppWithPrice(t, true)
 	publishUsageRecord(t, app, UsageRecord{

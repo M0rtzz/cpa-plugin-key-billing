@@ -100,7 +100,7 @@ func TestUsageAfterPriceDeletionKeepsTokensAndZeroCost(t *testing.T) {
 			}
 			publishUsageRecord(t, app, UsageRecord{
 				Model: model, Alias: model, APIKey: "sk-dummy-deleted-price",
-				Provider: "openai", RequestedAt: app.store.Now(), Failed: failed,
+				Provider: "openai", AuthType: "apikey", ServiceTier: "priority", RequestedAt: app.store.Now(), Failed: failed,
 				Detail: UsageDetail{InputTokens: 100, OutputTokens: 25, TotalTokens: 125},
 			})
 			events := requestEventEntries(t, app)
@@ -110,7 +110,8 @@ func TestUsageAfterPriceDeletionKeepsTokensAndZeroCost(t *testing.T) {
 			event := events[0]
 			if event.Failed != failed || event.PriceSource != billing.PriceSourceNone ||
 				event.Cost.TotalUSD != 0 || event.Cost.UncachedInputTokens != 100 ||
-				event.Cost.BilledOutputTokens != 25 {
+				event.Cost.BilledOutputTokens != 25 || event.Cost.Pricing.PriceFallback != "missing_base_price" ||
+				event.Cost.Pricing.TierFallback != "missing_response_tier" {
 				t.Fatalf("unpriced usage was not retained at zero cost: %+v", event)
 			}
 		})
@@ -225,5 +226,27 @@ func TestReferencePriceSearchAcceptsCPAModelID(t *testing.T) {
 		url.Values{"q": {"codex/gpt-4o(xhigh)"}, "limit": {"1"}}, nil, 200, &result)
 	if len(result.Prices) != 1 || result.Prices[0].ProviderID != "openai" || result.Prices[0].ModelID != "gpt-4o" || !result.Prices[0].IsCanonical {
 		t.Fatalf("reference search = %+v", result.Prices)
+	}
+}
+
+func TestServiceTierPriceAPIValidationAndCompatibility(t *testing.T) {
+	app := newConfiguredApp(t)
+	good := map[string]any{"model_id": "gpt-6-sol", "input_per_1m": 2, "output_per_1m": 10, "service_tiers": map[string]any{
+		"priority": map[string]any{"input_per_1m": 3, "output_per_1m": 7, "cache_read_per_1m": 0},
+	}}
+	callOK(t, app, http.MethodPut, routePrices, nil, good, 200, nil)
+	callOK(t, app, http.MethodPut, routePrices, nil, map[string]any{"model_id": "gpt-6-sol", "input_per_1m": 4, "output_per_1m": 20}, 200, nil)
+	rows := readPrices(t, app, "gpt-6-sol")
+	if len(rows) != 1 || rows[0].ServiceTiers["priority"].InputPer1M == nil || *rows[0].ServiceTiers["priority"].InputPer1M != 3 || rows[0].ServiceTierPrices["priority"].Method != "explicit_tier" {
+		t.Fatalf("old writer erased tiers: %+v", rows)
+	}
+	for _, tiers := range []any{nil, map[string]any{"priority": map[string]any{"output_per_1m": 7}}, map[string]any{"priority": map[string]any{"input_per_1m": 3, "output_per_1m": 7, "long_context": map[string]any{"threshold_input_tokens": 1}}}, map[string]any{"priority": map[string]any{"input_per_1m": -1, "output_per_1m": 7}}, map[string]any{"future": map[string]any{"input_per_1m": 3, "output_per_1m": 7}}} {
+		body := map[string]any{"model_id": "gpt-6-sol", "input_per_1m": 4, "output_per_1m": 20, "service_tiers": tiers}
+		callOK(t, app, http.MethodPut, routePrices, nil, body, 400, nil)
+	}
+	callOK(t, app, http.MethodPut, routePrices, nil, map[string]any{"model_id": "gpt-6-sol", "input_per_1m": 4, "output_per_1m": 20, "service_tiers": map[string]any{}}, 200, nil)
+	rows = readPrices(t, app, "gpt-6-sol")
+	if len(rows[0].ServiceTiers) != 0 || rows[0].ServiceTierPrices["priority"].Price.InputPer1M != 8 || rows[0].ServiceTierPrices["priority"].Method != "model_ratio" {
+		t.Fatal(rows)
 	}
 }

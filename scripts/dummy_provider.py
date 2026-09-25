@@ -140,6 +140,8 @@ class DummyProviderHandler(BaseHTTPRequestHandler):
             self.pause(HOLD_SECONDS)
 
         turn = Turn(model)
+        tier_match = re.search(r"CPA_E2E_RESPONSE_TIER=([a-z]+)", json.dumps(body))
+        turn.service_tier = tier_match.group(1) if tier_match and tier_match.group(1) != "omitted" else None
         if not stream:
             self.pause(TTFT_SECONDS)
             for _ in turn.tokens[1:]:
@@ -154,6 +156,7 @@ class DummyProviderHandler(BaseHTTPRequestHandler):
             return {
                 "id": f"chatcmpl-{turn.id}",
                 "object": "chat.completion",
+                **({"service_tier": turn.service_tier} if turn.service_tier is not None else {}),
                 "created": turn.created,
                 "model": turn.model,
                 "choices": [
@@ -204,6 +207,7 @@ class DummyProviderHandler(BaseHTTPRequestHandler):
         return {
             "id": f"resp_{turn.id}",
             "object": "response",
+            **({"service_tier": turn.service_tier} if turn.service_tier is not None else {}),
             "created_at": turn.created,
             "status": status,
             "model": turn.model,
@@ -238,6 +242,7 @@ class DummyProviderHandler(BaseHTTPRequestHandler):
             payload = {
                 "id": f"chatcmpl-{turn.id}",
                 "object": "chat.completion.chunk",
+                **({"service_tier": turn.service_tier} if turn.service_tier is not None else {}),
                 "created": turn.created,
                 "model": turn.model,
                 "choices": choices,

@@ -89,16 +89,22 @@ plugins:
       enabled: true
       debug: false # Include routing and reference-price matching in debug logs
       billing_multiplier: 1 # Global factor; 0.2 bills 20% of the base cost
-      codex_fast_mode_billing: true # Enabled by default; qualifying Codex OAuth priority usage adds 2.5×
+      codex_fast_mode_billing: true # Enabled by default; Codex OAuth Priority: GPT-5.6/GPT-6 families 2×, other models 2.5×
       mask_api_key_view_emails: false # Mask email addresses in API key account views
       allow_api_key_quota_reset: false # Allow API key users to reset accessible Codex auth file quotas using upstream reset credits
       state_file: "plugins/cpa-key-billing-state-v1.db"
       account_api_base_url: "http://127.0.0.1:18316" # Use this CPA instance's actual loopback port
 ```
 
-Administrators can edit the global factor in the management center under **Plugins → CPA Key Billing → Configuration**. `billing_multiplier` must be finite and positive and defaults to `1`. `codex_fast_mode_billing` defaults to `true`; qualifying Codex OAuth requests with `service_tier=priority` add a **2.5×** factor. Set it explicitly to `false` to disable the surcharge.
+Administrators can edit the global factor in the management center under **Plugins → CPA Key Billing → Configuration**. `billing_multiplier` must be finite and positive and defaults to `1`. `codex_fast_mode_billing` defaults to `true`; Codex OAuth Priority/Fast adds **2×** for GPT-5.6 and GPT-6 families, and **2.5×** for other models. Set it explicitly to `false` to disable the Priority surcharge. This is the operator’s downstream billing policy. The response tier and model take precedence; a downgrade to Default uses **1×**. Missing response tiers are estimated from the request and marked.
 
-With a global factor of `0.2`, ordinary requests use **0.2×**, and qualifying Fast requests use **0.5×**. Stored costs and monetary quota consumption use the same adjusted amounts; token and request quotas are unchanged. Each event retains its applied factors. Configuration changes affect only newly recorded usage, and pages and CSV do not multiply stored costs again.
+Upstream API-key usage selects prices using the host's `ResponseServiceTier`: `priority`/`fast` uses model-specific Priority rates, `flex` defaults to half price, and `default` uses standard rates. Missing response tiers fall back to the requested tier; missing Priority prices fall back to base rates. Bills and CSV identify these estimates. Administrators can override Priority/Flex cards in model pricing. Without a Priority override, verified official component ratios adjust the configured base rates. Flex is independent of the Codex Fast switch.
+
+Compatibility: the current server, CLIProxyAPI v7.3.17, forwards `ResponseServiceTier` and `ResponseModel` through its plugin usage interface. Upstream responses can still omit these fields; older hosts such as v7.3.8 do not forward the response tier. Missing tiers use request estimates marked `missing_response_tier`, which cannot detect upstream downgrades.
+
+For GPT-6 Sol with a global factor of `0.2`, standard usage bills **0.2×**, default Flex **0.1×**, and API Priority **0.4×**; Codex OAuth Priority also bills **0.4×**. API tier adjustments are included in the applied unit prices, so the additional service-tier multiplier is `1`; this does not mean standard prices were used. Costs and monetary quotas share the same recorded amounts. Token/request counts and historical bills are unchanged.
+
+The verified v7.3.17 plugin interface supplies response tiers and models; API billing prefers those fields after upgrading, while absent response tiers still produce estimates.
 
 Historical rebilling requires an explicit offline maintenance operation. Schema upgrades preserve existing monetary values. See the [multiplier and historical rebilling guide](docs/billing-multiplier.md) for backups, transactional migration, and replay protection.
 

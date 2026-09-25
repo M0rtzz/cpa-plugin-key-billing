@@ -62,15 +62,36 @@ func (s *Store) recordUsage(event UsageEvent, failure *RequestError) {
 		price = Price{Source: PriceSourceNone}
 	}
 
+	var pricing PricingMetadata
+	apiTier := apiTierEligible(event)
+	oauthTier := strings.EqualFold(provider, "codex") && authType == "oauth"
+	if apiTier {
+		price, pricing = resolveAPIServicePrice(price, billingModel, event)
+	} else if oauthTier {
+		pricing = effectiveOAuthServiceTier(event, billingModel)
+		pricing.Method, pricing.RuleVersion = "oauth_multiplier", codexOAuthRuleVersion
+		if price.Source == PriceSourceNone {
+			pricing.PriceFallback = "missing_base_price"
+		}
+	}
 	cost := ComputeCost(price, event.Breakdown)
+	cost.Pricing = pricing
 	missingCycleTime := false
 	updateResult(s, func(state *State) (struct{}, Changes) {
 		serviceTierMultiplier := 1.0
-		// ServiceTier is the client-requested tier, not the upstream response tier.
-		if s.cfg.CodexFastModeBilling && price.Source != PriceSourceNone && event.Breakdown.Billable() &&
-			strings.EqualFold(provider, "codex") && authType == "oauth" &&
-			strings.EqualFold(strings.TrimSpace(event.ServiceTier), "priority") {
-			serviceTierMultiplier = CodexFastModeMultiplier
+		if !apiTier && price.Source != PriceSourceNone && event.Breakdown.Billable() {
+			tier := strings.ToLower(strings.TrimSpace(event.ServiceTier))
+			if oauthTier {
+				tier = pricing.ServiceTier
+			}
+			switch tier {
+			case "flex":
+				serviceTierMultiplier = FlexModeMultiplier
+			case "priority":
+				if s.cfg.CodexFastModeBilling && oauthTier {
+					serviceTierMultiplier = codexPriorityMultiplier(event, billingModel)
+				}
+			}
 		}
 		cost.applyMultipliers(s.cfg.BillingMultiplier, serviceTierMultiplier)
 		upstreamModel := strings.TrimSpace(event.UpstreamModel)

@@ -24,6 +24,8 @@ func billingMaintenanceFixture(t *testing.T) string {
 	}
 	defer db.Close()
 	_, err = db.db.Exec(`
+		ALTER TABLE prices DROP COLUMN service_tiers_json;
+		ALTER TABLE request_events DROP COLUMN pricing_json;
 		ALTER TABLE request_events DROP COLUMN billing_multiplier;
 		ALTER TABLE request_events DROP COLUMN service_tier_multiplier;
 		DROP TABLE billing_adjustments;
@@ -134,7 +136,7 @@ func TestBillingBackfillPreviewApplyAndReplay(t *testing.T) {
 	}
 	db := maintenanceRawDB(t, path)
 	var version int
-	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 18 {
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != schemaVersion {
 		t.Fatal(version, err)
 	}
 	var total, global, service, rate float64

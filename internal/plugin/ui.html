@@ -518,6 +518,7 @@
       .tag.bad { background: var(--failure-badge-bg); color: var(--failure-badge-text); border-color: var(--failure-badge-border); }
       .tag.info { background: var(--info-badge-bg); color: var(--info-badge-text); border-color: var(--info-badge-border); }
       .tag.plain { background: var(--count-badge-bg); color: var(--count-badge-text); }
+      .billing-policy .tag { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
       .tag.icon { padding: 2px 5px; }
       :root[data-cpamp-plugin-host="true"] body {
         background-color: var(--app-bg, #eff2f7);
@@ -1804,6 +1805,7 @@
       .cost-tooltip.show { opacity: 1; visibility: visible; }
       .cost-tooltip-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
       .cost-tooltip-summary { display: flex; gap: 10px; margin-bottom: 8px; color: var(--text-secondary); }
+      .cost-tooltip-summary.tag { white-space: normal; overflow-wrap: anywhere; }
       .cost-tooltip-summary b { color: var(--text-primary); font-weight: 500; }
       .cost-tooltip-grid {
         display: grid;
@@ -2659,6 +2661,51 @@
         <label class="field"> <span data-i18n="ui.long_context_cache_read_1m_tokens">Long-context cache read&thinsp;/&thinsp;1M tokens</span> <input id="price-tier-cr" type="number" step="any" min="0" /> </label>
         <label class="field"> <span data-i18n="ui.long_context_cache_write_1m_tokens">Long-context cache write&thinsp;/&thinsp;1M tokens</span> <input id="price-tier-cw" type="number" step="any" min="0" /> </label>
       </div>
+      <p class="muted small" data-i18n="ui.service_price_default_note">API keys use the response tier when available. Without an override, Priority uses verified per-model rate ratios, falling back to estimated base prices; Flex defaults to 0.5×. Selected rates receive the global multiplier once. Empty cache rates inherit this tier’s input price.</p>
+      <section class="tier-fields">
+        <h3 data-i18n="ui.priority_fast">Priority / Fast</h3>
+        <p class="muted small" id="price-service-priority-preview"></p>
+        <label class="switch-field"><input id="price-service-priority-enabled" type="checkbox" /><span data-i18n="ui.service_price_override">Set explicit service tier prices</span></label>
+        <div id="price-service-priority-fields" class="hidden">
+          <div class="price-fields">
+            <label class="field"><span data-i18n="ui.input_1m_tokens">Input / 1M tokens</span><input id="price-service-priority-in" type="number" min="0" step="any" required /></label>
+            <label class="field"><span data-i18n="ui.output_1m_tokens">Output / 1M tokens</span><input id="price-service-priority-out" type="number" min="0" step="any" required /></label>
+            <label class="field"><span data-i18n="ui.cache_read_1m_tokens">Cache read / 1M tokens</span><input id="price-service-priority-cr" type="number" min="0" step="any" /></label>
+            <label class="field"><span data-i18n="ui.cache_write_1m_tokens">Cache write / 1M tokens</span><input id="price-service-priority-cw" type="number" min="0" step="any" /></label>
+          </div>
+          <label class="switch-field"><input id="price-service-priority-tiered" type="checkbox" /><span data-i18n="ui.enable_long_context_tiered_pricing">Enable long-context tiered pricing</span></label>
+          <div class="price-fields hidden" id="price-service-priority-long-fields">
+            <label class="field"><span data-i18n="ui.long_context_threshold_input_tokens">Long-context threshold (input tokens)</span><input id="price-service-priority-threshold" type="number" min="1" step="1" required value="272000" /></label>
+            <span></span>
+            <label class="field"><span data-i18n="ui.input_1m_tokens">Input / 1M tokens</span><input id="price-service-priority-long-in" type="number" min="0" step="any" required /></label>
+            <label class="field"><span data-i18n="ui.output_1m_tokens">Output / 1M tokens</span><input id="price-service-priority-long-out" type="number" min="0" step="any" required /></label>
+            <label class="field"><span data-i18n="ui.cache_read_1m_tokens">Cache read / 1M tokens</span><input id="price-service-priority-long-cr" type="number" min="0" step="any" /></label>
+            <label class="field"><span data-i18n="ui.cache_write_1m_tokens">Cache write / 1M tokens</span><input id="price-service-priority-long-cw" type="number" min="0" step="any" /></label>
+          </div>
+        </div>
+      </section>
+      <section class="tier-fields">
+        <h3 data-i18n="ui.flex">Flex</h3>
+        <p class="muted small" id="price-service-flex-preview"></p>
+        <label class="switch-field"><input id="price-service-flex-enabled" type="checkbox" /><span data-i18n="ui.service_price_override">Set explicit service tier prices</span></label>
+        <div id="price-service-flex-fields" class="hidden">
+          <div class="price-fields">
+            <label class="field"><span data-i18n="ui.input_1m_tokens">Input / 1M tokens</span><input id="price-service-flex-in" type="number" min="0" step="any" required /></label>
+            <label class="field"><span data-i18n="ui.output_1m_tokens">Output / 1M tokens</span><input id="price-service-flex-out" type="number" min="0" step="any" required /></label>
+            <label class="field"><span data-i18n="ui.cache_read_1m_tokens">Cache read / 1M tokens</span><input id="price-service-flex-cr" type="number" min="0" step="any" /></label>
+            <label class="field"><span data-i18n="ui.cache_write_1m_tokens">Cache write / 1M tokens</span><input id="price-service-flex-cw" type="number" min="0" step="any" /></label>
+          </div>
+          <label class="switch-field"><input id="price-service-flex-tiered" type="checkbox" /><span data-i18n="ui.enable_long_context_tiered_pricing">Enable long-context tiered pricing</span></label>
+          <div class="price-fields hidden" id="price-service-flex-long-fields">
+            <label class="field"><span data-i18n="ui.long_context_threshold_input_tokens">Long-context threshold (input tokens)</span><input id="price-service-flex-threshold" type="number" min="1" step="1" required value="272000" /></label>
+            <span></span>
+            <label class="field"><span data-i18n="ui.input_1m_tokens">Input / 1M tokens</span><input id="price-service-flex-long-in" type="number" min="0" step="any" required /></label>
+            <label class="field"><span data-i18n="ui.output_1m_tokens">Output / 1M tokens</span><input id="price-service-flex-long-out" type="number" min="0" step="any" required /></label>
+            <label class="field"><span data-i18n="ui.cache_read_1m_tokens">Cache read / 1M tokens</span><input id="price-service-flex-long-cr" type="number" min="0" step="any" /></label>
+            <label class="field"><span data-i18n="ui.cache_write_1m_tokens">Cache write / 1M tokens</span><input id="price-service-flex-long-cw" type="number" min="0" step="any" /></label>
+          </div>
+        </div>
+      </section>
       <div class="row dialog-actions"> <button id="price-cancel" data-i18n="ui.cancel">Cancel</button> <button id="price-save" class="primary" data-i18n="ui.save">Save</button> </div>
     </dialog>
 
@@ -2893,7 +2940,17 @@
           "billing_multiplier",
           "service_tier_multiplier",
           "multiplier",
-          "total_usd"
+          "total_usd",
+          "billed_service_tier",
+          "tier_source",
+          "pricing_method",
+          "pricing_rule_version",
+          "tier_fallback",
+          "price_fallback",
+          "applied_input_per_1m",
+          "applied_output_per_1m",
+          "applied_cache_read_per_1m",
+          "applied_cache_write_per_1m"
         ],
         errors: ["at", "preview", "label", "billing_model", "upstream_model", "source", "status_code", "error_type", "body"]
       };
@@ -4786,7 +4843,10 @@
           el("b", { class: "mono account-model-name", title: model }, model),
           price
             ? el("div", { class: "account-model-price-list" }, priceRows.map(priceRow))
-            : el("span", { class: "muted small", text: m("ui.no_price_configured_currently_unavailable") })
+            : el("span", { class: "muted small", text: m("ui.no_price_configured_currently_unavailable") }),
+          ...(price
+            ? ["priority", "flex"].map((tier) => el("div", { class: "muted small" }, tier + ": " + servicePricePreview(price, tier)))
+            : [])
         );
       }
 
@@ -7184,6 +7244,7 @@
               "td",
               { class: "mono" },
               row.model_id,
+              ...["priority", "flex"].map((tier) => el("div", { class: "muted small" }, tier + ": " + servicePricePreview(row, tier))),
               row.in_models === false ? el("div", { class: "muted small", text: m("ui.not_in_the_cpa_model_list") }) : null,
               row.custom_price_model_id && row.custom_price_model_id !== row.model_id
                 ? el("div", { class: "muted small", text: m("ui.using_the_custom_price_for_value", { v0: row.custom_price_model_id }) })
@@ -7252,6 +7313,35 @@
         return cost.long_context ? m("ui.long_context_value", { v0: threshold }) : m("ui.standard_context_value", { v0: threshold });
       }
 
+      function pricingReasonText(pricing) {
+        return [pricing.tier_fallback, pricing.price_fallback].filter(Boolean).map((reason) => m("ui.pricing_reason_" + reason))
+          .join(" · ");
+      }
+
+      function costPricingRows(cost) {
+        const summary = (label, value) => el("div", { class: "cost-tooltip-summary" }, el("span", {}, label), el("b", {}, value));
+        const rows = [];
+        if (typeof cost.billing_multiplier === "number")
+          rows.push(summary(m("ui.global_billing_multiplier"), multiplierText(costMultipliers(cost).billing)));
+        const pricing = cost.pricing;
+        if (pricing?.service_tier) {
+          rows.push(summary(m("ui.billed_service_tier"), pricing.service_tier));
+          rows.push(summary(m("ui.tier_basis"), m("ui.tier_source_" + pricing.tier_source)));
+          rows.push(summary(m("ui.pricing_method"), m("ui.pricing_method_" + pricing.method)));
+          if (pricing.method === "oauth_multiplier") {
+            rows.push(summary(m("ui.service_tier_multiplier"), multiplierText(costMultipliers(cost).serviceTier)));
+            rows.push(summary(m("ui.effective_billing_multiplier"), multiplierText(costMultipliers(cost).total)));
+          }
+          const reason = pricingReasonText(pricing);
+          if (reason) rows.push(el("div", { class: "cost-tooltip-summary tag warn", text: reason }));
+        } else {
+          if (typeof cost.billing_multiplier === "number")
+            rows.push(summary(m("ui.service_tier_multiplier"), multiplierText(costMultipliers(cost).serviceTier)));
+          rows.push(summary(m("ui.effective_billing_multiplier"), multiplierText(costMultipliers(cost).total)));
+        }
+        return rows;
+      }
+
       function showCostTooltip(anchor, cost, hasCacheWrite) {
         const tooltip = $("cost-tooltip");
         const rows = [
@@ -7265,28 +7355,7 @@
           ...(cost.tiered
             ? [el("div", { class: "cost-tooltip-summary" }, el("span", {}, m("ui.tier")), el("b", {}, costTierText(cost)))]
             : []),
-          ...(typeof cost.billing_multiplier === "number"
-            ? [
-                el(
-                  "div",
-                  { class: "cost-tooltip-summary" },
-                  el("span", {}, m("ui.global_billing_multiplier")),
-                  el("b", {}, multiplierText(costMultipliers(cost).billing))
-                ),
-                el(
-                  "div",
-                  { class: "cost-tooltip-summary" },
-                  el("span", {}, m("ui.service_tier_multiplier")),
-                  el("b", {}, multiplierText(costMultipliers(cost).serviceTier))
-                )
-              ]
-            : []),
-          el(
-            "div",
-            { class: "cost-tooltip-summary" },
-            el("span", {}, m("ui.effective_billing_multiplier")),
-            el("b", {}, multiplierText(costMultipliers(cost).total))
-          ),
+          ...costPricingRows(cost),
           el("div", { class: "cost-tooltip-summary" }, m("ui.the_prices_and_amounts_below_include_the_multiplier")),
           el(
             "div",
@@ -7316,7 +7385,7 @@
         let top = anchorRect.top;
         const rect = tooltip.getBoundingClientRect();
         if (left + rect.width > innerWidth - margin) left = anchorRect.left - rect.width - gap;
-        if (left < margin) left = Math.max(margin, innerWidth - rect.width - margin);
+        left = Math.max(margin, Math.min(left, innerWidth - rect.width - margin));
         if (top + rect.height > innerHeight - margin) top = innerHeight - rect.height - margin;
         tooltip.style.left = Math.round(left) + "px";
         tooltip.style.top = Math.round(Math.max(margin, top)) + "px";
@@ -7978,6 +8047,12 @@
               ? {
                   ...entry,
                   ...entry.cost,
+                  billed_service_tier: entry.cost.pricing?.service_tier,
+                  tier_source: entry.cost.pricing?.tier_source,
+                  pricing_method: entry.cost.pricing?.method,
+                  pricing_rule_version: entry.cost.pricing?.rule_version,
+                  tier_fallback: entry.cost.pricing?.tier_fallback,
+                  price_fallback: entry.cost.pricing?.price_fallback,
                   billing_multiplier: typeof entry.cost.billing_multiplier === "number" ? costMultipliers(entry.cost).billing : null,
                   service_tier_multiplier:
                     typeof entry.cost.service_tier_multiplier === "number" ? costMultipliers(entry.cost).serviceTier : null,
@@ -8920,7 +8995,7 @@
         return value;
       }
 
-      function fillPriceFields(row) {
+      function fillPriceFields(row, includeServiceTiers = true) {
         $("price-in").value = row.input_per_1m ?? 0;
         $("price-out").value = row.output_per_1m ?? 0;
         $("price-cr").value = row.cache_read_per_1m ?? "";
@@ -8933,6 +9008,69 @@
         $("price-tier-cr").value = tier?.cache_read_per_1m ?? "";
         $("price-tier-cw").value = tier?.cache_write_per_1m ?? "";
         syncPriceTierFields();
+        if (includeServiceTiers) fillServicePriceFields(row);
+      }
+
+      function servicePricePreview(row, tier) {
+        const view = row.service_tier_prices?.[tier];
+        if (!view) return m("ui.service_price_default_note");
+        const label = m("ui.pricing_method_" + view.method);
+        const prices = view.price ? referencePriceText(view.price) : "";
+        const limit = view.max_input_tokens ? " · " + m("ui.service_price_limit", { v0: int(view.max_input_tokens) }) : "";
+        const cacheWarning = view.unverified_cache?.length
+          ? " · " + m("ui.service_price_unverified_cache", { v0: view.unverified_cache.map((kind) => m("ui." + kind)).join(" / ") })
+          : "";
+        return label + DISPLAY_SEPARATOR + prices + limit + cacheWarning;
+      }
+
+      function fillServicePriceFields(row) {
+        for (const tier of ["priority", "flex"]) {
+          const prefix = "price-service-" + tier;
+          const card = row.service_tiers?.[tier];
+          $(prefix + "-enabled").checked = !!card;
+          setText($(prefix + "-preview"), servicePricePreview(row, tier));
+          for (const [suffix, field] of [
+            ["in", "input_per_1m"],
+            ["out", "output_per_1m"],
+            ["cr", "cache_read_per_1m"],
+            ["cw", "cache_write_per_1m"]
+          ]) {
+            $(prefix + "-" + suffix).value = card?.[field] ?? "";
+            $(prefix + "-long-" + suffix).value = card?.long_context?.[field] ?? "";
+          }
+          $(prefix + "-tiered").checked = !!card?.long_context;
+          $(prefix + "-threshold").value = card?.long_context?.threshold_input_tokens ?? 272000;
+          syncServicePriceFields(tier);
+        }
+      }
+
+      function syncServicePriceFields(tier) {
+        const prefix = "price-service-" + tier;
+        $(prefix + "-fields").classList.toggle("hidden", !$(prefix + "-enabled").checked);
+        $(prefix + "-long-fields").classList.toggle("hidden", !$(prefix + "-tiered").checked);
+      }
+
+      function readServicePriceFields() {
+        const cards = {};
+        for (const tier of ["priority", "flex"]) {
+          const prefix = "price-service-" + tier;
+          if (!$(prefix + "-enabled").checked) continue;
+          const rates = (part) => ({
+            input_per_1m: priceNumber(prefix + part + "in"),
+            output_per_1m: priceNumber(prefix + part + "out"),
+            cache_read_per_1m: priceNumber(prefix + part + "cr", null),
+            cache_write_per_1m: priceNumber(prefix + part + "cw", null)
+          });
+          const card = rates("-");
+          if ($(prefix + "-tiered").checked) {
+            const threshold = priceNumber(prefix + "-threshold");
+            if (!Number.isSafeInteger(threshold) || threshold <= 0)
+              throw new UIError(m("ui.the_long_context_threshold_must_be_a_valid_positive_integer"));
+            card.long_context = { threshold_input_tokens: threshold, ...rates("-long-") };
+          }
+          cards[tier] = card;
+        }
+        return cards;
       }
 
       function referencePriceText(row) {
@@ -8972,7 +9110,7 @@
                 class: "price-reference-option",
                 type: "button",
                 onclick: (event) => {
-                  fillPriceFields(row);
+                  fillPriceFields(row, false);
                   for (const option of results.querySelectorAll(".price-reference-option")) option.classList.remove("selected");
                   event.currentTarget.classList.add("selected");
                 }
@@ -9580,6 +9718,10 @@
         }, 180);
       });
       $("price-tiered").addEventListener("change", syncPriceTierFields);
+      for (const tier of ["priority", "flex"]) {
+        for (const suffix of ["enabled", "tiered"])
+          $("price-service-" + tier + "-" + suffix).addEventListener("change", () => syncServicePriceFields(tier));
+      }
       $("price-dialog").addEventListener("close", () => {
         clearTimeout(priceReferenceTimer);
         priceReferenceTimer = 0;
@@ -9618,6 +9760,7 @@
               cache_write_per_1m: priceNumber("price-tier-cw", null)
             };
           }
+          price.service_tiers = readServicePriceFields();
           await mutateAdmin("PUT", "/prices", price);
           notify(m("ui.saved_pricing_for_value", { v0: model }));
         });

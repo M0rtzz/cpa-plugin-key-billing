@@ -87,16 +87,22 @@ plugins:
       enabled: true
       debug: false # 是否记录 debug 日志，例如路由日志、匹配参考价日志
       billing_multiplier: 1 # 全局计费倍率，默认 1；例如 0.2 表示按基础费用的 20% 计费
-      codex_fast_mode_billing: true # 默认开启，符合条件的 Codex OAuth priority 请求再乘 2.5
+      codex_fast_mode_billing: true # 默认开启，Codex OAuth Priority：GPT-5.6/GPT-6 系列 2×，其他模型 2.5×
       mask_api_key_view_emails: false # 对 API Key 查询页面返回的邮箱进行掩码脱敏
       allow_api_key_quota_reset: false # 允许 API Key 用户重置可访问的 Codex 认证文件额度，消耗上游重置次数
       state_file: "plugins/cpa-key-billing-state-v1.db"
       account_api_base_url: "http://127.0.0.1:18316" # 普通用户鉴权地址，端口改为当前 CPA 监听端口
 ```
 
-管理员可在管理中心「插件管理 → CPA Key Billing → 配置」修改倍率。`billing_multiplier` 必须是有限正数，默认 `1`。`codex_fast_mode_billing` 默认开启；符合条件的 Codex OAuth `service_tier=priority` 请求额外乘以 **2.5**，显式设为 `false` 可关闭。
+管理员可在管理中心「插件管理 → CPA Key Billing → 配置」修改倍率。`billing_multiplier` 必须是有限正数，默认 `1`。`codex_fast_mode_billing` 默认开启；Codex OAuth Priority/Fast 请求中，GPT-5.6 和 GPT-6 系列额外乘以 **2**，其他模型乘以 **2.5**，显式设为 `false` 可关闭 Priority 加价。此为本站对下游用户的计费政策。优先采用上游响应档位和模型；Priority 降为 Default 时按 **1×**，缺少响应档位时按请求估算并记录原因。
 
-例如全局倍率为 `0.2` 时，普通请求按 **0.2 倍**、Fast 请求按 **0.5 倍**计费。费用统计和金额配额扣除使用同一金额，Token 与请求次数配额保持原值。每条账单保存当时的倍率；后续修改配置只影响新入账请求。用户页面和 CSV 展示已计费金额，不会再次乘倍率。
+上游 API Key 请求优先采用宿主 `ResponseServiceTier`：`priority`/`fast` 选择模型 Priority 单价，`flex` 默认半价，`default` 按标准价。缺少响应档位时按请求档位估算；Priority 缺价时按基础价估算，账单与 CSV 均标记原因。管理员可在模型定价中设置 Priority/Flex 独立单价；未设置 Priority 时按已核实的官方分项价比调整当前基础价。Flex 不受 Codex Fast 开关影响。
+
+兼容性：当前服务器 CLIProxyAPI v7.3.17 已通过插件用量接口传递 `ResponseServiceTier` 和 `ResponseModel`。字段仍可能因上游未提供而缺失；v7.3.8 等旧版本未传递响应档位。此时按请求档位估算，标记 `missing_response_tier`，无法识别实际降级。
+
+例如 GPT-6 Sol 全局倍率为 `0.2` 时，普通请求按 **0.2 倍**、默认 Flex 按 **0.1 倍**、API Priority 按 **0.4 倍**计费；Codex OAuth Priority 也按 **0.4 倍**。新 API 账单的档位调整已进入实际单价，额外档位倍率为 `1`，不能据此判断它与标准档同价。费用统计和金额配额使用同一入账金额，Token 与请求次数保持原值；配置变化不会重算历史账单。
+
+已核对的 v7.3.17 插件接口提供响应档位和响应模型，升级后 API 计费优先使用这些字段；上游未提供档位时仍标记估算。
 
 历史金额换算必须显式运行离线维护工具。数据库结构升级不会自动重算旧账单；操作步骤、事务与重复执行保护见 [倍率与历史账单换算](docs/billing-multiplier.md)。
 

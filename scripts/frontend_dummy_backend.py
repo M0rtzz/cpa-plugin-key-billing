@@ -726,6 +726,7 @@ def event_sample(
     failed=False,
     multiplier=1,
     billing_multiplier=0.2,
+    pricing=None,
 ):
     uncached, cache_read, cache_write, output = tokens
     if failed:
@@ -746,7 +747,7 @@ def event_sample(
         "ttft_ms": ttft_ms,
         "accounting_quality": "" if failed else "complete",
         "price_source": "custom",
-        "cost": make_cost(
+        "cost": dict(make_cost(
             uncached,
             cache_read,
             cache_write,
@@ -756,7 +757,7 @@ def event_sample(
             long_context,
             multiplier if not failed else 1,
             billing_multiplier,
-        ),
+        ), **({"pricing": pricing} if pricing is not None else {})),
         "reasoning_tokens": 0 if failed else reasoning_tokens,
     }
 
@@ -764,7 +765,13 @@ def event_sample(
 # Numeric usage and timing values are sampled from a real export. All identities
 # below are synthetic and intentionally unrelated to the source records.
 SUCCESS_EVENT_SAMPLES = [
-    event_sample(0, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "high", "priority", 11513, 8209, 266, (712, 91648, 4096, 425), (4, 0.4, 5, 20), multiplier=2.5, response_tier="priority"),
+    event_sample(0, "openai · sk-dum…0001", "openai", "gpt-6-sol", "OpenAICompatExecutor", "medium", "auto", 1200, 300, 50, (1000, 400, 0, 200), (4, 0.4, 5, 20), response_tier="priority", pricing={"service_tier":"priority","tier_source":"response","method":"model_ratio","rule_version":"openai-2026-09-25"}),
+    event_sample(0, "openai · sk-dum…0001", "openai", "gpt-6-sol", "OpenAICompatExecutor", "medium", "flex", 1200, 300, 50, (1000, 400, 0, 200), (1, 0.1, 1.25, 5), response_tier="flex", pricing={"service_tier":"flex","tier_source":"response","method":"model_ratio","rule_version":"flex-0.5-v1"}),
+    event_sample(0, "openai · sk-dum…0001", "openai", "gpt-6-sol", "OpenAICompatExecutor", "medium", "priority", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), response_tier="default", pricing={"service_tier":"default","tier_source":"response","method":"base"}),
+    event_sample(0, "openai · sk-dum…0001", "openai", "demo-unknown", "OpenAICompatExecutor", "medium", "priority", 1200, 300, 50, (1000, 400, 0, 200), (2, 0.2, 2.5, 10), pricing={"service_tier":"priority","tier_source":"request","method":"base_fallback","tier_fallback":"missing_response_tier","price_fallback":"missing_priority_price"}),
+    event_sample(0, "codex · flex-demo@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "medium", "flex", 12000, 3000, 20, (600, 400, 100, 100), (4, 0.4, 5, 20), multiplier=0.5, response_tier="flex", pricing={"service_tier":"flex","tier_source":"response","method":"oauth_multiplier","rule_version":"codex-oauth-family-v1"}),
+    event_sample(0, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexExecutor", "high", "priority", 11513, 8209, 266, (712, 91648, 4096, 425), (4, 0.4, 5, 20), multiplier=2, response_tier="priority", pricing={"service_tier":"priority","tier_source":"response","method":"oauth_multiplier","rule_version":"codex-oauth-family-v1"}),
+    event_sample(0, "codex · unknown-tier@example.com", "codex", "gpt-6-astra", "CodexExecutor", "medium", "fast", 1200, 300, 50, (1000, 400, 0, 200), (10, 1, 12.5, 50), multiplier=2, response_tier="future", pricing={"service_tier":"priority","tier_source":"request","method":"oauth_multiplier","rule_version":"codex-oauth-family-v2","tier_fallback":"unknown_response_tier_request_fallback"}),
     event_sample(5, "codex · dev-team@example.com", "codex", "codex-auto-review", "CodexWebsocketsExecutor", "low", "auto", 2516, 1431, 10, (1030, 49920, 0, 75), (0.2, 0.02, 0.25, 1.2), response_model="gpt-5.6-luna", response_tier="default"),
     event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.5", "CodexWebsocketsExecutor", "medium", "auto", 2417, 1103, 0, (1194, 95616, 0, 73), (5, 0.5, 5, 30), billing_multiplier=1),
     event_sample(1, "codex · dev-team@example.com", "codex", "gpt-5.6-sol", "CodexWebsocketsExecutor", "high", "priority", 5306, 2121, 21, (798, 169984, 0, 201), (4, 0.4, 5, 20), billing_multiplier=1, multiplier=2.5, response_tier="priority"),
@@ -1346,8 +1353,29 @@ def model_prices(query, include_custom):
     models = set(query.get("model", []))
     rows = {row["model_id"]: row for row in PRICES}
     names = models | ({row["model_id"] for row in PRICES if row["source"] == "custom"} if include_custom else set())
-    return [dict(rows.get(model, {"model_id": model, "source": "none", "input_per_1m": 0, "output_per_1m": 0}),
-                 in_models=model in models) for model in sorted(names)]
+    result = []
+    for model in sorted(names):
+        row = dict(rows.get(model, {"model_id": model, "source": "none", "input_per_1m": 0, "output_per_1m": 0}), in_models=model in models)
+        views = {}
+        for tier in ("priority", "flex"):
+            custom = row.get("service_tiers", {}).get(tier)
+            known = model.split("/")[-1] in {"gpt-6-sol", "gpt-5.6-sol", "gpt-5.5", "gpt-4o"}
+            ratio = 0.5 if tier == "flex" else (2.5 if model.endswith("gpt-5.5") else 1.7 if model.endswith("gpt-4o") else 2)
+            fallback = tier == "priority" and not known and custom is None
+            if custom is not None:
+                price = dict(custom)
+                for key in ("cache_read_per_1m", "cache_write_per_1m"):
+                    if price.get(key) is None:
+                        price[key] = price["input_per_1m"]
+            else:
+                price = {key: (row.get(key) if row.get(key) is not None else row.get("input_per_1m", 0)) * (1 if fallback else ratio)
+                         for key in ("input_per_1m", "output_per_1m", "cache_read_per_1m", "cache_write_per_1m")}
+            views[tier] = {"price": price, "method": "explicit_tier" if custom is not None else "base_fallback" if fallback else "model_ratio"}
+            if fallback:
+                views[tier]["price_fallback"] = "missing_priority_price"
+        row["service_tier_prices"] = views
+        result.append(row)
+    return result
 
 
 def credential_labels(refs):

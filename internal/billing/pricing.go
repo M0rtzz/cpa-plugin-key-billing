@@ -70,15 +70,17 @@ const (
 // PriceRates describes token prices in USD per million tokens. Nil cache rates
 // inherit the input rate; configured cache rates are used as supplied.
 type PriceRates struct {
-	InputPer1M      float64           `json:"input_per_1m"`
-	OutputPer1M     float64           `json:"output_per_1m"`
-	CacheReadPer1M  *float64          `json:"cache_read_per_1m,omitempty"`
-	CacheWritePer1M *float64          `json:"cache_write_per_1m,omitempty"`
-	LongContext     *LongContextPrice `json:"long_context,omitempty"`
+	ServiceTiers    map[string]TierPriceRates `json:"service_tiers,omitempty"`
+	InputPer1M      float64                   `json:"input_per_1m"`
+	OutputPer1M     float64                   `json:"output_per_1m"`
+	CacheReadPer1M  *float64                  `json:"cache_read_per_1m,omitempty"`
+	CacheWritePer1M *float64                  `json:"cache_write_per_1m,omitempty"`
+	LongContext     *LongContextPrice         `json:"long_context,omitempty"`
 }
 
 // Rates are USD per 1,000,000 tokens.
 type Price struct {
+	ServiceTiers    map[string]TierPriceRates `json:"service_tiers,omitempty"`
 	InputPer1M      float64                   `json:"input_per_1m"`
 	OutputPer1M     float64                   `json:"output_per_1m"`
 	CacheReadPer1M  float64                   `json:"cache_read_per_1m"`
@@ -97,6 +99,7 @@ type ResolvedLongContextPrice struct {
 
 func (r PriceRates) resolve(source PriceSource) Price {
 	price := Price{
+		ServiceTiers:    cloneServiceTiers(r.ServiceTiers),
 		InputPer1M:      r.InputPer1M,
 		OutputPer1M:     r.OutputPer1M,
 		CacheReadPer1M:  r.InputPer1M,
@@ -128,9 +131,14 @@ func (r PriceRates) resolve(source PriceSource) Price {
 	return price
 }
 
-const CodexFastModeMultiplier = 2.5
+const (
+	// Retained for other OAuth models and normalization of historical bills.
+	CodexFastModeMultiplier = 2.5
+	FlexModeMultiplier      = 0.5
+)
 
 type Cost struct {
+	Pricing PricingMetadata `json:"pricing,omitzero"`
 	// Multiplier is the product of BillingMultiplier and ServiceTierMultiplier.
 	// Applied rates and amounts already include it; token counts do not. Legacy
 	// records with omitted component fields are normalized when loaded.
@@ -230,6 +238,15 @@ func perMillion(tokens int64, pricePer1M float64) float64 {
 }
 
 func samePriceRates(a, b PriceRates) bool {
+	if len(a.ServiceTiers) != len(b.ServiceTiers) {
+		return false
+	}
+	for key, tier := range a.ServiceTiers {
+		other, ok := b.ServiceTiers[key]
+		if !ok || !samePriceRates(tier.rates(), other.rates()) {
+			return false
+		}
+	}
 	return a.InputPer1M == b.InputPer1M &&
 		a.OutputPer1M == b.OutputPer1M &&
 		sameOptionalPrice(a.CacheReadPer1M, b.CacheReadPer1M) &&
@@ -255,6 +272,18 @@ func sameOptionalPrice(a, b *float64) bool {
 }
 
 func (r PriceRates) validate(modelID string) error {
+	for name, tier := range r.ServiceTiers {
+		if name != "priority" && name != "flex" {
+			return invalidf("Model %q: unsupported service tier %q", modelID, name)
+		}
+		if tier.InputPer1M == nil || tier.OutputPer1M == nil {
+			return invalidf("Model %q: %s input and output prices are required", modelID, name)
+		}
+		if err := tier.rates().validate(modelID + " " + name); err != nil {
+			return err
+		}
+	}
+
 	if invalidPrice(r.InputPer1M) || invalidPrice(r.OutputPer1M) {
 		return invalidf("Model %q: token rates must be finite non-negative numbers", modelID)
 	}

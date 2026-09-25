@@ -16,7 +16,8 @@ type CustomPrice struct {
 }
 
 type PriceRow struct {
-	ModelID string `json:"model_id"`
+	ServiceTierPrices map[string]ServiceTierPriceView `json:"service_tier_prices,omitempty"`
+	ModelID           string                          `json:"model_id"`
 	PriceRates
 	Source             PriceSource `json:"source"`
 	InModels           bool        `json:"in_models"`
@@ -65,6 +66,7 @@ func (s *Store) ModelPriceRows(models []string, includeCustom bool) ([]PriceRow,
 		billingModel := pricingState.ResolveBillingModel(name, name)
 		if price, found := custom[NormalizeModelID(billingModel)]; found {
 			row.PriceRates = price.PriceRates
+			row.ServiceTiers = cloneServiceTiers(price.ServiceTiers)
 			row.Source = PriceSourceCustom
 			row.CustomPriceModelID = price.ModelID
 		} else if rates, found := resolveBuiltinRates(billingModel); found {
@@ -84,6 +86,9 @@ func (s *Store) ModelPriceRows(models []string, includeCustom bool) ([]PriceRow,
 			rows[i].PriceRates = *price.PriceRates
 			rows[i].Source = PriceSourceReference
 		}
+	}
+	for i := range rows {
+		rows[i].ServiceTierPrices = serviceTierPriceViews(rows[i].ModelID, rows[i].PriceRates, rows[i].Source)
 	}
 	return rows, nil
 }
@@ -111,13 +116,19 @@ func (s *Store) UpsertPrice(price CustomPrice) (CustomPrice, error) {
 	if existing, found := s.state.Prices[key]; found {
 		// Preserve the stored spelling when updating the same model.
 		price.ModelID = existing.ModelID
+		if price.ServiceTiers == nil {
+			price.ServiceTiers = existing.ServiceTiers
+		}
 	}
+	price.ServiceTiers = cloneServiceTiers(price.ServiceTiers)
 	if s.repo != nil {
 		if err := s.repo.UpsertPrice(price); err != nil {
 			return CustomPrice{}, err
 		}
 	}
-	s.state.Prices[key] = price
+	stored := price
+	stored.ServiceTiers = cloneServiceTiers(price.ServiceTiers)
+	s.state.Prices[key] = stored
 	return price, nil
 }
 
