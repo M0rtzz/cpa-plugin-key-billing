@@ -69,7 +69,7 @@ func (s *Store) recordUsage(event UsageEvent, failure *RequestError) {
 	if apiTier {
 		price, pricing = resolveAPIServicePrice(price, billingModel, event)
 	} else if oauthTier {
-		pricing = effectiveOAuthServiceTier(event, billingModel)
+		pricing = effectiveOAuthServiceTier(event)
 		pricing.Method, pricing.RuleVersion = "oauth_multiplier", codexOAuthRuleVersion
 		if price.Source == PriceSourceNone {
 			pricing.PriceFallback = "missing_base_price"

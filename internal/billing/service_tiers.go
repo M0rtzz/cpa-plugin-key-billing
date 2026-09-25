@@ -120,15 +120,14 @@ func effectiveServiceTier(event UsageEvent) PricingMetadata {
 	return meta
 }
 
-const codexOAuthRuleVersion = "codex-oauth-family-v7"
+const codexOAuthRuleVersion = "codex-oauth-family-v8"
 
-func effectiveOAuthServiceTier(event UsageEvent, billingModel string) PricingMetadata {
+func effectiveOAuthServiceTier(event UsageEvent) PricingMetadata {
 	// Codex OAuth's terminal tier does not reliably reflect Fast routing:
 	// https://github.com/openai/codex/issues/14204#issuecomment-4033184620
-	// Bill explicit Fast requests for these families under the operator's 2x
-	// policy. Keep the raw response tier on the event for independent inspection.
-	if normalizedServiceTier(event.ServiceTier) == "priority" &&
-		codexPriorityMultiplier(event, billingModel) == 2 {
+	// Resolve explicit Fast requests consistently across model families; the
+	// family's multiplier is applied separately. Preserve the raw response tier.
+	if normalizedServiceTier(event.ServiceTier) == "priority" {
 		// Only these explicit response values confirm a cheaper tier under the
 		// operator's policy. Keep default distinct from standard: Codex can echo
 		// default even for Fast turns. Auto/unknown/missing retain the request.

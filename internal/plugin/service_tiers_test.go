@@ -113,12 +113,18 @@ func TestUsageHandleOAuthTiersPersistWithoutRepricing(t *testing.T) {
 		{"gpt-5.6-sol", "flex", "standard", "response", "", 1},
 		{"gpt-5.5", "flex", "default", "response", "", 1},
 		{"gpt-6-sol", "auto", "default", "response", "", 1},
-		{"gpt-5.5", "priority", "priority", "response", "", 2.5},
+		{"gpt-5.5", "priority", "priority", "request_policy", "", 2.5},
+		{"gpt-5.5", "priority", "default", "request_policy", "", 2.5},
+		{"gpt-5.5", "fast", "auto", "request_policy", "", 2.5},
+		{"gpt-5.5", "fast", "", "request_policy", "", 2.5},
+		{"gpt-5.5", "priority", "standard", "response", "", 1},
+		{"gpt-5.5", "priority", "flex", "response", "", .5},
+		{"gpt-5.5", "auto", "default", "response", "", 1},
 		{"gpt-6-sol", "priority", "", "request_policy", "", 2},
 		{"gpt-6-sol", "auto", "", "default", "missing_response_tier", 1},
 		{"gpt-6-sol", "priority", "future", "request_policy", "", 2},
 		{"gpt-5.6-sol", "fast", "future", "request_policy", "", 2},
-		{"gpt-5.5", "priority", "future", "response", "unknown_response_tier", 1},
+		{"gpt-5.5", "priority", "future", "request_policy", "", 2.5},
 	} {
 		publishUsageRecord(t, app, UsageRecord{
 			Provider: "codex", ExecutorType: "CodexExecutor", AuthType: "oauth", APIKey: testAPIKey,
@@ -130,7 +136,7 @@ func TestUsageHandleOAuthTiersPersistWithoutRepricing(t *testing.T) {
 		entry := requestEventEntries(t, app)[0]
 		assertCostClose(t, entry.Cost.TotalUSD, .001665*.2*tt.factor)
 		if entry.Cost.ServiceTierMultiplier != tt.factor || entry.Cost.Pricing.Method != "oauth_multiplier" ||
-			entry.Cost.Pricing.RuleVersion != "codex-oauth-family-v7" || entry.Cost.Pricing.TierSource != tt.source || entry.Cost.Pricing.TierFallback != tt.fallback {
+			entry.Cost.Pricing.RuleVersion != "codex-oauth-family-v8" || entry.Cost.Pricing.TierSource != tt.source || entry.Cost.Pricing.TierFallback != tt.fallback {
 			t.Fatal(entry.Cost)
 		}
 		if entry.ServiceTier != tt.request || entry.ResponseServiceTier != tt.response {

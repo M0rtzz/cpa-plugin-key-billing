@@ -670,7 +670,7 @@
   "ui.codex_fast_billing_enabled": "Codex OAuth Priority: GPT-5.6 / GPT-6 families 2×; other models 2.5×",
   "ui.codex_fast_billing_disabled": "Codex OAuth Priority: surcharge disabled",
   "ui.codex_flex_response_note": "Codex OAuth uses 0.5× only when the response confirms Flex. Requesting Flex alone does not grant a discount; missing or unknown responses use a standard-tier estimate. Codex API keys also require response confirmation before selecting Flex prices.",
-  "ui.codex_fast_request_policy_note": "When Fast billing is enabled, GPT-5.6 / GPT-6 Priority/Fast requests use 2× for auto/default, unknown or missing responses. Explicit standard responses use 1×; flex responses use 0.5×.",
+  "ui.codex_fast_request_policy_note": "When Fast billing is enabled, Codex OAuth Priority/Fast requests use the model’s 2× or 2.5× rate for auto/default, unknown or missing responses. Explicit standard responses use 1×; flex responses use 0.5×.",
   "ui.billing_policy_history_note": "API keys use response-tier prices; missing information is marked as estimated. Flex defaults to 0.5× and supports custom tier prices. Amounts already include selected prices and the global multiplier. Historical bills and monetary quota consumption retain recorded amounts.",
   "ui.billing_multiplier_settings_location": "Administrators can change billing_multiplier in Plugin management → CPA Key Billing → Configuration.",
   "ui.service_price_override": "Set explicit service tier prices",

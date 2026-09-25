@@ -43,7 +43,17 @@ func TestOAuthModelTierBillingAndQuota(t *testing.T) {
 		{name: "flex downgrade with zero usage", responseModel: "gpt-6-sol", request: "priority", response: "flex", failed: true, zero: true, want: .5},
 		{name: "auto request returned default", responseModel: "gpt-6-sol", request: "auto", response: "default", want: 1},
 		{name: "default request returned default", responseModel: "gpt-5.6-sol", request: "default", response: "default", want: 1},
-		{name: "legacy model retains response policy", responseModel: "gpt-5.5", request: "priority", response: "default", want: 1},
+		{name: "5.5 requested priority returned default", responseModel: "gpt-5.5", request: "priority", response: "default", want: 2.5},
+		{name: "5.5 normalized fast returned auto", responseModel: " Vendor/GPT-5.5(high) ", request: " FAST ", response: " AUTO ", want: 2.5},
+		{name: "5.5 snapshot missing response", responseModel: "gpt-5.5-2026-04-23", request: "fast", want: 2.5},
+		{name: "5.5 explicit standard downgrade", responseModel: "gpt-5.5", request: "priority", response: "standard", want: 1},
+		{name: "5.5 explicit flex downgrade", responseModel: "gpt-5.5", request: "fast", response: "flex", want: .5},
+		{name: "5.5 request policy disabled", responseModel: "gpt-5.5", request: "priority", response: "default", disabled: true, want: 1},
+		{name: "5.5 request policy long context", responseModel: "gpt-5.5", request: "priority", response: "default", longContext: true, want: 2.5},
+		{name: "5.5 request policy failed usage", responseModel: "gpt-5.5", request: "priority", response: "default", failed: true, want: 2.5},
+		{name: "5.5 request policy zero usage", responseModel: "gpt-5.5", request: "priority", response: "default", failed: true, zero: true, want: 2.5},
+		{name: "5.5 auto request remains standard", responseModel: "gpt-5.5", request: "auto", response: "default", want: 1},
+		{name: "5.4 retains family rate", responseModel: "gpt-5.4", request: "priority", response: "default", want: 2.5},
 		{name: "upgrade", responseModel: "gpt-6-sol", request: "auto", response: "priority", want: 2},
 		{name: "unknown response", responseModel: "gpt-6-sol", request: "priority", response: "future", want: 2},
 		{name: "unknown response 5.6 fast", responseModel: " Vendor/GPT-5.6-SOL(high) ", request: " FAST ", response: " FUTURE ", want: 2},
@@ -53,8 +63,8 @@ func TestOAuthModelTierBillingAndQuota(t *testing.T) {
 		{name: "request policy long context", responseModel: "gpt-6-sol", request: "priority", response: "default", longContext: true, want: 2},
 		{name: "request policy failure", responseModel: "gpt-6-sol", request: "priority", response: "auto", failed: true, want: 2},
 		{name: "request policy zero usage", responseModel: "gpt-6-sol", request: "priority", response: "default", failed: true, zero: true, want: 2},
-		{name: "unknown response legacy model", responseModel: "gpt-5.5", upstream: "gpt-6-sol", request: "priority", response: "future", fallback: "unknown_response_tier", want: 1},
-		{name: "unknown response similar model", responseModel: "gpt-60", request: "priority", response: "future", fallback: "unknown_response_tier", want: 1},
+		{name: "unknown response legacy model", responseModel: "gpt-5.5", upstream: "gpt-6-sol", request: "priority", response: "future", want: 2.5},
+		{name: "unknown response similar model", responseModel: "gpt-60", request: "priority", response: "future", want: 2.5},
 		{name: "unknown response auto", responseModel: "gpt-6-sol", request: "auto", response: "future", fallback: "unknown_response_tier", want: 1},
 		{name: "unknown response default", responseModel: "gpt-6-sol", request: "default", response: "future", fallback: "unknown_response_tier", want: 1},
 		{name: "unknown response flex", responseModel: "gpt-6-sol", request: "flex", response: "future", fallback: "unknown_response_tier", want: 1},
@@ -135,14 +145,14 @@ func TestOAuthModelTierBillingAndQuota(t *testing.T) {
 			if cost.BillingMultiplier != .2 || cost.ServiceTierMultiplier != tt.want || cost.LongContext != tt.longContext || entry.Failed != tt.failed {
 				t.Fatalf("incorrect accounting: %+v", entry)
 			}
-			if cost.Pricing.Method != "oauth_multiplier" || cost.Pricing.RuleVersion != "codex-oauth-family-v7" || cost.Pricing.TierFallback != tt.fallback {
+			if cost.Pricing.Method != "oauth_multiplier" || cost.Pricing.RuleVersion != "codex-oauth-family-v8" || cost.Pricing.TierFallback != tt.fallback {
 				t.Fatal(cost.Pricing)
 			}
-			if (tt.request == "priority" || strings.EqualFold(strings.TrimSpace(tt.request), "fast")) && (tt.want == 2 || tt.disabled && tt.want == 1) && !strings.EqualFold(strings.TrimSpace(tt.response), "standard") &&
+			response := strings.ToLower(strings.TrimSpace(tt.response))
+			if normalizedServiceTier(tt.request) == "priority" && response != "standard" && response != "flex" &&
 				(cost.Pricing.ServiceTier != "priority" || cost.Pricing.TierSource != "request_policy") {
 				t.Fatal("explicit Fast must identify the request billing policy", cost.Pricing)
 			}
-			response := strings.ToLower(strings.TrimSpace(tt.response))
 			if normalizedServiceTier(tt.request) == "priority" && (response == "standard" || response == "flex") &&
 				(cost.Pricing.ServiceTier != normalizedServiceTier(response) || cost.Pricing.TierSource != "response") {
 				t.Fatal("explicit downgrade must identify the response tier", cost.Pricing)

@@ -14,7 +14,7 @@ plugins:
 
 全局倍率默认 `1`，必须是有限正数。Codex Fast 计费默认开启，显式 `false` 可关闭。Codex OAuth Priority/Fast 按本站策略计费：GPT-5.6/GPT-6 系列乘 `2`，其他模型乘 `2.5`。
 
-GPT-5.6/GPT-6 系列只要宿主上报的请求档位为 `priority` 或 `fast`，响应明确为 `standard` 时按响应计 `1×`，明确为 `flex` 时按响应计 `0.5×`，标注“上游响应”；其他响应（包括 `auto`、`default`、未知或缺失）按请求计 `2×`，标注“请求档位（本站计费规则）”。原始请求和响应档位均保留。这是本站的下游计费规则，不代表已验证上游 Fast 执行状态或额度消耗。[OpenAI Codex 的说明](https://github.com/openai/codex/issues/14204#issuecomment-4033184620)指出，OAuth 模式下的响应 `default` 不能可靠判断 Fast 是否生效。
+Codex OAuth 只要宿主上报的请求档位为 `priority` 或 `fast`，响应明确为 `standard` 时按响应计 `1×`，明确为 `flex` 时按响应计 `0.5×`，标注“上游响应”；其他响应（包括 `auto`、`default`、未知或缺失）按请求和模型计费：GPT-5.6/GPT-6 系列为 `2×`，GPT-5.5 等其他模型为 `2.5×`，标注“请求档位（本站计费规则）”。原始请求和响应档位均保留。这是本站的下游计费规则，不代表已验证上游 Fast 执行状态或额度消耗。[OpenAI Codex 的说明](https://github.com/openai/codex/issues/14204#issuecomment-4033184620)指出，OAuth 模式下的响应 `default` 不能可靠判断 Fast 是否生效。
 
 所有 Codex OAuth 模型仅在宿主上报的响应档位明确为 `flex` 时计 `0.5×`，标注 `tier_source=response`。仅请求 `flex` 不触发折扣：响应 `default` / `standard` 计 `1×`；`auto` / 未知 / 缺失按标准档估算；响应 `priority` / `fast` 则按对应模型的 Priority 倍率与 Fast 开关计费。
 
@@ -58,7 +58,7 @@ API Key 指宿主上报的上游鉴权方式，不是调用代理的下游 Key�
 
 已核实规则来自 [OpenAI 价格表](https://developers.openai.com/api/docs/pricing) 与 [Fast 指南](https://developers.openai.com/api/docs/guides/fast-mode)，版本 `openai-2026-09-25`。包括 GPT-6、GPT-5.6、GPT-5.5、GPT-5.4、GPT-5.2/5.1/5、GPT-4.1/4o、o3/o4-mini 中列出的支持型号；精确名单及上下文限制见 `internal/billing/service_tiers.go`。不对未知型号、未知快照或未核实的长上下文价格外推。此功能不覆盖区域附加费、工具调用费等宿主用量无法完整表达的费用。
 
-新 API 账单的 `cost.pricing` 保存 `service_tier`、`tier_source`、`method`、`rule_version`、`tier_fallback`、`price_fallback`；实际应用单价与金额直接持久化。档位价已计入单价，因此额外 `service_tier_multiplier=1`，`cost.multiplier` 仍是全局倍率与额外档位倍率的乘积，不代表相对标准价的总加价。新 OAuth 账单也保存 `cost.pricing`，其中 `method=oauth_multiplier`、`rule_version=codex-oauth-family-v7`；GPT-5.6/GPT-6 明确请求 Priority/Fast 且响应非 `standard` / `flex` 时，`service_tier=priority`、`tier_source=request_policy`；响应明确降档时保存对应的 `default` / `flex` 计费档位及 `tier_source=response`。两者均不标成响应档位回退估算。响应确认 Flex 时保存 `service_tier=flex`、`tier_source=response`。Codex 请求 Flex 但响应缺失时保存 `service_tier=default`、`tier_source=default`、`tier_fallback=unconfirmed_flex_tier`；未知响应保存 `tier_fallback=unknown_response_tier`。实际档位倍率写入 `service_tier_multiplier`，`multiplier` 是全局倍率与档位倍率的乘积。历史账单保留原金额、倍率、规则版本及估算标记，不补写推测的定价依据。页面和 CSV 直接使用入账金额。
+新 API 账单的 `cost.pricing` 保存 `service_tier`、`tier_source`、`method`、`rule_version`、`tier_fallback`、`price_fallback`；实际应用单价与金额直接持久化。档位价已计入单价，因此额外 `service_tier_multiplier=1`，`cost.multiplier` 仍是全局倍率与额外档位倍率的乘积，不代表相对标准价的总加价。新 OAuth 账单也保存 `cost.pricing`，其中 `method=oauth_multiplier`、`rule_version=codex-oauth-family-v8`；Codex OAuth 明确请求 Priority/Fast 且响应非 `standard` / `flex` 时，`service_tier=priority`、`tier_source=request_policy`；响应明确降档时保存对应的 `default` / `flex` 计费档位及 `tier_source=response`。两者均不标成响应档位回退估算。响应确认 Flex 时保存 `service_tier=flex`、`tier_source=response`。Codex 请求 Flex 但响应缺失时保存 `service_tier=default`、`tier_source=default`、`tier_fallback=unconfirmed_flex_tier`；未知响应保存 `tier_fallback=unknown_response_tier`。实际档位倍率写入 `service_tier_multiplier`，`multiplier` 是全局倍率与档位倍率的乘积。历史账单保留原金额、倍率、规则版本及估算标记，不补写推测的定价依据。页面和 CSV 直接使用入账金额。
 
 ### 配置档位价格
 
