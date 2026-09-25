@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 )
 
-//go:embed ui.html i18n.js locales/*.json
+//go:embed ui.html i18n.js locales/*.json analysis-dashboard.js analysis-dashboard.css vendor/*
 var uiFiles embed.FS
 
 // These files are also exported unchanged for same-origin static hosting.
@@ -46,7 +46,9 @@ func buildUI() []byte {
 	script := append([]byte("const BILLING_MESSAGES = "), data...)
 	script = append(script, ';', '\n')
 	script = append(script, read("i18n.js")...)
-	return bytes.Replace(read("ui.html"), []byte("// BILLING_I18N"), script, 1)
+	page := bytes.Replace(read("ui.html"), []byte("// BILLING_I18N"), script, 1)
+	page = bytes.Replace(page, []byte("// BILLING_ANALYSIS"), read("analysis-dashboard.js"), 1)
+	return bytes.Replace(page, []byte("/* BILLING_ANALYSIS_CSS */"), read("analysis-dashboard.css"), 1)
 }
 
 // The inline SVG keeps the plugin logo independent of external image files.

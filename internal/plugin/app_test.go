@@ -125,6 +125,7 @@ func TestManagementRegistrationExposesOnlyCurrentEndpoints(t *testing.T) {
 	}
 
 	wantResources := map[string]bool{
+		"/xlsx.js":    false,
 		"/usage.html": false, "/quota.html": false, "/session": false, "/logout": false, "/quota-summary": false,
 		"/ui": false, "/profile": false, "/subscription": false, "/routing": false, "/prices": false,
 		"/analysis": false, "/events": false, "/errors": false,

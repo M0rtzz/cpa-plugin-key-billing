@@ -1258,7 +1258,7 @@ def analysis_view(query, scope=""):
     )
     bucket_size = timedelta(hours=1)
     bucket_start = from_time
-    if to_time - from_time > timedelta(days=1):
+    if query.get("granularity", ["auto"])[0] == "day" or (query.get("granularity", ["auto"])[0] == "auto" and to_time - from_time > timedelta(days=1)):
         bucket_size = timedelta(days=1)
         browser_zone = ZoneInfo(query.get("timezone", ["UTC"])[0])
         local_from = from_time.astimezone(browser_zone)
@@ -1307,8 +1307,34 @@ def analysis_view(query, scope=""):
         "total_cost": trend(lambda item: item["total_cost"]),
     }
 
+    model_groups = []
+    key_totals = {}
+    key_points = {}
+    for entry in rows:
+        c = entry.get("cost", {})
+        entry_scope = entry.get("scope", "")
+        total = sum(c.get(k, 0) for k in ("uncached_input_tokens", "cache_read_tokens", "cache_write_tokens", "billed_output_tokens"))
+        multiplier = c.get("billing_multiplier", 1)
+        model_groups.append({"requested_model": entry.get("billing_model", ""), "reported_model": entry.get("upstream_model", ""),
+            "key": entry_scope, "label": entry.get("label", ""), "preview": entry.get("preview", ""), "requests": 1, "total_tokens": total,
+            "cost_usd": c.get("total_usd", 0), "before_global_usd": c.get("total_usd", 0) / multiplier if multiplier else 0,
+            "unconvertible": 0 if multiplier else 1})
+        key_totals[entry_scope] = key_totals.get(entry_scope, 0) + total
+        if entry_scope not in key_points:
+            key_points[entry_scope] = {"key": entry_scope, "label": entry.get("label", ""), "preview": entry.get("preview", ""),
+                "points": [{"time": iso(b["time"]), "value": 0} for b in buckets]}
+        at = datetime.fromisoformat(entry["at"].replace("Z", "+00:00"))
+        for index, bucket in enumerate(buckets):
+            if bucket["time"] <= at < bucket["time"] + bucket_size:
+                key_points[entry_scope]["points"][index]["value"] += total
+                break
+    top = sorted(key_totals, key=lambda key: (-key_totals[key], key))[:10]
     return {
         **BILLING_POLICY,
+        "from": iso(from_time), "to": iso(to_time),
+        "granularity": "day" if bucket_size == timedelta(days=1) else "hour",
+        "snapshot_id": str(max((int(e["id"]) for e in rows), default=0)),
+        "model_groups": model_groups, "key_trends": [key_points[key] for key in top if key_totals[key] > 0],
         "summary": {
             "requests": requests,
             "succeeded": requests - failed,
@@ -1549,6 +1575,13 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path in (f"{RESOURCE_BASE}/usage.html", f"{RESOURCE_BASE}/quota.html", "/usage.html", "/quota.html"):
             self.send_html((UI_PATH.parent / parsed.path.rsplit("/", 1)[-1]).read_text())
             return
+        if parsed.path == RESOURCE_BASE + "/xlsx.js":
+            body = (UI_PATH.parent / "vendor" / "xlsx-0.20.3.min.js").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if parsed.path in ("/", "/ui"):
             body = UI_PATH.read_text()
             catalogs = {language: json.loads((UI_PATH.parent / "locales" / f"{language}.json").read_text())
@@ -1556,6 +1589,8 @@ class Handler(BaseHTTPRequestHandler):
             script = "const BILLING_MESSAGES = " + json.dumps(catalogs).replace("<", "\\u003c") + ";\n"
             script += (UI_PATH.parent / "i18n.js").read_text()
             body = body.replace("// BILLING_I18N", script)
+            body = body.replace("// BILLING_ANALYSIS", (UI_PATH.parent / "analysis-dashboard.js").read_text())
+            body = body.replace("/* BILLING_ANALYSIS_CSS */", (UI_PATH.parent / "analysis-dashboard.css").read_text())
             if self.host_mode != "standalone":
                 body = body.replace(
                     "</head>",

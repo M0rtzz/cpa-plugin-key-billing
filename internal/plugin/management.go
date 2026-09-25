@@ -128,8 +128,9 @@ var resourceEndpoints = []resourceEndpoint{
 func managementRegistration() ManagementRegistrationResponse {
 	registration := ManagementRegistrationResponse{
 		Routes:    make([]ManagementRoute, 0, len(managementEndpoints)),
-		Resources: make([]ResourceRoute, 1, len(resourceEndpoints)+5),
+		Resources: make([]ResourceRoute, 1, len(resourceEndpoints)+6),
 	}
+	registration.Resources = append(registration.Resources, ResourceRoute{Path: resourceBase + "/xlsx.js"})
 	registration.Resources[0] = ResourceRoute{Path: resourceBase + resourceUIPath, Menu: MenuLabel, Description: MenuDescription}
 	for _, path := range []string{"/usage.html", "/quota.html", resourceSessionPath, resourceLogoutPath} {
 		registration.Resources = append(registration.Resources, ResourceRoute{Path: resourceBase + path})
@@ -171,6 +172,13 @@ func (a *App) handleManagement(raw []byte) ([]byte, error) {
 		}
 	}
 
+	if req.Method == http.MethodGet && path == resourceBase+"/xlsx.js" {
+		body, err := uiFiles.ReadFile("vendor/xlsx-0.20.3.min.js")
+		if err != nil {
+			return nil, err
+		}
+		return OKEnvelope(ManagementResponse{StatusCode: http.StatusOK, Headers: http.Header{"Content-Type": []string{"application/javascript; charset=utf-8"}, "X-Content-Type-Options": []string{"nosniff"}, "Cache-Control": []string{"public, max-age=86400"}}, Body: body})
+	}
 	if req.Method == http.MethodGet && path == resourceBase+resourceUIPath {
 		return OKEnvelope(ManagementResponse{
 			StatusCode: http.StatusOK,
@@ -181,7 +189,7 @@ func (a *App) handleManagement(raw []byte) ([]byte, error) {
 				"Referrer-Policy":        []string{"no-referrer"},
 				"X-Content-Type-Options": []string{"nosniff"},
 				"Content-Security-Policy": []string{
-					"default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; " +
+					"default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdn.jsdelivr.net; " +
 						"font-src https://cdn.jsdelivr.net; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
 				},
 			},

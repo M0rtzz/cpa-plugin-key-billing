@@ -2110,6 +2110,7 @@
       #keys-body tr.key-deleted { background: color-mix(in srgb, var(--text-secondary) 5%, transparent); color: var(--text-secondary); }
       #keys-body tr.key-deleted .quota-window { opacity: 0.65; }
       #keys-body tr.key-deleted .quota-fill { background: var(--text-tertiary); }
+      /* BILLING_ANALYSIS_CSS */
     </style>
     <script>
       "use strict";
@@ -3391,6 +3392,7 @@
         button.setAttribute("aria-pressed", String(masked));
         setLabeledActionIcon(button, masked ? "eye-off" : "eye", m("ui.mask"));
         document.body.classList.toggle("privacy-masked", masked);
+        if (role === "admin" && analysisQueries.admin.value) analysisDashboard.render(analysisQueries.admin.value);
       }
 
       function storedTimeRange(role) {
@@ -4262,7 +4264,15 @@
         const key = account ? "" : $("analysis-key").value;
         params.set("timezone", timezone);
         if (key) params.set("api_key", key);
-        const selection = JSON.stringify([sharedTimeRanges[role], key, timezone]);
+        const granularity = account || key ? "auto" : analysisDashboard.granularity;
+        params.set(
+          "granularity",
+          granularity === "hour" &&
+            Math.ceil((new Date(range.to) - new Date(range.from)) / 3600000 + new Date(range.from).getMinutes() / 60) > 1000
+            ? "day"
+            : granularity
+        );
+        const selection = JSON.stringify([sharedTimeRanges[role], key, timezone, params.get("granularity")]);
         return analysisQueries[role].read(
           selection,
           async () => {
@@ -4271,6 +4281,7 @@
               await (account ? accountAPI("/analysis?" + params) : plugin("GET", "/analysis?" + params)),
               m("ui.analysis")
             );
+            value._dashboardQuery = Object.fromEntries(params);
             requireObject(value.summary, m("ui.analysis_summary"));
             requireObject(value.trends, m("ui.analysis_trends"));
             requireObject(value.summary.cost, m("ui.cost_analysis"));
@@ -4564,7 +4575,8 @@
             tasks.push(...page.groups.map((name) => loadDataGroup(account, name, reload)));
             if (page.sources.includes(eventKeysQuery)) tasks.push(readEventKeys(reload));
             if (page.query === "analysis") {
-              tasks.push(readAnalysis(account, reload));
+              if (!account) analysisDashboard.beginLoad();
+              tasks.push(readAnalysis(account, reload).finally(() => { if (!account) analysisDashboard.endLoad(); }));
               if (typeof Chart !== "function" && (!chartError || reload)) tasks.push(loadCharts());
             } else if (page.query) {
               const list = pagedList(page.query, account);
@@ -4871,6 +4883,7 @@
       };
 
       function destroyAnalysisCharts(account) {
+        if (!account) analysisDashboard.reset();
         const role = account ? "account" : "admin";
         for (const chart of [analysisCharts[role].trend, analysisCharts[role].distribution]) chart?.destroy();
         analysisCharts[role].trend = null;
@@ -5402,6 +5415,7 @@
           target.replaceChildren(el("div", { class: "card empty analysis-state" }), content);
         }
         const analysis = load.value;
+        if (!account && analysis) analysisDashboard.render(analysis);
         const status = target.querySelector(".analysis-state");
         status.classList.toggle("hidden", !!analysis);
         content.classList.toggle("hidden", !analysis);
@@ -7496,6 +7510,22 @@
       }
 
       function renderEventKeys() {
+        let search = $("analysis-key-search");
+        if (!search) {
+          search = el("input", {
+            id: "analysis-key-search",
+            type: "search",
+            placeholder: m("dashboard.key_search"),
+            "aria-label": m("dashboard.key_search")
+          });
+          $("analysis-key").parentElement.before(search);
+          search.oninput = () => {
+            const term = search.value.trim().toLocaleLowerCase();
+            for (const option of $("analysis-key").options)
+              option.hidden = !!option.value && !option.textContent.toLocaleLowerCase().includes(term);
+          };
+          $("analysis-key").addEventListener("change", () => analysisDashboard.invalidate());
+        }
         const keys = eventKeysQuery.value;
         if (!keys) return;
         const select = $("analysis-key");
@@ -9775,6 +9805,8 @@
             notify(result.changed ? m("ui.reference_prices_updated") : m("ui.reference_prices_are_up_to_date"));
           } finally { button.disabled = false; }
         });
+
+      // BILLING_ANALYSIS
 
       (async function () {
         const panelKey = readPanelKey();

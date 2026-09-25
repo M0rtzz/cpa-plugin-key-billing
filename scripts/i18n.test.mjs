@@ -9,7 +9,7 @@ const root = new URL("../internal/plugin/", import.meta.url);
 const en = JSON.parse(fs.readFileSync(new URL("locales/en.json", root)));
 const zh = JSON.parse(fs.readFileSync(new URL("locales/zh-CN.json", root)));
 const runtime = fs.readFileSync(new URL("i18n.js", root), "utf8");
-const ui = fs.readFileSync(new URL("ui.html", root), "utf8");
+const ui = fs.readFileSync(new URL("ui.html", root), "utf8").replace("// BILLING_ANALYSIS", fs.readFileSync(new URL("analysis-dashboard.js", root), "utf8"));
 const slots = (text) => [...text.matchAll(/\{([a-zA-Z][\w]*)\}/g)].map((match) => match[1]).sort();
 
 test("catalog keys and interpolation arguments match", () => {
