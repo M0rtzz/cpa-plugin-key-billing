@@ -34,8 +34,16 @@
 .dashboard-detail-wrap { display: inline-flex; flex: none; }
 #analysis-dashboard .dashboard-info { display: inline-grid; place-items: center; padding: 0; width: 20px; height: 20px; min-width: 20px; min-height: 20px; border: 1px solid var(--border-color); border-radius: 50%; background: var(--count-badge-bg); color: var(--text-secondary); }
 #analysis-dashboard .dashboard-info:hover, #analysis-dashboard .dashboard-info[aria-expanded="true"] { color: var(--primary-color); border-color: var(--primary-color); }
-.dashboard-detail { position: fixed; z-index: 10000; width: min(340px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; padding: 14px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-primary); box-shadow: var(--shadow); white-space: normal; }
-.dashboard-detail-row { display: flex; justify-content: space-between; gap: 16px; margin-top: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.dashboard-detail { position: fixed; z-index: 10000; width: min(340px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; padding: 14px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-primary); color: var(--text-primary); box-shadow: var(--shadow); white-space: normal; font-size: 12px; }
+.dashboard-detail h3 { margin: 0 0 8px; color: var(--text-primary); font-size: 14px; font-weight: 700; }
+.dashboard-detail-note { display: block; margin: 0 0 8px; color: var(--text-secondary); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.dashboard-detail-section + .dashboard-detail-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color); }
+.dashboard-detail-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-top: 4px; font-size: 12px; overflow-wrap: anywhere; }
+.dashboard-detail-row:first-child { margin-top: 0; }
+.dashboard-detail-row > span { color: var(--text-secondary); }
+.dashboard-detail-row > strong { color: var(--text-primary); text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dashboard-detail-total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color); }
+.dashboard-detail-total > strong { color: var(--primary-color); font-weight: 750; }
 .dashboard-error-body { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 600px; max-height: 260px; overflow: auto; }
 #dashboard-pagination { margin-top: 14px; }
 #dashboard-pagination > span:first-child { margin-right: auto; }

@@ -787,6 +787,366 @@ const analysisDashboard = (() => {
     );
     return node;
   }
+  function tokenValues(entry) {
+    const t = entry.token_usage,
+      c = entry.cost || {};
+    if (t && t.quality !== "inconsistent")
+      return {
+        quality: t.quality,
+        input: t.input?.uncached_tokens,
+        output: t.output?.total_tokens,
+        read: t.input?.cache_read_tokens,
+        write: t.input?.cache_write_tokens,
+        reasoning: t.output?.reasoning_tokens,
+        unclassified: t.unclassified_tokens,
+        total: t.total_tokens,
+      };
+    if (entry.accounting_quality === "complete")
+      return {
+        quality: "complete",
+        input: c.uncached_input_tokens,
+        output: c.billed_output_tokens,
+        read: c.cache_read_tokens,
+        write: c.cache_write_tokens,
+        reasoning: entry.reasoning_tokens,
+        unclassified: 0,
+        total:
+          c.uncached_input_tokens +
+          c.billed_output_tokens +
+          c.cache_read_tokens +
+          c.cache_write_tokens,
+        historical: true,
+      };
+    return {
+      quality: t?.quality || entry.accounting_quality || "",
+      unclassified: t?.unclassified_tokens,
+      total: t?.total_tokens,
+    };
+  }
+  function info(title, sections, notes = []) {
+    const popup = el(
+      "div",
+      { class: "dashboard-detail", role: "tooltip" },
+      element("h3", title),
+    );
+    for (const note of notes)
+      popup.append(element("small", note, "dashboard-detail-note"));
+    for (const section of sections) {
+      const group = el("div", { class: "dashboard-detail-section" });
+      for (const [key, value] of section.rows || [])
+        group.append(
+          el(
+            "div",
+            { class: "dashboard-detail-row" },
+            element("span", key),
+            element("strong", value),
+          ),
+        );
+      if (section.total)
+        group.append(
+          el(
+            "div",
+            { class: "dashboard-detail-row dashboard-detail-total" },
+            element("span", section.total[0]),
+            element("strong", section.total[1]),
+          ),
+        );
+      popup.append(group);
+    }
+    popup.hidden = true;
+    const trigger = el(
+      "button",
+      {
+        type: "button",
+        class: "dashboard-info",
+        "aria-label": title,
+        "aria-expanded": "false",
+      },
+      glyph("info"),
+    );
+    const wrap = el("span", { class: "dashboard-detail-wrap" }, trigger, popup);
+    const show = () => {
+      popup.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+      const r = trigger.getBoundingClientRect();
+      popup.style.left =
+        Math.max(8, Math.min(innerWidth - 348, r.right + 8)) + "px";
+      popup.style.top =
+        Math.max(8, Math.min(innerHeight - popup.offsetHeight - 8, r.top)) +
+        "px";
+    };
+    const hide = () => {
+      popup.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+    };
+    wrap.onmouseenter = show;
+    wrap.onmouseleave = () => {
+      if (document.activeElement !== trigger) hide();
+    };
+    trigger.onfocus = show;
+    trigger.onblur = hide;
+    trigger.onclick = () => (popup.hidden ? show() : hide());
+    trigger.onkeydown = (e) => {
+      if (e.key === "Escape") hide();
+    };
+    return wrap;
+  }
+  function tokensCell(entry) {
+    const v = tokenValues(entry),
+      lines = el("div", { class: "dashboard-token-lines" });
+    function part(kind, value, name, cls) {
+      return el(
+        "span",
+        { class: "dashboard-token-part " + cls, title: label(name) },
+        glyph(kind),
+        element("span", count(value)),
+      );
+    }
+    if (v.input != null || v.output != null)
+      lines.append(
+        el(
+          "div",
+          { class: "dashboard-token-line" },
+          part("input", v.input, "input_tokens", "dashboard-token-input"),
+          part("output", v.output, "output_tokens", "dashboard-token-output"),
+        ),
+      );
+    const cache = el("div", { class: "dashboard-token-line" });
+    if (v.read > 0)
+      cache.append(
+        part("cache", v.read, "cache_read_tokens", "dashboard-token-cache"),
+      );
+    if (v.write > 0)
+      cache.append(
+        part("write", v.write, "cache_write_tokens", "dashboard-token-cache"),
+      );
+    if (cache.childNodes.length) lines.append(cache);
+    lines.append(
+      element("small", label("total") + " " + count(v.total), "muted"),
+    );
+    if (
+      /^(gpt-image-|dall-e-)/i.test(
+        (
+          entry.response_model ||
+          entry.upstream_model ||
+          entry.billing_model ||
+          ""
+        )
+          .split("/")
+          .pop(),
+      )
+    )
+      lines.append(
+        el(
+          "span",
+          { class: "dashboard-token-part dashboard-token-image" },
+          glyph("image"),
+          element("small", text("image_note")),
+        ),
+      );
+    const node = el(
+      "div",
+      { class: "dashboard-metric" },
+      lines,
+      info(
+        label("token_detail"),
+        [
+          {
+            rows:
+              v.quality !== "inconsistent"
+                ? [
+                    ["input_tokens", v.input],
+                    ["output_tokens", v.output],
+                    ["cache_read_tokens", v.read],
+                    ["cache_write_tokens", v.write],
+                  ]
+                    .filter(
+                      ([, value]) =>
+                        value != null &&
+                        (v.quality === "complete" || value > 0),
+                    )
+                    .map(([key, value]) => [
+                      label("token_" + key),
+                      count(value),
+                    ])
+                    .concat(
+                      v.reasoning > 0
+                        ? [[label("reasoning"), count(v.reasoning)]]
+                        : [],
+                    )
+                    .concat(
+                      v.unclassified > 0
+                        ? [
+                            [
+                              label("unclassified_tokens"),
+                              count(v.unclassified),
+                            ],
+                          ]
+                        : [],
+                    )
+                : [],
+            total: [
+              label("total_tokens"),
+              v.total == null ? "—" : count(v.total),
+            ],
+          },
+        ],
+        [
+          ...(v.quality !== "complete"
+            ? [
+                label(
+                  v.quality === "inconsistent"
+                    ? "token_inconsistent"
+                    : "token_incomplete",
+                ),
+              ]
+            : []),
+          ...(isImageModel(entry) ? [label("image_detail_note")] : []),
+          ...(v.historical ? [label("historical_tokens_note")] : []),
+        ],
+      ),
+    );
+    return node;
+  }
+  function isImageModel(entry) {
+    return /^(gpt-image-|dall-e-)/i.test(
+      (
+        entry.response_model ||
+        entry.upstream_model ||
+        entry.billing_model ||
+        ""
+      )
+        .split("/")
+        .pop(),
+    );
+  }
+  function tierLabel(value) {
+    const key = String(value || "")
+      .trim()
+      .toLowerCase();
+    const known = {
+      priority: label("tier_priority"),
+      fast: label("tier_fast"),
+      flex: label("tier_flex"),
+      default: label("tier_default"),
+      standard: label("tier_standard"),
+      auto: label("tier_auto"),
+    };
+    return known[key] || String(value || label("not_reported"));
+  }
+  function pricingMethod(value) {
+    const key = String(value || "")
+      .trim()
+      .toLowerCase();
+    const known = {
+      base: label("method_base"),
+      explicit_tier: label("method_explicit_tier"),
+      model_ratio: label("method_model_ratio"),
+      base_fallback: label("method_base_fallback"),
+      oauth_multiplier: label("method_oauth_multiplier"),
+    };
+    return known[key] || String(value || label("not_reported"));
+  }
+  function tierSource(value) {
+    const key = String(value || "")
+      .trim()
+      .toLowerCase();
+    const known = {
+      response: label("source_response"),
+      request: label("source_request"),
+      request_policy: label("source_request_policy"),
+      default: label("source_default"),
+    };
+    return known[key] || String(value || label("not_reported"));
+  }
+  function costCell(entry) {
+    const c = entry.cost || {},
+      p = c.pricing || {},
+      node = el(
+        "div",
+        { class: "dashboard-metric" },
+        element("strong", usdExact(c.total_usd), "dashboard-billed-amount"),
+      );
+    if (
+      Number.isFinite(c.service_tier_multiplier) &&
+      c.service_tier_multiplier !== 1
+    )
+      node.append(
+        el(
+          "span",
+          {
+            class: "dashboard-multiplier",
+            title:
+              label("tier_multiplier") +
+              ": ×" +
+              count(c.service_tier_multiplier),
+          },
+          glyph("lightning"),
+          element("span", "×" + count(c.service_tier_multiplier)),
+        ),
+      );
+    if (c.long_context)
+      node.append(element("small", text("long_context"), "muted"));
+    const multiplier = Number.isFinite(Number(c.multiplier))
+      ? Number(c.multiplier)
+      : Number(c.billing_multiplier) * Number(c.service_tier_multiplier);
+    const multiplierText = (value) =>
+      value == null ? "—" : count(value) + "×";
+    node.append(
+      info(
+        label("cost_detail"),
+        [
+          {
+            rows: [
+              ["input", c.uncached_input_usd, c.applied_input_per_1m],
+              ["output", c.output_usd, c.applied_output_per_1m],
+              ["read", c.cache_read_usd, c.applied_cache_read_per_1m],
+              ["write", c.cache_write_usd, c.applied_cache_write_per_1m],
+            ].flatMap(([kind, amount, rate]) => [
+              [label(kind + "_cost"), usdExact(amount)],
+              [
+                label(kind + "_rate"),
+                rate == null ? "—" : usdExact(rate) + label("rate_per_million"),
+              ],
+            ]),
+          },
+          {
+            rows: [
+              [label("request_tier"), tierLabel(entry.service_tier)],
+              [label("response_tier"), tierLabel(entry.response_service_tier)],
+              [label("billing_tier"), tierLabel(p.service_tier)],
+              [label("tier_source"), tierSource(p.tier_source)],
+              ...(p.method
+                ? [[label("pricing_method"), pricingMethod(p.method)]]
+                : []),
+              [
+                label("global_multiplier"),
+                multiplierText(c.billing_multiplier),
+              ],
+              [
+                label("tier_multiplier"),
+                multiplierText(c.service_tier_multiplier),
+              ],
+              [label("final_multiplier"), multiplierText(multiplier)],
+              [
+                label("before"),
+                c.billing_multiplier > 0
+                  ? usdExact(c.total_usd / c.billing_multiplier)
+                  : "—",
+              ],
+            ],
+          },
+          { total: [label("actual_charge"), usdExact(c.total_usd)] },
+        ],
+        [
+          label("cost_detail_note"),
+          ...(c.long_context ? [label("long_context_note")] : []),
+          ...(isImageModel(entry) ? [label("image_cost_note")] : []),
+        ],
+      ),
+    );
+    return node;
+  }
   function renderRecords() {
     const loading = busy || analysisBusy;
     const parent = $("dashboard-table"),
