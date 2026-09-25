@@ -110,7 +110,7 @@ plugins:
 
 ## 页面访问
 
-独立普通用户页面：`/v0/resource/plugins/cpa-key-billing/usage.html`（用量费用）和 `/v0/resource/plugins/cpa-key-billing/quota.html`（额度查询）。用户输入本人 API Key，无需管理密码；插件使用服务端 `HttpOnly` 会话支持刷新和重新进入。号池账号保留 Plus、Pro 20x 等类型。额度查询只读取缓存；启用 `allow_api_key_quota_reset` 后，用户还可重置路由权限范围内的 Codex 认证文件额度，消耗上游主动重置次数，并在重置成功后更新缓存。构建、配置、会话、缓存行为及回滚见 [普通用户页面部署文档](docs/self-service-deployment.md)。
+独立普通用户页面：`/v0/resource/plugins/cpa-key-billing/usage.html`（用量费用）和 `/v0/resource/plugins/cpa-key-billing/quota.html`（额度查询）。用户输入本人 API Key，无需管理密码；插件使用服务端 `HttpOnly` 会话支持刷新和重新进入。号池账号保留 Plus、Pro 20x 等类型。额度查询只读取缓存；启用 `allow_api_key_quota_reset` 后，用户还可重置路由权限范围内的 Codex 认证文件额度，消耗上游主动重置次数，并在重置成功后更新缓存。构建、配置、会话、缓存行为及回滚见 [普通用户页面部署文档](docs/self-service-deployment.md)；本机到服务器的完整发布步骤见 [服务器提交与部署流程](docs/server-deployment-workflow.zh-CN.md)。
 
 包括旧入口在内的用户 JSON 接口均需配置 `account_api_base_url`，否则返回 `503`。HTML 和管理员入口不受影响。
 

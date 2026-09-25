@@ -51,26 +51,7 @@ plugins:
 
 ## 替换插件
 
-以 `/data/xzh/Programs/cliproxyapi` 为例，先将构建产物上传到暂存目录。停止当前 CPA 进程后再备份与替换；不要覆盖正在加载的 `.so`。
-
-```sh
-cd /data/xzh/Programs/cliproxyapi
-backup_dir="backups/self-service-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$backup_dir"
-chmod 700 "$backup_dir"
-cp -p config.yaml "$backup_dir/config.yaml"
-cp -p plugins/cpa-key-billing.so "$backup_dir/cpa-key-billing.so"
-# 如果 state_file 使用其他路径，相应替换下一行。
-cp -p plugins/cpa-key-billing-state-v1.db "$backup_dir/state.db"
-```
-
-备份应在服务完全停止后执行，以得到一致的 SQLite 文件。随后将新共享库复制到 `plugins/cpa-key-billing.so`，合并配置，再按原来的方式启动：
-
-```sh
-./cli-proxy-api --config config.yaml
-```
-
-本功能不改变账单数据库结构，不清理历史账单。
+当前服务器在 `/data/collab/Programs/cliproxyapi` 运行，计费插件使用带版本号的动态库。先在插件目录之外暂存构建产物，停止 CPA 后再备份数据库、配置和旧动态库；同时核对 `store.version` 与 `store.release-tag` 是否仍固定为旧版。完整的提交、服务器构建、停服替换、验收和回滚命令见[服务器提交与部署流程](server-deployment-workflow.zh-CN.md)。
 
 ## 访问与额度更新
 
@@ -107,6 +88,6 @@ http://222.20.99.38:18316/v0/resource/plugins/cpa-key-billing/quota.html
 
 验收时使用两个测试 Key，确认各自只能看到自己的账单和允许的匿名账号；通过管理员刷新，确认两个角色看到一致的 Plus/Pro 20x 类型及额度。检查无缓存、过期和禁用状态，并撤销一个 Key 验证下一次请求返回 `401`。测试不需要真实模型生成。
 
-当前版本将数据库结构从 v14 升级到 v15，以保存每笔账单的全局及 Fast 倍率。结构升级保留费用金额；历史金额换算是独立的离线操作，见 [倍率与历史账单换算](billing-multiplier.md)。
+当前插件 v1.3.18 使用数据库结构 v18，并会从支持的旧版本迁移。结构升级保留费用金额；历史金额换算是独立的离线操作，见 [倍率与历史账单换算](billing-multiplier.md)。
 
-旧插件无法打开 v15 数据库。上线前应在隔离副本上完成迁移与验收；尚未接收新请求时，可停服后恢复完整的插件、配置和数据库备份。已经产生新账单后，保留当前数据库修复，不能直接替换旧插件，也不能用旧数据库备份覆盖新增记录。不要手动修改 `PRAGMA user_version` 伪装数据库版本。
+旧插件无法打开 v18 数据库。上线前应在隔离副本上完成迁移与验收；尚未接收新请求时，可停服后恢复完整的插件、配置和数据库备份。已经产生新账单后，保留当前数据库修复，不能直接替换旧插件，也不能用旧数据库备份覆盖新增记录。不要手动修改 `PRAGMA user_version` 伪装数据库版本。
