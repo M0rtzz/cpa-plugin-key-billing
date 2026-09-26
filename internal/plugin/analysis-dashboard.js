@@ -815,7 +815,6 @@ const analysisDashboard = (() => {
           c.billed_output_tokens +
           c.cache_read_tokens +
           c.cache_write_tokens,
-        historical: true,
       };
     return {
       quality: t?.quality || entry.accounting_quality || "",
@@ -865,27 +864,36 @@ const analysisDashboard = (() => {
       glyph("info"),
     );
     const wrap = el("span", { class: "dashboard-detail-wrap" }, trigger, popup);
+    let closeTimer = null;
     const show = () => {
+      clearTimeout(closeTimer);
       popup.hidden = false;
       trigger.setAttribute("aria-expanded", "true");
-      const r = trigger.getBoundingClientRect();
-      popup.style.left =
-        Math.max(8, Math.min(innerWidth - 348, r.right + 8)) + "px";
-      popup.style.top =
-        Math.max(8, Math.min(innerHeight - popup.offsetHeight - 8, r.top)) +
-        "px";
+      const anchor = trigger.getBoundingClientRect();
+      const rect = popup.getBoundingClientRect();
+      let left = anchor.right + 9;
+      if (left + rect.width > innerWidth - 12) left = anchor.left - rect.width - 9;
+      popup.style.left = Math.max(12, Math.min(left, innerWidth - rect.width - 12)) + "px";
+      popup.style.top = Math.max(12, Math.min(anchor.top + anchor.height / 2 - rect.height / 2, innerHeight - rect.height - 12)) + "px";
     };
     const hide = () => {
+      clearTimeout(closeTimer);
       popup.hidden = true;
       trigger.setAttribute("aria-expanded", "false");
     };
-    wrap.onmouseenter = show;
-    wrap.onmouseleave = () => {
-      if (document.activeElement !== trigger) hide();
+    const deferHide = () => {
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => {
+        if (document.activeElement !== trigger) hide();
+      }, 160);
     };
+    wrap.onmouseenter = show;
+    wrap.onmouseleave = deferHide;
+    popup.onmouseenter = () => clearTimeout(closeTimer);
+    popup.onmouseleave = deferHide;
     trigger.onfocus = show;
-    trigger.onblur = hide;
-    trigger.onclick = () => (popup.hidden ? show() : hide());
+    trigger.onblur = deferHide;
+    trigger.onclick = show;
     trigger.onkeydown = (e) => {
       if (e.key === "Escape") hide();
     };
@@ -1002,7 +1010,6 @@ const analysisDashboard = (() => {
               ]
             : []),
           ...(isImageModel(entry) ? [label("image_detail_note")] : []),
-          ...(v.historical ? [label("historical_tokens_note")] : []),
         ],
       ),
     );
