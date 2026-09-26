@@ -452,8 +452,7 @@
           output: parts[1],
           read: parts[2],
           write: parts[3],
-          reasoning: count(entry.reasoning_tokens),
-          historical: true
+          reasoning: count(entry.reasoning_tokens)
         };
       return { quality: entry.accounting_quality || "", total: null };
     }
@@ -481,7 +480,6 @@
       if (data.quality !== "complete")
         box.append(node("small", data.quality === "inconsistent" ? "宿主用量不一致，无法提供可靠分项。" : "用量明细未完整上报；缺失分项不计作零。", "detail-note"));
       if (isImageModel(entry)) box.append(node("small", "生图模型：图片 Token 细分未上报；以上输出为总输出，不另计图片 Token。", "detail-note"));
-      if (data.historical) box.append(node("small", "历史记录：使用已保存的计费 Token 分项。", "detail-note"));
       return box;
     }
     function costDetail(entry) {
