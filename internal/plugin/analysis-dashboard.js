@@ -76,6 +76,16 @@ const analysisDashboard = (() => {
   }
   const usdExact = (value) => (value == null ? "—" : "$" + Number(value).toLocaleString(locale(), { maximumFractionDigits: 8 }));
   const count = (value) => (value == null ? "—" : Number(value).toLocaleString(locale()));
+  const rankingTokens = (value) => {
+    if (value == null) return "—";
+    const number = Number(value),
+      absolute = Math.abs(number);
+    if (absolute >= 1e9) return (number / 1e9).toFixed(1) + "B";
+    if (absolute >= 1e6) return (number / 1e6).toFixed(1) + "M";
+    if (absolute >= 1e3) return (number / 1e3).toFixed(1) + "K";
+    return count(number);
+  };
+  const rankingCost = (value) => (value == null ? "—" : "$" + Number(value).toFixed(4));
   const timingMs = (value) => {
     if (value == null || value === "") return null;
     const milliseconds = Number(value);
@@ -635,6 +645,9 @@ const analysisDashboard = (() => {
           [
             ["cost_usd", text("by_cost")],
             ["total_tokens", text("by_tokens")],
+            ["input_tokens", text("ranking_input_tokens")],
+            ["output_tokens", text("ranking_output_tokens")],
+            ["cache_tokens", text("ranking_cache_tokens")],
             ["requests", text("requests")],
           ],
           state.rankSort,
@@ -1207,7 +1220,16 @@ const analysisDashboard = (() => {
     else if (!entries.length) parent.replaceChildren(element("p", text("empty"), "empty"));
     else {
       let headers = ranking
-        ? [text("rank"), text("key"), text("requests"), text("tokens"), text("actual")]
+        ? [
+            text("rank"),
+            text("key"),
+            text("requests"),
+            text("ranking_input_tokens"),
+            text("ranking_output_tokens"),
+            text("ranking_cache_tokens"),
+            text("ranking_total_tokens"),
+            text("ranking_cost"),
+          ]
         : state.tab === "errors"
           ? [text("time"), text("key"), text("model"), text("http"), text("error_type"), text("error_body")]
           : [
@@ -1233,7 +1255,16 @@ const analysisDashboard = (() => {
               $("analysis-key").dispatchEvent(new Event("change"));
             },
           });
-          return tableRow([state.page * PAGE + i + 1, name, count(e.requests), count(e.total_tokens), usdExact(e.cost_usd)]);
+          return tableRow([
+            state.page * PAGE + i + 1,
+            name,
+            count(e.requests),
+            rankingTokens(e.input_tokens),
+            rankingTokens(e.output_tokens),
+            rankingTokens(e.cache_tokens),
+            rankingTokens(e.total_tokens),
+            element("strong", rankingCost(e.cost_usd), "dashboard-ranking-cost"),
+          ]);
         }
         let values = [new Date(e.at).toLocaleString(locale()), identity(e), e.billing_model || e.upstream_model || "—"];
         if (state.tab === "errors")
@@ -1254,7 +1285,9 @@ const analysisDashboard = (() => {
         if (scopeKey) values.splice(1, 1);
         return tableRow(values);
       });
-      parent.replaceChildren(table(headers, rows));
+      const grid = table(headers, rows);
+      if (ranking) grid.classList.add("dashboard-ranking-scroll");
+      parent.replaceChildren(grid);
     }
     const pages = Math.max(1, Math.ceil(total / PAGE)),
       go = (page) => {
@@ -1298,8 +1331,14 @@ const analysisDashboard = (() => {
   function exportRows(entries, kind, masked, sort) {
     if (kind === "ranking")
       return [
-        [label("rank"), label("key"), label("requests"), label("tokens"), label("actual")],
-        ...entries.map((r, i) => [i + 1, masked ? label("masked") : identity(r), r.requests, r.total_tokens, r.cost_usd]),
+        [
+          label("rank"), label("key"), label("requests"), label("ranking_input_tokens"), label("ranking_output_tokens"),
+          label("ranking_cache_tokens"), label("ranking_total_tokens"), label("ranking_cost"),
+        ],
+        ...entries.map((r, i) => [
+          i + 1, masked ? label("masked") : identity(r), r.requests, r.input_tokens, r.output_tokens,
+          r.cache_tokens, r.total_tokens, r.cost_usd,
+        ]),
       ];
     const keys =
       kind === "errors"

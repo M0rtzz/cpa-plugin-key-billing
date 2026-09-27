@@ -242,6 +242,9 @@ func (groups analysisGroups) add(key string, part billing.AnalysisSummary) {
 	}
 	row := groups[key]
 	row.Requests += part.Requests
+	row.InputTokens += part.InputTokens - part.CacheReadTokens - part.CacheWriteTokens
+	row.OutputTokens += part.OutputTokens
+	row.CacheTokens += part.CacheReadTokens + part.CacheWriteTokens
 	row.TotalTokens += part.TotalTokens
 	row.CostUSD += part.Cost.TotalUSD
 }

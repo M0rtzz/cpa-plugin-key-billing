@@ -15,6 +15,8 @@
 .dashboard-table { width: 100%; }
 .dashboard-table th, .dashboard-table td { padding: 10px 12px; vertical-align: middle; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
 .dashboard-table td:first-child { max-width: 360px; overflow-wrap: anywhere; }
+.dashboard-ranking-scroll th:nth-child(n+3), .dashboard-ranking-scroll td:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }
+.dashboard-ranking-cost { color: var(--dashboard-positive); font-weight: 650; }
 .dashboard-expand { white-space: normal; text-align: left; }
 .dashboard-timing { display: flex; align-items: stretch; gap: 8px; }
 .dashboard-timing-bar { width: 4px; flex: none; border-radius: 4px; background: linear-gradient(to bottom, var(--first-color) 40%, var(--total-color) 60%); }

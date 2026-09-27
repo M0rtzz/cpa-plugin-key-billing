@@ -1258,11 +1258,14 @@ def analysis_view(query, scope=""):
             if not label and field == "scope":
                 label = entry.get("preview", "")
             item = grouped.setdefault(key, {"key": key, "label": label or key,
-                                            "total_tokens": 0, "requests": 0,
-                                            "cost_usd": 0})
+                                            "input_tokens": 0, "output_tokens": 0, "cache_tokens": 0,
+                                            "total_tokens": 0, "requests": 0, "cost_usd": 0})
             if field == "scope":
                 item["preview"] = entry.get("preview", "")
             cost = entry.get("cost", {})
+            item["input_tokens"] += cost.get("uncached_input_tokens", 0)
+            item["output_tokens"] += cost.get("billed_output_tokens", 0)
+            item["cache_tokens"] += cost.get("cache_read_tokens", 0) + cost.get("cache_write_tokens", 0)
             item["total_tokens"] += sum(cost.get(name, 0) for name in (
                 "uncached_input_tokens", "cache_read_tokens", "cache_write_tokens", "billed_output_tokens"))
             item["requests"] += 1

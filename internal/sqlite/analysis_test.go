@@ -138,6 +138,12 @@ func TestAnalysisSummaryIncludesTokenAndCostBreakdowns(t *testing.T) {
 		summary.Cost.OutputUSD != 0.5 {
 		t.Fatalf("cost summary = %+v", summary.Cost)
 	}
+	keys := view.UsageDistribution.APIKeys
+	if len(keys) != 1 || keys[0].Requests != 1 || keys[0].InputTokens != 100 ||
+		keys[0].OutputTokens != 50 || keys[0].CacheTokens != 350 ||
+		keys[0].TotalTokens != 500 || keys[0].CostUSD != 5 {
+		t.Fatalf("key ranking breakdown = %+v", keys)
+	}
 	trends := view.Trends
 	if len(trends.UncachedInputTokens) != 1 || trends.UncachedInputTokens[0].Value != 100 ||
 		trends.OutputTokens[0].Value != 50 || trends.CacheReadTokens[0].Value != 300 ||
