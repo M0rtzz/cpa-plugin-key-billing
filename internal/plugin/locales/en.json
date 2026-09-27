@@ -820,7 +820,7 @@
   "dashboard.method_model_ratio": "Model tier price ratio",
   "dashboard.method_base_fallback": "Base price fallback (estimated)",
   "dashboard.method_oauth_multiplier": "Codex OAuth model multiplier",
-  "dashboard.long_context_note": "Long context: this bill uses its recorded long-context price; it should not be treated as a uniform 2× multiplier.",
+  "dashboard.long_context_note": "Long context: this bill uses its recorded long-context prices.",
   "dashboard.image_cost_note": "Image-specific token and cost breakdowns were not reported; the amounts above are the recorded costs.",
   "dashboard.unit_input": "Input rate / 1M",
   "dashboard.unit_output": "Output rate / 1M",

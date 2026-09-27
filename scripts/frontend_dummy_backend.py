@@ -1137,6 +1137,51 @@ def seed_paginated_history():
             })
 
 
+def seed_latency_scenarios():
+    """Show every valid timing color combination in the real usage views."""
+    colors = {"good": "绿", "warn": "黄", "slow": "橙", "critical": "红"}
+    first_samples = {"good": 5000, "warn": 15000, "slow": 45000, "critical": 65000}
+    total_samples = {"good": 30000, "warn": 90000, "slow": 240000, "critical": 360000}
+    scenarios = []
+    for first_tier, first in first_samples.items():
+        for total_tier, total in total_samples.items():
+            if first_tier == "critical" and total_tier == "good":
+                continue  # First token cannot take longer than the whole request.
+            if first_tier == "slow" and total_tier == "good":
+                total = 50000
+            scenarios.append((f"组合 {colors[first_tier]}/{colors[total_tier]}", first, total))
+    scenarios.extend((f"首字边界 {first}ms", first, 90000)
+                     for first in (9999, 10000, 29999, 30000, 59999, 60000))
+    scenarios.extend((f"总耗时边界 {total}ms", 5000, total)
+                     for total in (59999, 60000, 179999, 180000, 299999, 300000))
+    scenarios.extend((f"缺首字/{colors[tier]}总耗时", None, total)
+                     for tier, total in total_samples.items())
+    scenarios.extend((f"{colors[tier]}首字/缺总耗时", first, None)
+                     for tier, first in first_samples.items())
+    scenarios.append(("两项均缺失", None, None))
+    scenarios.extend((f"时间格式 {value}ms", value, value)
+                     for value in (0, 999, 1000, 59999, 60000, 3599999, 3600000))
+
+    REQUEST_EVENTS.clear()
+    ERRORS.clear()
+    PLUGIN_LOGS.clear()
+    key = LIVE_KEYS[0]
+    for index, (name, first, total) in enumerate(scenarios, start=1):
+        sample = event_sample(
+            0, "synthetic latency scenarios", "codex", "gpt-6-sol", "CodexExecutor", "", "auto",
+            total, first, 0, (100, 0, 0, 20), (2, 0.2, 2.5, 10),
+            billing_model=f"{index:02d} · {name}", response_model="gpt-6-sol", stream=True,
+        )
+        REQUEST_EVENTS.append({
+            "id": str(index),
+            "at": iso(NOW - timedelta(seconds=index)),
+            "scope": key["scope"],
+            "preview": key["preview"],
+            "label": key["label"],
+            **{field: value for field, value in sample.items() if field != "key_index"},
+        })
+
+
 def error_view(query, scope=""):
     snapshot = event_snapshot(query)
     rows = filter_event_time([entry for entry in ERRORS
@@ -1941,6 +1986,8 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description="Serve the billing UI with deterministic dummy data.")
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--latency-scenarios", action="store_true",
+                        help="Show synthetic latency cases in the actual usage and analysis tables.")
     parser.add_argument(
         "--host",
         choices=("standalone", "cpamc", "cpamp"),
@@ -1959,7 +2006,10 @@ def main():
         help="Allow API key users to reset Codex auth file quotas.",
     )
     args = parser.parse_args()
-    seed_paginated_history()
+    if args.latency_scenarios:
+        seed_latency_scenarios()
+    else:
+        seed_paginated_history()
     Handler.host_mode = args.host
     Handler.initial_theme = args.theme
     Handler.allow_api_key_quota_reset = args.allow_api_key_quota_reset

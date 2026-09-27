@@ -41,20 +41,22 @@ const analysisDashboard = (() => {
       image: "M3 3h18v18H3zM3 16l5-5 5 5 3-3 5 5M15 7h.01",
       info: "M12 11v6m0-10h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0",
       lightning: "M13 2 3 14h8l-1 8 11-12h-8l1-8Z",
+      warning: "M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z",
     };
     const ns = "http://www.w3.org/2000/svg",
       svg = document.createElementNS(ns, "svg"),
       path = document.createElementNS(ns, "path");
     for (const [key, value] of Object.entries({
       viewBox: "0 0 24 24",
-      fill: name === "lightning" ? "currentColor" : "none",
-      stroke: name === "lightning" ? "none" : "currentColor",
+      fill: name === "lightning" || name === "warning" ? "currentColor" : "none",
+      stroke: name === "lightning" || name === "warning" ? "none" : "currentColor",
       "stroke-width": "1.6",
       "aria-hidden": "true",
       class: "dashboard-glyph",
     }))
       svg.setAttribute(key, value);
     path.setAttribute("d", paths[name]);
+    if (name === "warning") path.setAttribute("fill-rule", "evenodd");
     path.setAttribute("stroke-linecap", "round");
     path.setAttribute("stroke-linejoin", "round");
     svg.append(path);
@@ -74,6 +76,46 @@ const analysisDashboard = (() => {
   }
   const usdExact = (value) => (value == null ? "—" : "$" + Number(value).toLocaleString(locale(), { maximumFractionDigits: 8 }));
   const count = (value) => (value == null ? "—" : Number(value).toLocaleString(locale()));
+  const timingMs = (value) => {
+    if (value == null || value === "") return null;
+    const milliseconds = Number(value);
+    return Number.isFinite(milliseconds) && milliseconds >= 0 ? milliseconds : null;
+  };
+  const duration = (milliseconds) => {
+    if (milliseconds == null) return "—";
+    if (milliseconds < 1000) return Math.round(milliseconds) + "ms";
+    if (milliseconds < 60000) return (milliseconds / 1000).toFixed(2) + "s";
+    const seconds = Math.round(milliseconds / 1000);
+    if (seconds < 3600) return Math.floor(seconds / 60) + "m " + (seconds % 60) + "s";
+    return Math.floor(seconds / 3600) + "h " + Math.floor((seconds % 3600) / 60) + "m";
+  };
+  const timingSeverity = (milliseconds, warn, slow, critical) =>
+    milliseconds >= critical ? "critical" : milliseconds >= slow ? "slow" : milliseconds >= warn ? "warn" : "good";
+  function timingCell(entry) {
+    const first = timingMs(entry.ttft_ms),
+      total = timingMs(entry.latency_ms),
+      firstSeverity = first == null ? null : timingSeverity(first, 10000, 30000, 60000),
+      totalSeverity = total == null ? null : timingSeverity(total, 60000, 180000, 300000),
+      cell = el("div", { class: "dashboard-timing" });
+    if (firstSeverity || totalSeverity)
+      cell.append(
+        el("span", {
+          class: "dashboard-timing-bar first-" + (firstSeverity || totalSeverity) + " total-" + (totalSeverity || firstSeverity),
+          "aria-hidden": "true",
+        }),
+      );
+    cell.append(
+      el(
+        "div",
+        { class: "dashboard-timing-lines" },
+        element("span", label("ttft"), "dashboard-timing-label"),
+        element("span", duration(first), "dashboard-timing-value" + (firstSeverity ? " " + firstSeverity : "")),
+        element("span", label("latency"), "dashboard-timing-label"),
+        element("span", duration(total), "dashboard-timing-value" + (totalSeverity ? " " + totalSeverity : "")),
+      ),
+    );
+    return cell;
+  }
   function chartNumber(value, unit) {
     if (value == null || !Number.isFinite(Number(value))) return "—";
     const number = Number(value),
@@ -731,7 +773,6 @@ const analysisDashboard = (() => {
     if (v.read > 0) cache.append(part("cache", v.read, "cache_read_tokens", "dashboard-token-cache"));
     if (v.write > 0) cache.append(part("write", v.write, "cache_write_tokens", "dashboard-token-cache"));
     if (cache.childNodes.length) lines.append(cache);
-    lines.append(element("small", label("total") + " " + count(v.total), "muted"));
     if (/^(gpt-image-|dall-e-)/i.test((entry.response_model || entry.upstream_model || entry.billing_model || "").split("/").pop()))
       lines.append(
         el("span", { class: "dashboard-token-part dashboard-token-image" }, glyph("image"), element("small", text("image_note"))),
@@ -754,7 +795,7 @@ const analysisDashboard = (() => {
   function costCell(entry) {
     const c = entry.cost || {},
       p = c.pricing || {},
-      node = el("div", { class: "dashboard-metric" }, element("strong", usdExact(c.total_usd), "dashboard-billed-amount"));
+      node = el("div", { class: "dashboard-metric dashboard-cost-metric" }, element("strong", usdExact(c.total_usd), "dashboard-billed-amount"));
     if (Number.isFinite(c.service_tier_multiplier) && c.service_tier_multiplier !== 1)
       node.append(
         el(
@@ -764,7 +805,8 @@ const analysisDashboard = (() => {
           element("span", "×" + count(c.service_tier_multiplier)),
         ),
       );
-    if (c.long_context) node.append(element("small", text("long_context"), "muted"));
+    if (c.long_context)
+      node.append(el("span", { class: "dashboard-context-badge" }, glyph("warning"), element("span", text("long_context"))));
     node.append(
       info(label("cost_detail"), [
         [label("input_tokens"), usdExact(c.uncached_input_usd)],
@@ -929,9 +971,6 @@ const analysisDashboard = (() => {
         part("write", v.write, "cache_write_tokens", "dashboard-token-cache"),
       );
     if (cache.childNodes.length) lines.append(cache);
-    lines.append(
-      element("small", label("total") + " " + count(v.total), "muted"),
-    );
     if (
       /^(gpt-image-|dall-e-)/i.test(
         (
@@ -1071,7 +1110,7 @@ const analysisDashboard = (() => {
       p = c.pricing || {},
       node = el(
         "div",
-        { class: "dashboard-metric" },
+        { class: "dashboard-metric dashboard-cost-metric" },
         element("strong", usdExact(c.total_usd), "dashboard-billed-amount"),
       );
     if (
@@ -1093,7 +1132,7 @@ const analysisDashboard = (() => {
         ),
       );
     if (c.long_context)
-      node.append(element("small", text("long_context"), "muted"));
+      node.append(el("span", { class: "dashboard-context-badge" }, glyph("warning"), element("span", text("long_context"))));
     const multiplier = Number.isFinite(Number(c.multiplier))
       ? Number(c.multiplier)
       : Number(c.billing_multiplier) * Number(c.service_tier_multiplier);
@@ -1210,7 +1249,7 @@ const analysisDashboard = (() => {
             e.reasoning_effort || "—",
             tokensCell(e),
             costCell(e),
-            `${label("ttft")} ${e.ttft_ms == null ? "—" : count(e.ttft_ms) + " ms"} / ${label("latency")} ${e.latency_ms == null ? "—" : count(e.latency_ms) + " ms"}`,
+            timingCell(e),
           );
         if (scopeKey) values.splice(1, 1);
         return tableRow(values);

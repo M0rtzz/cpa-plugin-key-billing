@@ -820,7 +820,7 @@
   "dashboard.method_model_ratio": "模型档位价比",
   "dashboard.method_base_fallback": "基础价回退（估算）",
   "dashboard.method_oauth_multiplier": "Codex OAuth 模型倍率",
-  "dashboard.long_context_note": "长上下文：已采用该账单记录的长上下文单价，不能统一视作 2×。",
+  "dashboard.long_context_note": "长上下文：已采用该账单记录的长上下文单价。",
   "dashboard.image_cost_note": "图片专用 Token 与费用细分未上报，以上为已记录的费用。",
   "dashboard.unit_input": "输入单价 / 1M",
   "dashboard.unit_output": "输出单价 / 1M",
