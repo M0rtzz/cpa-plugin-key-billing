@@ -612,6 +612,7 @@ KEYS[-1]["in_config"] = False
 KEYS[-1]["deleted_at"] = iso(NOW - timedelta(days=1))
 KEYS[-1]["route_bindings"]["route_ids"] = ["economy"]
 LIVE_KEYS = [key for key in KEYS if not key.get("deleted_at")]
+CONFIGURED_API_KEYS = [f"sk-demo-{index:04d}" for index in range(1, len(LIVE_KEYS) + 1)]
 
 PRICES = [
     {
@@ -1538,7 +1539,7 @@ def payload_for(path, query):
             for model, price in REFERENCE_PRICES.items() if term in model.lower()
         ]}
     if path in {"/v0/management/config", "/v0/management/api-keys"}:
-        config = {"api-keys": [f"sk-demo-{index:04d}" for index in range(1, len(LIVE_KEYS) + 1)]}
+        config = {"api-keys": list(CONFIGURED_API_KEYS)}
         if path == "/v0/management/config":
             config.update({
                 "gemini-api-key": [],
@@ -1649,7 +1650,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_html(body)
             return
         authorization = self.headers.get("Authorization", "")
-        api_keys = [f"sk-demo-{index:04d}" for index in range(1, len(LIVE_KEYS) + 1)]
+        api_keys = CONFIGURED_API_KEYS
         if parsed.path == f"{RESOURCE_BASE}/session":
             if not authorization.startswith("Bearer ") or authorization[7:] not in api_keys:
                 self.send_json(401, {"error": {"message": "API Key 无效"}})
@@ -1797,7 +1798,25 @@ class Handler(BaseHTTPRequestHandler):
             self.mutation_view = json.loads(request_body or b"{}")
             request_body = json.dumps(self.mutation_view.get("data") or {}).encode()
         route = self.command, parsed.path
-        if route == ("POST", f"{API_BASE}/auth-files/quota/reset"):
+        if route == ("PATCH", "/v0/management/api-keys"):
+            body = json.loads(request_body or b"{}")
+            old, new = body.get("old"), body.get("new")
+            if not isinstance(old, str) or not isinstance(new, str):
+                self.send_json(400, {"error": "missing fields"})
+                return
+            if old in CONFIGURED_API_KEYS:
+                CONFIGURED_API_KEYS[CONFIGURED_API_KEYS.index(old)] = new
+            else:
+                CONFIGURED_API_KEYS.append(new)
+            self.send_json(200, {"ok": True})
+        elif route == ("DELETE", "/v0/management/api-keys"):
+            index = parse_qs(parsed.query).get("index", [""])[0]
+            if not index.isdigit() or int(index) >= len(CONFIGURED_API_KEYS):
+                self.send_json(400, {"error": "invalid index"})
+                return
+            CONFIGURED_API_KEYS.pop(int(index))
+            self.send_json(200, {"ok": True})
+        elif route == ("POST", f"{API_BASE}/auth-files/quota/reset"):
             self.reset_auth_quota(parsed, AUTH_FILES)
         elif route == ("DELETE", f"{API_BASE}/plugin-logs"):
             cleared = len(PLUGIN_LOGS)
@@ -1849,7 +1868,35 @@ class Handler(BaseHTTPRequestHandler):
                     break
             self.send_json(200, {"ok": True})
         elif route == ("POST", f"{API_BASE}/keys/sync"):
-            self.send_json(200, {"added": 0, "deleted": 0})
+            body = json.loads(request_body or b"{}")
+            configured = {}
+            for value in body.get("keys", []):
+                value = value.strip()
+                if value:
+                    configured[hashlib.sha256(CALLER_SCOPE_SALT + value.encode()).hexdigest()] = value
+            added = deleted = 0
+            for scope, value in configured.items():
+                key = next((item for item in KEYS if item["scope"] == scope), None)
+                if key is None:
+                    key = {"scope": scope, "preview": value[:6] + "…" + value[-4:], "label": "", "in_config": True,
+                           "plan_id": "", "concurrency_limit": 0, "current_concurrency": 0,
+                           "route_bindings": {"route_ids": [], "models": [], "credential_ids": [], "credential_providers": []}}
+                    refresh_key_quota(key)
+                    KEYS.append(key)
+                    added += 1
+                elif not key.get("in_config"):
+                    added += 1
+                key["in_config"] = True
+                key.pop("deleted_at", None)
+            for key in KEYS:
+                if key.get("in_config") and key["scope"] not in configured:
+                    key["in_config"] = False
+                    key["deleted_at"] = iso(NOW)
+                    deleted += 1
+            LIVE_KEYS[:] = [next(key for key in KEYS if key["scope"] == hashlib.sha256(
+                CALLER_SCOPE_SALT + value.strip().encode()).hexdigest())
+                for value in CONFIGURED_API_KEYS if value.strip()]
+            self.send_json(200, {"added": added, "deleted": deleted})
         elif route == ("POST", f"{API_BASE}/credentials/sync"):
             body = json.loads(request_body or b"{}")
             CREDENTIALS[:] = [

@@ -683,6 +683,7 @@
       .concurrency-editor .native-select, .concurrency-editor select { width: 96px; min-width: 96px; }
       .concurrency-editor .small { white-space: nowrap; }
       .key-plan-select { max-width: 240px; }
+      .key-config-number { color: var(--text-secondary); white-space: nowrap; font-variant-numeric: tabular-nums; }
       .api-key-identity { display: inline-flex; align-items: baseline; flex: 0 1 auto; gap: 6px; min-width: 0; max-width: 100%; }
       .api-key-identity-stacked { display: grid; align-items: initial; gap: 1px; }
       .api-key-identity-line { display: flex; align-items: center; gap: 4px; min-width: 0; }
@@ -2292,6 +2293,7 @@
               <div class="row section-actions">
                 <input id="key-filter" placeholder="Search API keys, labels, or plans" class="wide-search"  data-i18n-placeholder="ui.search_api_keys_labels_or_plans"/>
                 <div class="row key-toolbar-buttons">
+                  <button id="keys-add" class="labeled-icon-button" type="button" data-i18n="ui.add_api_key">Add API key</button>
                   <label class="toggle-filter">
                     <input id="keys-include-deleted" type="checkbox" role="switch" />
                     <span data-i18n="ui.include_deleted">Include deleted</span>
@@ -2994,13 +2996,27 @@
       // Their cached rows keep scope references; labels and previews live here once.
       const keyDirectory = {
         value: new Map(),
+        order: new Map(),
         revisions: new Map(),
         revision: 0,
         beginRead() { return ++keyDirectory.revision; },
         clear() {
           keyDirectory.value = new Map();
+          keyDirectory.order = new Map();
           keyDirectory.revisions.clear();
           keyDirectory.revision++;
+        },
+        async setOrder(keys) {
+          const generation = sessionGeneration;
+          const order = new Map();
+          for (const [index, key] of keys.entries()) {
+            const value = key.trim();
+            if (!value) continue;
+            const scope = await sha256Hex(CALLER_SCOPE_SALT + value);
+            if (!order.has(scope)) order.set(scope, index + 1);
+          }
+          if (generation !== sessionGeneration || currentRole !== "admin") throw new StaleRequestError();
+          keyDirectory.order = order;
         },
         receive(rows, revision = ++keyDirectory.revision, { field = "scope", fallback = false } = {}) {
           let identities = keyDirectory.value;
@@ -4085,7 +4101,11 @@
           }
         };
         const synced = settleLoads([
-          sync("API Key", async () => plugin("POST", "/keys/sync", { keys: await configuredKeys, allow_empty: true }, { command: true })),
+          sync("API Key", async () => {
+            const keys = await configuredKeys;
+            await keyDirectory.setOrder(keys);
+            await plugin("POST", "/keys/sync", { keys, allow_empty: true }, { command: true });
+          }),
           sync(m("ui.credentials"), async () =>
             plugin("POST", "/credentials/sync", { credentials: await parseConfiguredCredentials(await config) }, { command: true })
           )
@@ -4179,6 +4199,71 @@
       async function fetchConfiguredAPIKeys() {
         const result = await api("GET", "/v0/management/api-keys", null, { raw: true });
         return parseConfiguredAPIKeys(result);
+      }
+
+      function generateAPIKey() {
+        const bytes = crypto.getRandomValues(new Uint8Array(32));
+        return "sk-" + Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      }
+
+      async function configuredKeyIndexes(keys, scope) {
+        const indexes = [];
+        for (const [index, value] of keys.entries()) {
+          if (value.trim() && (await sha256Hex(CALLER_SCOPE_SALT + value.trim())) === scope) indexes.push(index);
+        }
+        return indexes;
+      }
+
+      async function addConfiguredAPIKey(raw) {
+        const key = String(raw || "").trim();
+        if (key.length < 32 || /\s/.test(key)) throw new UIError(m("ui.new_api_key_requirements"));
+        const scope = await sha256Hex(CALLER_SCOPE_SALT + key);
+        let attempted = false;
+        try {
+          await queueAdminData("configuration", async (current) => {
+            const keys = await fetchConfiguredAPIKeys();
+            current();
+            if ((await configuredKeyIndexes(keys, scope)).length) throw new UIError(m("ui.api_key_already_configured"));
+            current();
+            attempted = true;
+            // PATCH appends when old is absent; using the same value for old/new
+            // also makes a repeated request idempotent.
+            await api("PATCH", "/v0/management/api-keys", { old: key, new: key }, { raw: true, command: true });
+            current();
+          });
+        } finally { if (attempted && currentRole === "admin") await loadDataGroup(false, "configuration", true); }
+        if (!keyDirectory.order.has(scope) || !resources.admin.keys.value?.some((view) => view.scope === scope && view.in_config)) {
+          throw new UIError(m("ui.api_key_change_needs_refresh"));
+        }
+        notify(m("ui.api_key_added_number", { v0: keyDirectory.order.get(scope) }));
+      }
+
+      async function deleteConfiguredAPIKey(view) {
+        let attempted = false;
+        try {
+          await queueAdminData("configuration", async (current) => {
+            const keys = await fetchConfiguredAPIKeys();
+            current();
+            const indexes = await configuredKeyIndexes(keys, view.scope);
+            if (!indexes.length) throw new UIError(m("ui.this_api_key_no_longer_exists_refresh_the_list"));
+            // Delete duplicate entries from the end so earlier indexes stay
+            // stable. Recheck each index before calling CPA's index-only API.
+            for (const index of indexes.reverse()) {
+              const latest = await fetchConfiguredAPIKeys();
+              current();
+              if (!latest[index] || (await sha256Hex(CALLER_SCOPE_SALT + latest[index].trim())) !== view.scope) {
+                throw new UIError(m("ui.api_key_list_changed_retry"));
+              }
+              attempted = true;
+              await api("DELETE", "/v0/management/api-keys?index=" + index, null, { raw: true, command: true });
+              current();
+            }
+          });
+        } finally { if (attempted && currentRole === "admin") await loadDataGroup(false, "configuration", true); }
+        if (keyDirectory.order.has(view.scope) || resources.admin.keys.value?.some((key) => key.scope === view.scope && key.in_config)) {
+          throw new UIError(m("ui.api_key_change_needs_refresh"));
+        }
+        notify(m("ui.api_key_deleted"));
       }
 
       async function fetchModels(account, key) {
@@ -6207,10 +6292,18 @@
         if (renderDataPending($("keys-body"), [resources.admin.keys], m("ui.loading"), "empty section-loading")) return;
         const plans = resources.admin.plans.value;
         const filter = $("key-filter").value.trim().toLowerCase();
-        const keys = resources.admin.keys.value.filter((key) => !key.deleted_at || $("keys-include-deleted").checked)
-          .filter((view) => matchesTerm([apiKeyIdentity(view).text, view.plan_name, view.scope].filter(Boolean).join(" "), filter));
+        const order = keyDirectory.order;
+        const keys = resources.admin.keys.value.filter((key) => !key.deleted_at || $("keys-include-deleted").checked).filter((view) =>
+          matchesTerm(
+            [apiKeyIdentity(view).text, view.plan_name, view.scope, order.get(view.scope) && "#" + order.get(view.scope)].filter(Boolean)
+              .join(" "),
+            filter
+          )
+        )
+          .sort((left, right) => (order.get(left.scope) ?? Infinity) - (order.get(right.scope) ?? Infinity));
         renderCollection($("keys-body"), keys, {
           headers: [
+            { label: m("ui.sequence_number"), num: true },
             "API Key",
             m("ui.subscription_plans"),
             m("ui.routing_rules"),
@@ -6297,6 +6390,7 @@
             return el(
               "tr",
               { class: deleted ? "key-deleted" : "" },
+              el("td", { class: "num key-config-number", text: order.has(view.scope) ? "#" + order.get(view.scope) : "—" }),
               el(
                 "td",
                 {},
@@ -6369,6 +6463,18 @@
                       await mutateAdmin("POST", "/keys/label", { scope: view.scope, label });
                       notify(m("ui.label_saved"));
                     })
+                }),
+                el("button", {
+                  class: "link",
+                  text: m("ui.delete_api_key"),
+                  disabled: deleted || saving || !view.in_config,
+                  onclick: () =>
+                    openActionDialog(
+                      m("ui.delete_api_key"),
+                      m("ui.delete_api_key_confirm", { v0: apiKeyIdentity(view).text }),
+                      undefined,
+                      () => submitKeyChange(view.scope, () => deleteConfiguredAPIKey(view))
+                    )
                 })
               )
             );
@@ -9537,6 +9643,7 @@
         };
 
       $("key-filter").addEventListener("input", renderKeys);
+      $("keys-add").onclick = () => openActionDialog(m("ui.add_api_key"), m("ui.add_api_key_hint"), generateAPIKey(), addConfiguredAPIKey);
       $("keys-include-deleted").addEventListener("change", () => {
         saveChoice("admin", "keys-include-deleted");
         renderKeys();
