@@ -191,7 +191,12 @@
   th { color: var(--muted); font-weight: 550; background: var(--bg); }
   td.message { min-width: 180px; max-width: 380px; white-space: normal; overflow-wrap: anywhere; }
   .timing { display: flex; align-items: stretch; gap: 8px; }
-  .timing-bar { width: 4px; flex: none; border-radius: 4px; background: linear-gradient(to bottom, var(--first-color) 40%, var(--total-color) 60%); }
+  .timing-bar {
+    width: 4px;
+    flex: none;
+    border-radius: 4px;
+    background: linear-gradient(to bottom, var(--first-color) 40%, var(--total-color) 60%);
+  }
   .timing-bar.first-good { --first-color: #10b981; }
   .timing-bar.first-warn { --first-color: #fbbf24; }
   .timing-bar.first-slow { --first-color: #f97316; }
@@ -722,7 +727,11 @@
       const firstSeverity = first == null ? null : timingSeverity(first, 10000, 30000, 60000);
       const totalSeverity = total == null ? null : timingSeverity(total, 60000, 180000, 300000);
       if (firstSeverity || totalSeverity) {
-        const bar = node("span", null, "timing-bar first-" + (firstSeverity || totalSeverity) + " total-" + (totalSeverity || firstSeverity));
+        const bar = node(
+          "span",
+          null,
+          "timing-bar first-" + (firstSeverity || totalSeverity) + " total-" + (totalSeverity || firstSeverity)
+        );
         bar.setAttribute("aria-hidden", "true");
         value.append(bar);
       }
