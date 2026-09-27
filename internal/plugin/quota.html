@@ -126,6 +126,9 @@
   .theme-picker button[aria-pressed="true"] { background: var(--soft); color: var(--accent); font-weight: 650; }
   .intro { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 22px; }
   .intro p { margin-top: 8px; }
+  .intro-meta { display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .intro-meta .badge:empty { display: none; }
+  .billing-multiplier { border: 1px solid var(--line); background: var(--panel); color: var(--muted); font-weight: 600; }
   .panel, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
   .panel { padding: 22px; margin-bottom: 20px; }
   .auth { max-width: 650px; margin: 46px auto; padding: 30px; }
@@ -221,7 +224,8 @@
     .nav { width: 100%; }
     .nav .theme-picker { margin-left: auto; }
     .brand-mark { width: 36px; height: 36px; }
-    .intro { align-items: start; }
+    .intro { align-items: start; flex-wrap: wrap; }
+    .intro-meta { justify-content: flex-start; }
     h1 { font-size: 23px; }
     .panel { padding: 17px; }
     .auth { margin: 25px auto; padding: 23px 18px; }
@@ -245,10 +249,9 @@
 <header class="top"><a class="brand" href="usage.html"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19V9m8 10V4m8 15v-7" stroke-linecap="round"/></svg></span><span><strong>CPA Key Billing</strong><br><small>账户自助查询</small></span></a><nav class="nav" aria-label="页面导航"><a href="usage.html">我的用量</a><a href="quota.html" aria-current="page">额度总览</a><div class="theme-picker" role="group" aria-label="主题"><button type="button" data-theme-mode="system" aria-pressed="true">系统</button><button type="button" data-theme-mode="dark" aria-pressed="false">暗色</button><button type="button" data-theme-mode="light" aria-pressed="false">亮色</button></div><button id="logout" type="button" hidden>退出</button></nav></header>
 <div id="message" class="notice" role="status" aria-live="polite" hidden></div>
 
-<div class="intro"><div><div class="eyebrow">Capacity & availability</div><h1>额度总览</h1><p class="muted">查看自己的订阅，以及可用上游账户的共享额度快照。</p></div><span id="identity" class="badge"></span></div>
+<div class="intro"><div><div class="eyebrow">Capacity & availability</div><h1>额度总览</h1><p class="muted">查看自己的订阅，以及可用上游账户的共享额度快照。</p></div><div class="intro-meta"><span id="identity" class="badge"></span><span id="billing-policy" class="badge billing-multiplier" aria-label="当前全局计费倍率" hidden></span></div></div>
 <section id="auth" class="panel auth"><h2>查看当前额度</h2><p class="muted">输入服务管理员提供的 API Key，查看当前可见的额度信息。</p><form id="login"><label for="key">API Key</label><div class="auth-row"><input id="key" type="password" placeholder="sk-…" autocomplete="off" autocapitalize="off" spellcheck="false" required maxlength="8192"><button class="primary" type="submit">查看额度</button></div><small>Key 不写入浏览器存储；登录会话保存在服务器内存中，最长保留 7 天。</small></form></section>
 <div id="dashboard" hidden>
-<section id="billing-policy" class="panel" data-private aria-label="计费倍率"></section>
 <div class="notice">此页只读，展示服务器已有的额度快照。数据不会自动更新，账户额度由管理员维护。</div>
 <div id="stats" class="grid stats" data-private></div>
 <section class="panel"><div class="section-head"><h2>我的订阅与并发</h2><span id="subscription-status" class="badge" data-private></span></div><div id="subscription" data-private></div></section>
@@ -270,20 +273,8 @@
     const factor = (value, fallback = 1) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback);
     const factorText = (value) => factor(value).toLocaleString("zh-CN", { maximumSignificantDigits: 12 }) + "×";
     function billingPolicy(value) {
-      const parent = clear("billing-policy");
-      parent.append(
-        node("strong", "当前全局计费倍率 " + factorText(value.billing_multiplier)),
-        node(
-          "p",
-          "Codex OAuth Priority：" + (value.codex_fast_mode_billing === true ? "GPT-5.6 / GPT-6 系列 2×，其他模型 2.5×" : "倍率加价已关闭"),
-          "muted"
-        ),
-        node(
-          "p",
-          "Codex OAuth 启用 Fast 加价时，请求 Priority/Fast 按模型计 2× 或 2.5×（包括响应 auto/default、未知或缺失）；响应明确为 standard 时计 1×，为 flex 时计 0.5×。",
-          "muted"
-        )
-      );
+      const badge = $("billing-policy");
+      badge.textContent = "当前全局计费倍率 " + factorText(value.billing_multiplier);
     }
     function node(tag, text, cls) {
       const value = document.createElement(tag);
@@ -349,6 +340,8 @@
       $("auth").hidden = false;
       $("logout").hidden = true;
       $("identity").textContent = "";
+      $("billing-policy").textContent = "";
+      $("billing-policy").hidden = true;
       message("");
       $("key").focus();
     }
@@ -401,6 +394,7 @@
     function showDashboard() {
       $("auth").hidden = true;
       $("dashboard").hidden = false;
+      $("billing-policy").hidden = false;
       $("logout").hidden = false;
       $("key").value = "";
     }
