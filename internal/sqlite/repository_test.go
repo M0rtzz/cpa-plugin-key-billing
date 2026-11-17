@@ -155,7 +155,7 @@ func TestFreshSchemaVersionAndTables(t *testing.T) {
 	}
 	want := map[string]bool{
 		"api_keys": true, "routes": true, "plans": true, "billing_adjustments": true,
-		"prices": true, "request_events": true, "config_credentials": true,
+		"prices": true, "request_events": true, "config_credentials": true, "official_price_catalog": true,
 		"request_errors": true, "plugin_logs": true, "reference_prices_metadata": true, "reference_prices": true,
 	}
 	rows, err := database.db.Query(`SELECT name FROM sqlite_master

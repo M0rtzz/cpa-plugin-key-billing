@@ -4,6 +4,8 @@ import "time"
 
 type Repository interface {
 	OpenReferencePrices() (ReferencePriceRepository, error)
+	LoadOfficialPrices() (OfficialPriceCatalog, error)
+	SaveOfficialPrices(OfficialPriceCatalog) error
 	Load(requestEventCutoff, pluginLogCutoff time.Time) (Snapshot, error)
 	Save(state *State, changes Changes) error
 	UpsertPrice(price CustomPrice) error

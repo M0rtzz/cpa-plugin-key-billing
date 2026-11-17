@@ -19,7 +19,8 @@ func TestV19ServiceTierMigrationPreservesHistoryAndRollsBack(t *testing.T) {
    ALTER TABLE prices DROP COLUMN service_tiers_json;
    ALTER TABLE request_events DROP COLUMN requested_model; ALTER TABLE request_events DROP COLUMN reported_model; ALTER TABLE request_events DROP COLUMN stream;
    ALTER TABLE request_events DROP COLUMN token_usage_json;
-   PRAGMA user_version=18;`); err != nil {
+   DROP TABLE official_price_catalog;
+		PRAGMA user_version=18;`); err != nil {
 				t.Fatal(err)
 			}
 			if !fail {

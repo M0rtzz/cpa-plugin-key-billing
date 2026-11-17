@@ -35,8 +35,8 @@ func (a *App) mutateWithView(req ManagementRequest, path string, handle func(*Ap
 		if path == routeRoutes || path == routeKeysRoutes {
 			view["routes"] = a.routeRows()
 		}
-	case routePrices, routeReferencePricesRefresh:
-		prices, err := a.store.ModelPriceRows(input.Models, true)
+	case routePrices, routeReferencePricesRefresh, routeOfficialPricesRefresh:
+		prices, err := a.store.ModelPriceRowsWithOfficial(input.Models, true, true)
 		if err != nil {
 			// The write has committed. A display-read failure must not turn it into
 			// a reported write failure or invite the caller to repeat the mutation.
@@ -45,6 +45,7 @@ func (a *App) mutateWithView(req ManagementRequest, path string, handle func(*Ap
 			view["prices"] = prices
 		}
 		view["metadata"] = a.store.ReferencePriceMetadata()
+		view["official_metadata"] = a.store.OfficialPriceMetadata()
 	case routePluginLogs:
 		view["logs_cleared"] = true
 	}

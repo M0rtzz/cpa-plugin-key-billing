@@ -2383,11 +2383,13 @@
               <div class="row section-actions">
                 <input id="price-filter" placeholder="Search models"  data-i18n-placeholder="ui.search_models"/>
                 <button id="price-reference-refresh" data-i18n="ui.update_references">Update references</button>
+                <button id="price-official-refresh" type="button" data-i18n="ui.sync_official_prices">Sync OpenAI prices</button>
                 <button id="price-new" data-i18n="ui.add_pricing">Add pricing</button>
               </div>
             </div>
             <div id="prices-body"></div>
             <p id="price-status" class="muted small price-footnote"></p>
+            <p id="price-official-status" class="muted small price-footnote"></p>
           </div>
         </section>
 
@@ -2981,6 +2983,7 @@
           models: m("ui.model_catalog"),
           catalog: m("ui.model_prices"),
           priceStatus: m("ui.reference_price_status"),
+          officialPriceStatus: m("ui.official_price_status"),
           authFiles: m("ui.auth_files")
         }),
         account: dataEntries({
@@ -3046,7 +3049,7 @@
       const resourceGroups = {
         admin: {
           configuration: { names: ["keys", "plans", "routes", "credentials", "models"], syncErrors: [] },
-          pricing: { names: ["catalog", "priceStatus"], after: "configuration" },
+          pricing: { names: ["catalog", "priceStatus", "officialPriceStatus"], after: "configuration" },
           authFiles: { names: ["authFiles"] }
         },
         account: {
@@ -4156,6 +4159,9 @@
         if (Object.hasOwn(view, "metadata")) {
           Object.assign(resources.admin.priceStatus, { value: { metadata: view.metadata }, error: "" });
         }
+        if (Object.hasOwn(view, "official_metadata")) {
+          Object.assign(resources.admin.officialPriceStatus, { value: { metadata: view.official_metadata }, error: "" });
+        }
         if (view.logs_cleared) {
           pagedList("logs").replace({ entries: [], level_counts: {}, next_before_id: 0 });
           expandedPluginLogIDs.clear();
@@ -4184,6 +4190,7 @@
         const prices = new Map();
         for (const [index, batch] of batches.entries()) {
           batch.set("include_custom", String(!account && index === 0));
+          if (!account && index === 0) batch.set("include_official", "true");
           const path = "/prices?" + batch.toString();
           const rows = await (account ? accountAPI(path) : plugin("GET", path));
           for (const row of requireArray(rows, m("ui.model_prices"))) {
@@ -4296,6 +4303,22 @@
                 })
               : load.value ? m("ui.no_reference_prices") : load.error ? "" : m("ui.loading_reference_price_status"),
             metadata?.last_error
+          ]
+            .filter(Boolean)
+            .join("；")
+        );
+        const official = resources.admin.officialPriceStatus;
+        const status = official.value?.metadata;
+        setText(
+          $("price-official-status"),
+          [
+            status?.usable
+              ? m("ui.official_prices_status", {
+                  count: int(status.model_count),
+                  time: window.billingI18n.date(status.fetched_at, { dateStyle: "short", timeStyle: "medium", hour12: false })
+                })
+              : m("ui.official_prices_not_synced"),
+            status?.last_error || official.error
           ]
             .filter(Boolean)
             .join("；")
@@ -4498,6 +4521,9 @@
             await settleLoads([
               read("catalog", () => fetchCatalog(false)),
               read("priceStatus", async () => requireObject(await plugin("GET", "/prices/reference/status"), m("ui.reference_price_status"))
+              ),
+              read("officialPriceStatus", async () =>
+                requireObject(await plugin("GET", "/prices/official/status"), m("ui.official_price_status"))
               )
             ]);
           } else { await read("authFiles", () => fetchAuthFiles(false)); }
@@ -4600,7 +4626,7 @@
               keyedSection(["plans", "keys"], renderPlans),
               keyedSection(["routes", "keys", "credentials"], renderRoutes),
               section(["catalog"], renderPriceTable),
-              section(["priceStatus", "catalog"], renderReferencePriceStatus),
+              section(["priceStatus", "officialPriceStatus", "catalog"], renderReferencePriceStatus),
               section(["logs"], renderPluginLogs)
             ]
           };
@@ -7307,6 +7333,8 @@
 
       function priceSourceTag(source) {
         switch (source) {
+          case "official":
+            return el("span", { class: "tag ok", text: m("ui.official_price") });
           case "custom":
             return el("span", { class: "tag warn", text: m("ui.custom") });
           case "builtin":
@@ -7365,6 +7393,32 @@
               { class: "mono" },
               row.model_id,
               ...["priority", "flex"].map((tier) => el("div", { class: "muted small" }, tier + ": " + servicePricePreview(row, tier))),
+              row.official_price
+                ? el(
+                    "div",
+                    { class: "muted small" },
+                    el("a", {
+                      href: "https://developers.openai.com/api/docs/pricing",
+                      target: "_blank",
+                      rel: "noopener noreferrer",
+                      text: m("ui.view_official_price")
+                    }),
+                    row.official_price.quotes.some((quote) => quote.modality === "Image" && quote.section === "Images")
+                      ? " · " + m("ui.official_image_price_note")
+                      : null,
+                    row.source === "none" ? " · " + m("ui.official_display_only") : null
+                  )
+                : null,
+              ...(row.source === "none" && row.official_price
+                ? row.official_price.quotes.filter((quote) => quote.tier === "standard").map((quote) =>
+                    el(
+                      "div",
+                      { class: "muted small" },
+                      [quote.modality, ...quote.values.map((value) => value.metric + ": " + value.value), quote.unit].filter(Boolean)
+                        .join(" · ")
+                    )
+                  )
+                : []),
               row.in_models === false ? el("div", { class: "muted small", text: m("ui.not_in_the_cpa_model_list") }) : null,
               row.custom_price_model_id && row.custom_price_model_id !== row.model_id
                 ? el("div", { class: "muted small", text: m("ui.using_the_custom_price_for_value", { v0: row.custom_price_model_id }) })
@@ -7374,7 +7428,14 @@
             el("td", { class: "num" }, tierPriceCell(row, "output_per_1m")),
             el("td", { class: "num" }, tierPriceCell(row, "cache_read_per_1m")),
             el("td", { class: "num" }, tierPriceCell(row, "cache_write_per_1m")),
-            el("td", {}, priceSourceTag(row.source)),
+            el(
+              "td",
+              {},
+              priceSourceTag(row.source),
+              row.source !== "official" && row.official_price
+                ? el("div", { class: "small muted", text: m("ui.official_quote_available") })
+                : null
+            ),
             el(
               "td",
               { class: "small" },
@@ -9150,6 +9211,7 @@
       }
 
       function servicePricePreview(row, tier) {
+        if (row.source === "none") return m("ui.unpriced");
         const view = row.service_tier_prices?.[tier];
         if (!view) return m("ui.service_price_default_note");
         const label = m("ui.pricing_method_" + view.method);
@@ -9911,6 +9973,27 @@
             const result = await mutateAdmin("POST", "/prices/reference/refresh", null, { timeoutMS: 45000 });
             notify(result.changed ? m("ui.reference_prices_updated") : m("ui.reference_prices_are_up_to_date"));
           } finally { button.disabled = false; }
+        });
+      $("price-official-refresh").onclick = () =>
+        guard(async () => {
+          const button = $("price-official-refresh");
+          button.disabled = true;
+          setText(button, m("ui.syncing_official_prices"));
+          try {
+            const result = await mutateAdmin("POST", "/prices/official/refresh", null, { timeoutMS: 45000 });
+            notify(m("ui.official_prices_synced", { count: int(result.metadata.model_count) }));
+          } catch (error) {
+            try {
+              resources.admin.officialPriceStatus.value = await plugin("GET", "/prices/official/status");
+              renderPage();
+            } catch (_) {
+              /* Preserve the sync error if the status read also fails. */
+            }
+            throw error;
+          } finally {
+            button.disabled = false;
+            setText(button, m("ui.sync_official_prices"));
+          }
         });
 
       // BILLING_ANALYSIS

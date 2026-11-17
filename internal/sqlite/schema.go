@@ -97,6 +97,11 @@ CREATE TABLE reference_prices (
     PRIMARY KEY (provider_id, model_id)
 );
 
+CREATE TABLE official_price_catalog (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    catalog_json TEXT NOT NULL
+);
+
 CREATE TABLE request_events (
 	id                          INTEGER PRIMARY KEY AUTOINCREMENT,
 	at                          INTEGER NOT NULL,

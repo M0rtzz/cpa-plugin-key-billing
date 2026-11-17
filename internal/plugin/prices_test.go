@@ -51,6 +51,24 @@ func TestPriceAdmissionAndDeleteWithoutInventory(t *testing.T) {
 	callOK(t, app, http.MethodPut, routePrices, nil, billing.CustomPrice{ModelID: "gpt-*"}, 200, nil)
 }
 
+func TestOfficialPriceStatusAndAccountIsolation(t *testing.T) {
+	app := newConfiguredApp(t)
+	var status struct {
+		Metadata billing.OfficialPriceMetadata `json:"metadata"`
+	}
+	callOK(t, app, http.MethodGet, routeOfficialPricesStatus, nil, nil, 200, &status)
+	if status.Metadata.SourceURL != billing.OpenAIPricesURL || status.Metadata.Usable {
+		t.Fatal(status)
+	}
+	callOK(t, app, http.MethodGet, routePrices, url.Values{"include_official": {"invalid"}}, nil, 400, nil)
+	for _, path := range []string{routeOfficialPricesStatus, routeOfficialPricesRefresh} {
+		response := callAccount(t, app, path, accountTestKeyA, nil)
+		if response.StatusCode != http.StatusNotFound {
+			t.Fatal("official admin route exposed to API keys", path, response.StatusCode)
+		}
+	}
+}
+
 func TestBuiltinPriceAdmissionAndListing(t *testing.T) {
 	app := newConfiguredApp(t)
 	for _, test := range []struct {

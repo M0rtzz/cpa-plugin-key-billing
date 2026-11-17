@@ -20,7 +20,15 @@ func (a *App) listPrices(req ManagementRequest, access viewAccess) ManagementRes
 		}
 		includeCustom = includeCustom && value
 	}
-	prices, err := a.store.ModelPriceRows(models, includeCustom)
+	includeOfficial := false
+	if raw := req.Query.Get("include_official"); raw != "" {
+		value, err := strconv.ParseBool(raw)
+		if err != nil {
+			return viewJSONError(access, http.StatusBadRequest, "invalid", "include_official must be true or false")
+		}
+		includeOfficial = !access.APIKey && value
+	}
+	prices, err := a.store.ModelPriceRowsWithOfficial(models, includeCustom, includeOfficial)
 	if err != nil {
 		return viewErrorResponse(access, err)
 	}
@@ -66,6 +74,14 @@ func (a *App) refreshReferencePrices() ManagementResponse {
 	result, errRefresh := a.store.RefreshReferencePrices()
 	if errRefresh != nil {
 		return errorResponse(errRefresh)
+	}
+	return JSONResponse(http.StatusOK, result)
+}
+
+func (a *App) refreshOfficialPrices() ManagementResponse {
+	result, err := a.store.RefreshOfficialPrices()
+	if err != nil {
+		return errorResponse(err)
 	}
 	return JSONResponse(http.StatusOK, result)
 }

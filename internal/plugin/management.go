@@ -28,6 +28,8 @@ const (
 	routeReferencePrices        = "/prices/reference"
 	routeReferencePricesStatus  = "/prices/reference/status"
 	routeReferencePricesRefresh = "/prices/reference/refresh"
+	routeOfficialPricesStatus   = "/prices/official/status"
+	routeOfficialPricesRefresh  = "/prices/official/refresh"
 	routePlans                  = "/plans"
 	routeRoutes                 = "/routes"
 	routeKeysRoutes             = "/keys/routes"
@@ -69,6 +71,10 @@ var managementEndpoints = []managementEndpoint{
 	{http.MethodGet, routeReferencePrices, "Search model reference prices", (*App).searchReferencePrices},
 	{http.MethodGet, routeReferencePricesStatus, "View reference price status", func(a *App, _ ManagementRequest) ManagementResponse { return a.referencePriceStatus() }},
 	{http.MethodPost, routeReferencePricesRefresh, "Update reference prices", func(a *App, _ ManagementRequest) ManagementResponse { return a.refreshReferencePrices() }},
+	{http.MethodGet, routeOfficialPricesStatus, "View OpenAI official price status", func(a *App, _ ManagementRequest) ManagementResponse {
+		return JSONResponse(http.StatusOK, map[string]any{"metadata": a.store.OfficialPriceMetadata()})
+	}},
+	{http.MethodPost, routeOfficialPricesRefresh, "Sync OpenAI official model prices", func(a *App, _ ManagementRequest) ManagementResponse { return a.refreshOfficialPrices() }},
 	{http.MethodDelete, routePrices, "Delete custom model pricing", (*App).deletePrice},
 	{http.MethodPut, routePrices, "Update model pricing", (*App).putPrices},
 	{http.MethodPost, routePlans, "Create subscription plan", (*App).createPlan},

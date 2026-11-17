@@ -16,8 +16,10 @@ import (
 // Work must finish synchronously within host calls: background activity in this
 // embedded Go runtime can conflict with CLIProxyAPI's runtime.
 type Store struct {
-	cfgMu           sync.Mutex
-	referencePrices atomic.Pointer[referencePriceManager]
+	cfgMu                sync.Mutex
+	referencePrices      atomic.Pointer[referencePriceManager]
+	officialPriceSyncing atomic.Bool
+	officialPrices       OfficialPriceCatalog
 
 	mu    sync.RWMutex
 	state *State
@@ -41,6 +43,7 @@ type Store struct {
 
 	open                    func(string) (Repository, error)
 	downloadReferencePrices func(context.Context) ([]byte, error)
+	downloadOfficialPrices  func(context.Context) ([]byte, error)
 
 	now func() time.Time
 }
@@ -56,6 +59,7 @@ func NewStore(open func(string) (Repository, error), downloadReferencePrices fun
 		activeByScope:           make(map[string]int),
 		open:                    open,
 		downloadReferencePrices: downloadReferencePrices,
+		downloadOfficialPrices:  downloadOpenAIPrices,
 		now:                     time.Now,
 	}
 }
@@ -105,6 +109,11 @@ func (s *Store) Configure(cfg Config) error {
 		s.closeRepository(repo)
 		return errLoad
 	}
+	official, errOfficial := repo.LoadOfficialPrices()
+	if errOfficial != nil {
+		s.closeRepository(repo)
+		return errOfficial
+	}
 	references, errReferencePrices := openReferencePrices(repo, s.downloadReferencePrices, s.AddPluginLog)
 	if errReferencePrices != nil {
 		s.closeRepository(repo)
@@ -114,6 +123,7 @@ func (s *Store) Configure(cfg Config) error {
 	previous := s.repo
 	previousReferences := s.referencePrices.Swap(references)
 	s.state = snapshot.State
+	s.officialPrices = official
 	s.cfg = normalized
 	s.repo = repo
 	s.path = path
@@ -137,6 +147,7 @@ func (s *Store) Close() {
 	repo := s.repo
 	previousReferences := s.referencePrices.Swap(nil)
 	s.repo = nil
+	s.officialPrices = OfficialPriceCatalog{}
 	s.path = ""
 	s.dirty = Changes{}
 	s.activeRequests = make(map[string]string)

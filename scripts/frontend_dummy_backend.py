@@ -1433,6 +1433,36 @@ REFERENCE_PRICES = {
 }
 
 
+
+OFFICIAL_PRICES_SYNCED = False
+OFFICIAL_PRICE_ROWS = [
+    {"model_id": "gpt-6.1-terra", "source": "official", "input_per_1m": 1,
+     "output_per_1m": 5, "cache_read_per_1m": 0.05,
+     "long_context": {"threshold_input_tokens": 272000, "input_per_1m": 2,
+                      "output_per_1m": 7.5, "cache_read_per_1m": 0.1},
+     "service_tiers": {"priority": {"input_per_1m": 2, "output_per_1m": 10, "cache_read_per_1m": 0.1},
+                       "flex": {"input_per_1m": 0.5, "output_per_1m": 2.5, "cache_read_per_1m": 0.025}},
+     "official_price": {"model_id": "gpt-6.1-terra", "quotes": [
+         {"section": "Flagship models", "tier": "standard", "unit": "USD / 1M tokens", "values": []}]}},
+    {"model_id": "gpt-image-2.6-flare", "source": "official", "input_per_1m": 5,
+     "output_per_1m": 30, "cache_read_per_1m": 1.25,
+     "official_price": {"model_id": "gpt-image-2.6-flare", "quotes": [
+         {"section": "Images", "tier": "standard", "modality": "Image", "unit": "USD / 1M tokens", "values": []}]}},
+    {"model_id": "gpt-live-1", "source": "none", "input_per_1m": 0, "output_per_1m": 0,
+     "official_price": {"model_id": "gpt-live-1", "quotes": [
+         {"section": "GPT-Live", "tier": "standard", "unit": "As quoted",
+          "values": [{"metric": "Price per minute", "value": "$0.05"}]}]}},
+]
+
+
+def official_price_status():
+    return {"metadata": {"source_url": "https://developers.openai.com/api/docs/pricing.md",
+                         "model_count": len(OFFICIAL_PRICE_ROWS) if OFFICIAL_PRICES_SYNCED else 0,
+                         "version": 1 if OFFICIAL_PRICES_SYNCED else 0,
+                         "fetched_at": iso(NOW) if OFFICIAL_PRICES_SYNCED else None,
+                         "usable": OFFICIAL_PRICES_SYNCED}}
+
+
 def price_status():
     return {
         "metadata": {
@@ -1449,7 +1479,13 @@ def price_status():
 def model_prices(query, include_custom):
     models = set(query.get("model", []))
     rows = {row["model_id"]: row for row in PRICES}
+    if OFFICIAL_PRICES_SYNCED:
+        for price in OFFICIAL_PRICE_ROWS:
+            if rows.get(price["model_id"], {}).get("source") != "custom":
+                rows[price["model_id"]] = price
     names = models | ({row["model_id"] for row in PRICES if row["source"] == "custom"} if include_custom else set())
+    if OFFICIAL_PRICES_SYNCED and query.get("include_official") == ["true"]:
+        names |= {price["model_id"] for price in OFFICIAL_PRICE_ROWS}
     result = []
     for model in sorted(names):
         row = dict(rows.get(model, {"model_id": model, "source": "none", "input_per_1m": 0, "output_per_1m": 0}), in_models=model in models)
@@ -1458,7 +1494,7 @@ def model_prices(query, include_custom):
             custom = row.get("service_tiers", {}).get(tier)
             known = model.split("/")[-1] in {"gpt-6-sol", "gpt-5.6-sol", "gpt-5.5", "gpt-4o"}
             ratio = 0.5 if tier == "flex" else (2.5 if model.endswith("gpt-5.5") else 1.7 if model.endswith("gpt-4o") else 2)
-            fallback = tier == "priority" and not known and custom is None
+            fallback = custom is None and ((tier == "priority" and not known) or row["source"] == "official")
             if custom is not None:
                 price = dict(custom)
                 for key in ("cache_read_per_1m", "cache_write_per_1m"):
@@ -1467,7 +1503,7 @@ def model_prices(query, include_custom):
             else:
                 price = {key: (row.get(key) if row.get(key) is not None else row.get("input_per_1m", 0)) * (1 if fallback else ratio)
                          for key in ("input_per_1m", "output_per_1m", "cache_read_per_1m", "cache_write_per_1m")}
-            views[tier] = {"price": price, "method": "explicit_tier" if custom is not None else "base_fallback" if fallback else "model_ratio"}
+            views[tier] = {"price": price, "method": ("official_tier" if row["source"] == "official" else "explicit_tier") if custom is not None else "base_fallback" if fallback else "model_ratio"}
             if fallback:
                 views[tier]["price_fallback"] = "missing_priority_price"
         row["service_tier_prices"] = views
@@ -1503,6 +1539,8 @@ def payload_for(path, query):
         return {"routes": route_rows()}
     if path == f"{API_BASE}/credentials":
         return {"credentials": CREDENTIALS}
+    if path == f"{API_BASE}/prices/official/status":
+        return official_price_status()
     if path == f"{API_BASE}/prices/reference/status":
         return price_status()
     if path == f"{API_BASE}/prices":
@@ -1591,9 +1629,10 @@ class Handler(BaseHTTPRequestHandler):
                     view["plans"] = PLANS
                 if path in {f"{API_BASE}/routes", f"{API_BASE}/keys/routes"}:
                     view["routes"] = route_rows()
-            elif path in {f"{API_BASE}/prices", f"{API_BASE}/prices/reference/refresh"}:
-                view["prices"] = model_prices({"model": self.mutation_view.get("models", [])}, include_custom=True)
+            elif path in {f"{API_BASE}/prices", f"{API_BASE}/prices/reference/refresh", f"{API_BASE}/prices/official/refresh"}:
+                view["prices"] = model_prices({"model": self.mutation_view.get("models", []), "include_official": ["true"]}, include_custom=True)
                 view["metadata"] = price_status()["metadata"]
+                view["official_metadata"] = official_price_status()["metadata"]
             elif path == f"{API_BASE}/plugin-logs":
                 view["logs_cleared"] = True
             payload = dict(payload, view=view)
@@ -1788,6 +1827,7 @@ class Handler(BaseHTTPRequestHandler):
         self.handle_mutation()
 
     def handle_mutation(self):
+        global OFFICIAL_PRICES_SYNCED
         parsed = urlparse(self.path)
         self.mutation_view = None
         length = int(self.headers.get("Content-Length", "0"))
@@ -1822,6 +1862,10 @@ class Handler(BaseHTTPRequestHandler):
             cleared = len(PLUGIN_LOGS)
             PLUGIN_LOGS.clear()
             self.send_json(200, {"cleared": cleared})
+        elif route == ("POST", f"{API_BASE}/prices/official/refresh"):
+            changed = not OFFICIAL_PRICES_SYNCED
+            OFFICIAL_PRICES_SYNCED = True
+            self.send_json(200, {"metadata": official_price_status()["metadata"], "changed": changed})
         elif route == ("POST", f"{API_BASE}/prices/reference/refresh"):
             self.send_json(200, {"metadata": price_status()["metadata"], "changed": False})
         elif route == ("PUT", f"{API_BASE}/prices"):

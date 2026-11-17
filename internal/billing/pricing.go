@@ -65,6 +65,7 @@ const (
 	PriceSourceNone      PriceSource = "none"
 	PriceSourceCustom    PriceSource = "custom"
 	PriceSourceBuiltin   PriceSource = "builtin"
+	PriceSourceOfficial  PriceSource = "official"
 )
 
 // PriceRates describes token prices in USD per million tokens. Nil cache rates
@@ -80,13 +81,15 @@ type PriceRates struct {
 
 // Rates are USD per 1,000,000 tokens.
 type Price struct {
-	ServiceTiers    map[string]TierPriceRates `json:"service_tiers,omitempty"`
-	InputPer1M      float64                   `json:"input_per_1m"`
-	OutputPer1M     float64                   `json:"output_per_1m"`
-	CacheReadPer1M  float64                   `json:"cache_read_per_1m"`
-	CacheWritePer1M float64                   `json:"cache_write_per_1m"`
-	Source          PriceSource               `json:"source"`
-	LongContext     *ResolvedLongContextPrice `json:"long_context,omitempty"`
+	officialModel     *OfficialModelPrice
+	officialThreshold int64
+	ServiceTiers      map[string]TierPriceRates `json:"service_tiers,omitempty"`
+	InputPer1M        float64                   `json:"input_per_1m"`
+	OutputPer1M       float64                   `json:"output_per_1m"`
+	CacheReadPer1M    float64                   `json:"cache_read_per_1m"`
+	CacheWritePer1M   float64                   `json:"cache_write_per_1m"`
+	Source            PriceSource               `json:"source"`
+	LongContext       *ResolvedLongContextPrice `json:"long_context,omitempty"`
 }
 
 type ResolvedLongContextPrice struct {

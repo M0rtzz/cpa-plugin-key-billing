@@ -9,6 +9,7 @@ import (
 )
 
 type memoryRepository struct {
+	officialPrices  OfficialPriceCatalog
 	referencePrices *memoryReferencePriceRepository
 	state           *State
 	requestEvents   []RequestEvent
@@ -16,6 +17,17 @@ type memoryRepository struct {
 	pluginLogs      []PluginLog
 	fail            error
 	closeFail       error
+}
+
+func (r *memoryRepository) LoadOfficialPrices() (OfficialPriceCatalog, error) {
+	return r.officialPrices, r.fail
+}
+func (r *memoryRepository) SaveOfficialPrices(catalog OfficialPriceCatalog) error {
+	if r.fail != nil {
+		return r.fail
+	}
+	r.officialPrices = catalog
+	return nil
 }
 
 func (r *memoryRepository) Load(requestCutoff, pluginCutoff time.Time) (Snapshot, error) {

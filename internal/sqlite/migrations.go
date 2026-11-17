@@ -11,6 +11,16 @@ import (
 	"cpa-key-billing/internal/billing"
 )
 
+// The independent official snapshot leaves reference prices, custom overrides
+// and already charged usage unchanged.
+func migrateToV22(tx *sql.Tx) error {
+	_, err := tx.Exec(`CREATE TABLE official_price_catalog (id INTEGER PRIMARY KEY CHECK (id = 1), catalog_json TEXT NOT NULL)`)
+	if err != nil {
+		return fmt.Errorf("Migrate official pricing catalog: %w", err)
+	}
+	return nil
+}
+
 // The host did not previously persist these fields. Leave historical values
 // NULL, preserving unknown separately from explicitly non-streaming usage.
 func migrateToV20(tx *sql.Tx) error {

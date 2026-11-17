@@ -860,5 +860,19 @@
   "dashboard.export_cancelled": "已取消导出",
   "dashboard.excel_limit": "超过 Excel 行数上限，请缩小筛选范围",
   "dashboard.export_progress": "已读取 {count} / {total} 条",
-  "dashboard.key_search": "搜索 Key 名称 / 别名"
+  "dashboard.key_search": "搜索 Key 名称 / 别名",
+  "ui.sync_official_prices": "同步 OpenAI 官方价",
+  "ui.syncing_official_prices": "正在同步官方报价…",
+  "ui.official_price_status": "官方报价状态",
+  "ui.official_price": "OpenAI 官方",
+  "ui.view_official_price": "查看官方报价",
+  "ui.official_prices_status": "OpenAI 官方：{count} 个模型 · 更新于 {time}。自定义价格优先。",
+  "ui.official_prices_not_synced": "尚未同步官方报价，点击按钮获取 OpenAI 价格页公布的全部模型及报价。",
+  "ui.official_prices_synced": "已同步官方报价：{count} 个模型",
+  "ui.official_quote_available": "已获取官方报价",
+  "ui.official_display_only": "仅展示报价，计价单位暂不支持",
+  "ui.official_image_price_note": "文本输入／图片输出单价；图片 Token 细分未上报",
+  "ui.pricing_reason_missing_flex_price": "缺少适用的 Flex 单价，按基础价估算",
+  "ui.pricing_method_official_tier": "官方档位单价",
+  "dashboard.method_official_tier": "官方档位单价"
 }

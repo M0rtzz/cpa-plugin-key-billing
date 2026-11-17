@@ -18,7 +18,8 @@ func TestV20UsageMigrationPreservesHistoryAndRollsBack(t *testing.T) {
 			if !conflict {
 				ddl += `ALTER TABLE request_events DROP COLUMN token_usage_json;`
 			}
-			if _, err := db.db.Exec(ddl + `PRAGMA user_version=19;
+			if _, err := db.db.Exec(ddl + `DROP TABLE official_price_catalog;
+		PRAGMA user_version=19;
 				INSERT INTO request_events(id,at,scope,failed,total_usd,billing_multiplier,service_tier_multiplier,pricing_json)
 				VALUES(1,1,'old',0,.123,.2,2.5,'{"rule_version":"codex-oauth-family-v2"}'),(2,2,'old',1,0,1,1,'{}'),(3,3,'deleted',0,0,1,1,'{}');
 				INSERT INTO request_errors(request_event_id,status_code,body) VALUES(2,502,'dummy failure');

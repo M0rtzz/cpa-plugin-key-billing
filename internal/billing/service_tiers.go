@@ -170,6 +170,9 @@ func resolveAPIServicePrice(base Price, model string, event UsageEvent) (Price, 
 	if meta.ServiceTier == "default" {
 		return base, meta
 	}
+	if base.Source == PriceSourceOfficial {
+		return officialServicePrice(base, event, meta)
+	}
 	if explicit, ok := base.ServiceTiers[meta.ServiceTier]; ok {
 		meta.Method = "explicit_tier"
 		return explicit.rates().resolve(base.Source), meta

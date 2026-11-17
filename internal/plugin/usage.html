@@ -540,6 +540,7 @@
       const methods = {
         base: "基础价格",
         explicit_tier: "自定义档位价格",
+        official_tier: "官方档位单价",
         model_ratio: "模型档位价比",
         base_fallback: "基础价回退（估算）",
         oauth_multiplier: "Codex OAuth 模型倍率"
@@ -559,6 +560,7 @@
         unknown_response_tier_request_fallback: "未知响应档位，按请求的 Priority 档位估算",
         unknown_request_tier: "未知请求档位，按标准档估算",
         missing_priority_price: "缺少适用 Priority 单价，按基础价估算",
+        missing_flex_price: "缺少适用 Flex 单价，按基础价估算",
         missing_base_price: "缺少基础价格，保留用量，金额未计费"
       };
       for (const reason of [pricing.tier_fallback, pricing.price_fallback].filter(Boolean))

@@ -16,6 +16,7 @@ type CustomPrice struct {
 }
 
 type PriceRow struct {
+	OfficialPrice     *OfficialModelPrice             `json:"official_price,omitempty"`
 	ServiceTierPrices map[string]ServiceTierPriceView `json:"service_tier_prices,omitempty"`
 	ModelID           string                          `json:"model_id"`
 	PriceRates
@@ -27,13 +28,24 @@ type PriceRow struct {
 // The browser supplies the current CPA model list for display only.
 // Display reads do not populate the call LRU.
 func (s *Store) ModelPriceRows(models []string, includeCustom bool) ([]PriceRow, error) {
+	return s.ModelPriceRowsWithOfficial(models, includeCustom, false)
+}
+
+func (s *Store) ModelPriceRowsWithOfficial(models []string, includeCustom, includeOfficial bool) ([]PriceRow, error) {
 	var custom map[string]CustomPrice
 	var references *referencePriceManager
+	var official OfficialPriceCatalog
 	s.read(func(state *State) {
 		custom = maps.Clone(state.Prices)
 		references = s.referencePrices.Load()
+		official = s.officialPrices
 	})
 	names := append([]string{}, models...)
+	if includeOfficial {
+		for _, price := range official.Models {
+			names = append(names, price.ModelID)
+		}
+	}
 	if includeCustom {
 		customModels := make([]string, 0, len(custom))
 		for _, price := range custom {
@@ -63,12 +75,19 @@ func (s *Store) ModelPriceRows(models []string, includeCustom bool) ([]PriceRow,
 		}
 		seen[key] = true
 		row := PriceRow{ModelID: name, Source: PriceSourceNone, InModels: available[key]}
+		if quote, found := official.lookup(name); found {
+			copy := cloneOfficialModel(quote)
+			row.OfficialPrice = &copy
+		}
 		billingModel := pricingState.ResolveBillingModel(name, name)
 		if price, found := custom[NormalizeModelID(billingModel)]; found {
 			row.PriceRates = price.PriceRates
 			row.ServiceTiers = cloneServiceTiers(price.ServiceTiers)
 			row.Source = PriceSourceCustom
 			row.CustomPriceModelID = price.ModelID
+		} else if price := official.resolve(name, name); price.Source == PriceSourceOfficial {
+			row.PriceRates, _ = price.officialModel.tokenRates("standard", official.ContextThreshold)
+			row.Source = PriceSourceOfficial
 		} else if rates, found := resolveBuiltinRates(billingModel); found {
 			row.PriceRates = rates
 			row.Source = PriceSourceBuiltin
@@ -89,6 +108,18 @@ func (s *Store) ModelPriceRows(models []string, includeCustom bool) ([]PriceRow,
 	}
 	for i := range rows {
 		rows[i].ServiceTierPrices = serviceTierPriceViews(rows[i].ModelID, rows[i].PriceRates, rows[i].Source)
+		if rows[i].Source == PriceSourceOfficial {
+			base := official.resolve(rows[i].ModelID, rows[i].ModelID)
+			for _, tier := range []string{"priority", "flex"} {
+				price, meta := resolveAPIServicePrice(base, rows[i].ModelID, UsageEvent{ResponseServiceTier: tier})
+				rates, _ := base.officialModel.tokenRates(tier, official.ContextThreshold)
+				limit := base.officialModel.tierLimit(tier, official.ContextThreshold, rates)
+				if limit > 0 {
+					price.LongContext = nil
+				}
+				rows[i].ServiceTierPrices[tier] = ServiceTierPriceView{Price: price, Method: meta.Method, RuleVersion: meta.RuleVersion, PriceFallback: meta.PriceFallback, MaxInputTokens: limit}
+			}
+		}
 	}
 	return rows, nil
 }
@@ -158,6 +189,9 @@ func (s *Store) ResolveModelPrice(upstream, requested string, refresh bool) (Pri
 		model = state.ResolveBillingModel(upstream, requested)
 		price = state.ResolveCustomPrice(model)
 		if price.Source == PriceSourceNone {
+			price = s.officialPrices.resolve(upstream, requested)
+		}
+		if price.Source == PriceSourceNone {
 			price = ResolveBuiltinPrice(model)
 		}
 		references = s.referencePrices.Load()
@@ -184,11 +218,14 @@ func (s *Store) ResolveModelPrice(upstream, requested string, refresh bool) (Pri
 		switched = s.referencePrices.Load() != references
 		model = state.ResolveBillingModel(upstream, requested)
 		price = state.ResolveCustomPrice(model)
+		if price.Source == PriceSourceNone {
+			price = s.officialPrices.resolve(upstream, requested)
+		}
 	})
 	if switched {
 		return Price{Source: PriceSourceNone}, model, fmt.Errorf("The reference price database changed; please retry")
 	}
-	if price.Source == PriceSourceCustom {
+	if price.Source == PriceSourceCustom || price.Source == PriceSourceOfficial {
 		return price, model, nil
 	}
 	if price = ResolveBuiltinPrice(model); price.Source != PriceSourceNone {

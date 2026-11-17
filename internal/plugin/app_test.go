@@ -95,7 +95,7 @@ func TestManagementRegistrationExposesOnlyCurrentEndpoints(t *testing.T) {
 	wantRoutes := map[string]bool{}
 	for _, value := range []string{
 		"GET /keys", "GET /plans", "GET /routes", "GET /credentials", "GET /prices", "GET /prices/reference",
-		"POST /prices/reference/refresh", "PUT /prices", "DELETE /prices", "GET /prices/reference/status",
+		"GET /prices/official/status", "POST /prices/official/refresh", "POST /prices/reference/refresh", "PUT /prices", "DELETE /prices", "GET /prices/reference/status",
 		"POST /plans", "PATCH /plans", "DELETE /plans",
 		"POST /routes", "PATCH /routes", "DELETE /routes", "PUT /keys/routes",
 		"POST /keys/bind", "POST /keys/unbind", "POST /keys/reset",

@@ -168,7 +168,8 @@ func TestV21MigrationPreservesHistoryAndRollsBack(t *testing.T) {
 			if !conflict {
 				ddl += `ALTER TABLE request_events DROP COLUMN requested_model;`
 			}
-			_, err := db.db.Exec(ddl + `PRAGMA user_version=20;
+			_, err := db.db.Exec(ddl + `DROP TABLE official_price_catalog;
+		PRAGMA user_version=20;
    INSERT INTO request_events(at,scope,failed,total_usd) VALUES(1,'a',0,.123),(2,'a',1,0),(3,'b',0,0);
    CREATE TRIGGER preserve_rows BEFORE UPDATE ON request_events BEGIN SELECT RAISE(ABORT,'rewritten'); END;
    CREATE TRIGGER preserve_deletes BEFORE DELETE ON request_events BEGIN SELECT RAISE(ABORT,'deleted'); END;`)

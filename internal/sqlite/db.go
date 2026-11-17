@@ -15,7 +15,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const schemaVersion = 21
+const schemaVersion = 22
 
 type DB struct {
 	db   *sql.DB
@@ -85,6 +85,11 @@ func (d *DB) initSchema(tx *sql.Tx) error {
 		fallthrough
 	case 20:
 		if err := migrateToV21(tx); err != nil {
+			return err
+		}
+		fallthrough
+	case 21:
+		if err := migrateToV22(tx); err != nil {
 			return err
 		}
 	case schemaVersion:

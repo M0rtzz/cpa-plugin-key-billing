@@ -860,5 +860,19 @@
   "dashboard.export_cancelled": "Export cancelled",
   "dashboard.excel_limit": "Excel row limit exceeded; narrow the filters",
   "dashboard.export_progress": "Read {count} / {total} records",
-  "dashboard.key_search": "Search key name / alias"
+  "dashboard.key_search": "Search key name / alias",
+  "ui.sync_official_prices": "Sync OpenAI prices",
+  "ui.syncing_official_prices": "Syncing official prices…",
+  "ui.official_price_status": "Official price status",
+  "ui.official_price": "OpenAI official",
+  "ui.view_official_price": "View official pricing",
+  "ui.official_prices_status": "OpenAI official: {count} models · updated {time}. Custom prices take precedence.",
+  "ui.official_prices_not_synced": "Official prices have not been synced. Sync all models published on the OpenAI pricing page.",
+  "ui.official_prices_synced": "Official prices synced: {count} models",
+  "ui.official_quote_available": "Official quote available",
+  "ui.official_display_only": "Quote only; incompatible billing units",
+  "ui.official_image_price_note": "Text input / image output rates; image token breakdown is unavailable",
+  "ui.pricing_reason_missing_flex_price": "Applicable Flex prices unavailable; base-price estimate",
+  "ui.pricing_method_official_tier": "Official tier prices",
+  "dashboard.method_official_tier": "Official tier price"
 }
