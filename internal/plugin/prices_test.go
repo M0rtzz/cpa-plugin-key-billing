@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"testing"
 
 	"cpa-key-billing/internal/billing"
@@ -66,6 +67,39 @@ func TestOfficialPriceStatusAndAccountIsolation(t *testing.T) {
 		if response.StatusCode != http.StatusNotFound {
 			t.Fatal("official admin route exposed to API keys", path, response.StatusCode)
 		}
+	}
+}
+
+func TestOfficialPriceRefreshUsesCredentialFreeHostHTTP(t *testing.T) {
+	app := newConfiguredApp(t)
+	body, err := os.ReadFile("../billing/testdata/openai_prices.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := http.StatusOK
+	app.SetHostCaller(func(method string, payload any) (json.RawMessage, error) {
+		request, ok := payload.(hostHTTPRequest)
+		if !ok || method != hostHTTPDo || request.URL != billing.OpenAIPricesURL || request.Method != http.MethodGet || request.HostCallbackID != "dummy-official-callback" || request.Headers.Get("Authorization") != "" || len(request.Body) != 0 {
+			t.Fatalf("unexpected official price request: %s, %+v", method, payload)
+		}
+		return json.Marshal(hostHTTPResponse{StatusCode: status, Body: body})
+	})
+	req := ManagementRequest{HostCallbackID: "dummy-official-callback"}
+	if result := app.refreshOfficialPrices(req); result.StatusCode != http.StatusOK {
+		t.Fatal(string(result.Body))
+	}
+	before := app.store.OfficialPriceMetadata()
+	price, _, err := app.store.ResolveModelPrice("gpt-image-2.6-flare", "gpt-image-2.6-flare", false)
+	if err != nil || price.Source != billing.PriceSourceOfficial || price.InputPer1M != 5 || price.OutputPer1M != 30 {
+		t.Fatal(price, err)
+	}
+	status = http.StatusForbidden
+	if result := app.refreshOfficialPrices(req); result.StatusCode == http.StatusOK {
+		t.Fatal("failed host download accepted")
+	}
+	after := app.store.OfficialPriceMetadata()
+	if !after.Usable || after.ContentHash != before.ContentHash || after.LastError == "" {
+		t.Fatal("last good snapshot lost", after)
 	}
 }
 

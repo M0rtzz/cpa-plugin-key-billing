@@ -74,7 +74,7 @@ var managementEndpoints = []managementEndpoint{
 	{http.MethodGet, routeOfficialPricesStatus, "View OpenAI official price status", func(a *App, _ ManagementRequest) ManagementResponse {
 		return JSONResponse(http.StatusOK, map[string]any{"metadata": a.store.OfficialPriceMetadata()})
 	}},
-	{http.MethodPost, routeOfficialPricesRefresh, "Sync OpenAI official model prices", func(a *App, _ ManagementRequest) ManagementResponse { return a.refreshOfficialPrices() }},
+	{http.MethodPost, routeOfficialPricesRefresh, "Sync OpenAI official model prices", (*App).refreshOfficialPrices},
 	{http.MethodDelete, routePrices, "Delete custom model pricing", (*App).deletePrice},
 	{http.MethodPut, routePrices, "Update model pricing", (*App).putPrices},
 	{http.MethodPost, routePlans, "Create subscription plan", (*App).createPlan},

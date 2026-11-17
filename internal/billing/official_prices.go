@@ -25,6 +25,12 @@ func (s *Store) OfficialPriceMetadata() OfficialPriceMetadata {
 // Download and parse within this management call. Billing keeps reading the
 // previous immutable snapshot until the complete replacement is committed.
 func (s *Store) RefreshOfficialPrices() (OfficialPriceRefreshResult, error) {
+	return s.RefreshOfficialPricesWithDownloader(s.downloadOfficialPrices)
+}
+
+// Management calls can use the host's HTTP bridge to inherit CPA's configured
+// proxy. The download still finishes synchronously before the snapshot write.
+func (s *Store) RefreshOfficialPricesWithDownloader(download func(context.Context) ([]byte, error)) (OfficialPriceRefreshResult, error) {
 	if !s.officialPriceSyncing.CompareAndSwap(false, true) {
 		return OfficialPriceRefreshResult{}, conflictf("Official price synchronization is already running")
 	}
@@ -38,7 +44,7 @@ func (s *Store) RefreshOfficialPrices() (OfficialPriceRefreshResult, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), referencePriceOperationTimeout)
 	defer cancel()
-	raw, err := s.downloadOfficialPrices(ctx)
+	raw, err := download(ctx)
 	next := before
 	changed := false
 	if err == nil {

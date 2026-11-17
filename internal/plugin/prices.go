@@ -2,7 +2,9 @@ package plugin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -78,8 +80,36 @@ func (a *App) refreshReferencePrices() ManagementResponse {
 	return JSONResponse(http.StatusOK, result)
 }
 
-func (a *App) refreshOfficialPrices() ManagementResponse {
-	result, err := a.store.RefreshOfficialPrices()
+func (a *App) refreshOfficialPrices(req ManagementRequest) ManagementResponse {
+	var result billing.OfficialPriceRefreshResult
+	var err error
+	if a.hostCaller == nil {
+		result, err = a.store.RefreshOfficialPrices()
+	} else {
+		result, err = a.store.RefreshOfficialPricesWithDownloader(func(ctx context.Context) ([]byte, error) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			raw, err := a.hostCaller(hostHTTPDo, hostHTTPRequest{
+				HostCallbackID: req.HostCallbackID, Method: http.MethodGet, URL: billing.OpenAIPricesURL,
+				Headers: http.Header{"Accept": {"text/markdown"}, "User-Agent": {"cpa-key-billing/official-pricing"}},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("Download OpenAI official prices through CPA: %w", err)
+			}
+			var response hostHTTPResponse
+			if err := json.Unmarshal(raw, &response); err != nil {
+				return nil, fmt.Errorf("Parse official price download: %w", err)
+			}
+			if response.StatusCode != http.StatusOK {
+				return nil, fmt.Errorf("OpenAI official pricing returned HTTP %d", response.StatusCode)
+			}
+			if len(response.Body) > 8<<20 {
+				return nil, fmt.Errorf("OpenAI official pricing response is too large")
+			}
+			return response.Body, ctx.Err()
+		})
+	}
 	if err != nil {
 		return errorResponse(err)
 	}
